@@ -1924,4 +1924,171 @@ function setPreviewRun(progress){const completed=progress>=100,statusText=comple
  window.addEventListener('hashchange',()=>{requestAnimationFrame(betaActivate);setTimeout(betaActivate,420)});
  betaActivate();
 })();
+</script>
+<style>
+/* Launch scenario consistency: retain the existing surfaces, only correct their data. */
+.launch-captures .frame-thumb{cursor:pointer;text-align:left}.launch-captures .frame-thumb[aria-current="true"]{border-color:var(--io-brand);box-shadow:0 0 0 2px var(--io-brand-soft)}
+.launch-screen-thumb{flex:0 0 208px!important;min-width:208px!important;min-height:154px!important;padding:0!important;background:var(--io-surface)!important}.launch-screen-thumb::before{display:none!important}.launch-screen-preview{height:108px;overflow:hidden;background:var(--io-bg);border-bottom:1px solid var(--io-border)}.launch-screen-chrome{display:flex;align-items:center;gap:4px;height:22px;padding:0 7px;border-bottom:1px solid var(--io-border);background:var(--io-surface)}.launch-screen-chrome i{width:4px;height:4px;border-radius:50%;background:var(--io-control-border)}.launch-screen-chrome span{overflow:hidden;margin-left:4px;color:var(--io-subtle);font:7px var(--io-mono);text-overflow:ellipsis;white-space:nowrap}.launch-mini-products,.launch-mini-plans{display:grid;grid-template-columns:repeat(3,1fr);gap:5px;padding:12px 9px}.launch-mini-products i,.launch-mini-plans i{display:block;height:54px;border:1px solid var(--io-border);border-radius:4px;background:linear-gradient(var(--io-raised) 0 55%,var(--io-surface) 55%)}.launch-mini-products i:nth-child(2),.launch-mini-plans i:nth-child(2){border:2px solid var(--io-brand);box-shadow:0 0 0 2px var(--io-selected)}.launch-mini-directory{padding:9px}.launch-mini-directory i{display:block;height:15px;margin-bottom:5px;border:1px solid var(--io-border);border-radius:3px;background:var(--io-surface)}.launch-mini-directory i:first-child{border-color:var(--io-brand);background:var(--io-selected)}.launch-mini-cookie{width:70%;margin:13px auto 0;padding:9px;border:1px solid var(--io-warning);border-radius:4px;background:var(--io-warning-bg)}.launch-mini-cookie i{display:block;width:80%;height:5px;margin:4px 0;border-radius:2px;background:var(--io-control-border)}.launch-screen-thumb .capture-label{padding:8px 10px;margin:0;font:9px/1.35 var(--io-mono)}.launch-screen-thumb .capture-label b,.launch-screen-thumb .capture-label small{display:block}.launch-screen-thumb .capture-label small{margin-top:2px;color:var(--io-subtle)}
+.launch-cookie-card{margin:20px;padding:20px;border:1px solid var(--io-warning);border-radius:9px;background:var(--io-warning-bg)}.launch-cookie-card p{margin:7px 0 15px;color:var(--io-muted)}.launch-cookie-card .dialog-actions{display:flex;gap:8px;flex-wrap:wrap}
+.launch-result-table td button{font:inherit;color:inherit;text-align:left}.launch-result-table .cell-source{color:var(--io-link);cursor:pointer}
+.runs-page .p2-open-id{display:grid;grid-template-columns:minmax(180px,1fr) auto;align-items:end;gap:10px;min-width:0}.runs-page .p2-open-id label{min-width:0}.runs-page .p2-open-id input{width:100%!important}.runs-page .ops-toolbar{grid-template-columns:minmax(420px,1fr) minmax(300px,390px) auto}
+.deploy-dialog:has([data-promote-confirm]){width:min(680px,calc(100vw - 32px))}.deploy-dialog:has([data-promote-confirm]) .deploy-shell{padding:26px}.deploy-dialog:has([data-promote-confirm]) .deploy-head{align-items:flex-start}.deploy-dialog:has([data-promote-confirm]) .deploy-head .icon-button{width:36px;height:36px;min-height:36px;flex:none}.promote-diff{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:22px 0}.promote-diff>.panel{display:block;min-width:0;padding:16px}.promote-diff b,.promote-diff small{display:block}.promote-diff b{margin-bottom:7px;font-size:18px}.promote-diff small{color:var(--io-muted);line-height:1.45}.deploy-dialog:has([data-promote-confirm]) .dialog-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:18px;border-top:1px solid var(--io-border)}
+@media(max-width:1050px){.runs-page .ops-toolbar{grid-template-columns:minmax(0,1fr) minmax(280px,.7fr)}.runs-page .system-runs{grid-column:1/-1}}
+@media(max-width:760px){.runs-page .ops-toolbar{grid-template-columns:minmax(0,1fr)}.runs-page .p2-open-id,.runs-page .system-runs{grid-column:1}.promote-diff{grid-template-columns:minmax(0,1fr)}}
+</style>
+<script>
+/* One resolver now drives Review plan, Watch run and Review data. */
+(()=>{
+ const launchEscape=value=>String(value??'').replace(/[&<>"']/g,char=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[char]));
+ const launchTemplateMap={prices:'compare',batch:'research',catalogue:'collect',suppliers:'discover'};
+ let launchScenarioName='compare',launchFields=[],launchResearchDisposition='pending';
+
+ const launchScenarios={
+  compare:{
+   label:'Compare',title:'Collecting competitor prices.',complete:'3 retailers checked. 1 field needs review.',status:'Partial',warning:'Availability for Trail Shop is unresolved—not rejected. The record remains in the dataset with its source and reason.',
+   fields:['retailer','product_name','price','currency','availability'],
+   steps:[['Open the three approved retailer pages','Render each page, retain the final URL and capture timestamp.','3 sources'],['Find the Trailhead 2P Tent','Read the matching product card on each retailer page.','≤ 6 pages'],['Extract one record per retailer','Require product identity and price evidence; keep honest unknowns.','3 records'],['Flag unsupported availability','Retain Trail Shop with availability set to unknown.','review']],
+   workers:[
+    {name:'Northwind Outdoors',domain:'northwind-outdoors.example',path:'/tents?page=2',state:'complete',detail:'In stock',quote:'Trailhead 2P Tent — €249.00 — In stock.'},
+    {name:'Summit Supply',domain:'summit-supply.example',path:'/camping/trailhead-two-person',state:'complete',detail:'Low stock',quote:'Trailhead Two-Person Tent — €239.95 — Low stock.'},
+    {name:'Trail Shop',domain:'trail-shop.example',path:'/search?q=trailhead',state:'review',detail:'Availability unresolved',quote:'Trailhead 2 Person — €259.00.'}
+   ],
+   rows:[
+    {retailer:'Northwind Outdoors',product_name:'Trailhead 2P Tent',price:'249.00',currency:'EUR',availability:'In stock',evidence:'Supported · page 2'},
+    {retailer:'Summit Supply',product_name:'Trailhead Two-Person Tent',price:'239.95',currency:'EUR',availability:'Low stock',evidence:'Supported · product page'},
+    {retailer:'Trail Shop',product_name:'Trailhead 2 Person',price:'259.00',currency:'EUR',availability:'Unknown',evidence:'Price supported · review field'}
+   ],captures:['Category page','Trailhead card','Product detail','Availability evidence']
+  },
+  research:{
+   label:'Research',title:'Researching SaaS pricing across domains.',complete:'4 pricing pages reviewed. 1 worker may need input.',status:'Needs input',warning:'Brevo paused at a cookie preference. Other workers and retained evidence remain available.',
+   fields:['company','pricing_url','starting_price','free_plan','free_trial'],
+   steps:[['Open each official SaaS domain','Retain final URLs and confirm first-party ownership.','4 domains'],['Locate the official pricing page','Inspect navigation and pricing-language links.','bounded'],['Extract plans and headline terms','Capture starting price, free plan and trial availability.','4 records'],['Pause on ambiguous consent','Ask for a cookie decision instead of guessing.','human input']],
+   workers:[
+    {name:'HubSpot',domain:'hubspot.com',path:'/pricing',state:'complete',detail:'Pricing read',quote:'Starter Customer Platform — starts at $15/month.'},
+    {name:'Mailchimp',domain:'mailchimp.com',path:'/pricing/marketing',state:'complete',detail:'4 plans',quote:'Free, Essentials, Standard and Premium plans.'},
+    {name:'Brevo',domain:'brevo.com',path:'/pricing',state:'input',detail:'Cookie choice',quote:'Cookie preferences must be selected before pricing is visible.'},
+    {name:'ActiveCampaign',domain:'activecampaign.com',path:'/pricing',state:'complete',detail:'Plans read',quote:'Starter plan — billed annually.'}
+   ],
+   rows:[
+    {company:'HubSpot',pricing_url:'hubspot.com/pricing',starting_price:'$15 / month',free_plan:'Yes',free_trial:'Yes',evidence:'Supported · pricing page'},
+    {company:'Mailchimp',pricing_url:'mailchimp.com/pricing/marketing',starting_price:'$13 / month',free_plan:'Yes',free_trial:'Yes',evidence:'Supported · plan cards'},
+    {company:'Brevo',pricing_url:'brevo.com/pricing',starting_price:'Unknown',free_plan:'Unknown',free_trial:'Unknown',evidence:'Cookie choice · needs input'},
+    {company:'ActiveCampaign',pricing_url:'activecampaign.com/pricing',starting_price:'$15 / month',free_plan:'No',free_trial:'Yes',evidence:'Supported · pricing page'}
+   ],captures:['Official homepage','Pricing navigation','Cookie choice','Plan cards']
+  },
+  collect:{
+   label:'Collect',title:'Collecting the Northwind tents catalogue.',complete:'3 typed product records collected.',status:'Succeeded',warning:'All visible category products were captured with their source page and typed fields.',
+   fields:['product_name','price','currency','availability','url'],
+   steps:[['Open the Northwind tents category','Render the category and retain its final URL.','1 source'],['Follow category pagination','Visit each allowed page exactly once.','2 pages'],['Extract every visible product card','Create typed product records with price and availability.','3 records'],['Validate the catalogue','Keep source URLs and field-level evidence.','complete']],
+   workers:[{name:'Northwind Outdoors',domain:'northwind-outdoors.example',path:'/tents?page=2',state:'complete',detail:'2 pages read',quote:'Trailhead 2P Tent — €249.00 — In stock.'}],
+   rows:[
+    {product_name:'Summit Solo Tent',price:'179.00',currency:'EUR',availability:'In stock',url:'northwind-outdoors.example/tents/summit-solo',evidence:'Supported · page 1'},
+    {product_name:'Trailhead 2P Tent',price:'249.00',currency:'EUR',availability:'In stock',url:'northwind-outdoors.example/tents/trailhead-2p',evidence:'Supported · page 2'},
+    {product_name:'Basecamp 4 Tent',price:'399.00',currency:'EUR',availability:'In stock',url:'northwind-outdoors.example/tents/basecamp-4',evidence:'Supported · page 2'}
+   ],captures:['Category page 1','Pagination action','Category page 2','Product cards']
+  },
+  discover:{
+   label:'Discover',title:'Discovering qualified Worthington suppliers.',complete:'3 qualified supplier records prepared.',status:'Succeeded',warning:'Candidates are deduplicated and retain the directory or detail-page evidence used to qualify them.',
+   fields:['business_name','location','product_categories','minimum_order','qualification'],
+   steps:[['Open the Worthington directory','Read public listings and retain the search page.','1 directory'],['Visit supplier detail pages','Inspect visible location and category information.','3 pages'],['Apply qualification criteria','Keep candidates matching outdoor-equipment requirements.','3 records'],['Deduplicate and retain evidence','Merge repeated businesses without losing source citations.','complete']],
+   workers:[
+    {name:'Worthington directory',domain:'directory.example',path:'/worthington/outdoor-suppliers',state:'complete',detail:'Listings read',quote:'Outdoor equipment suppliers in Worthington, Minnesota.'},
+    {name:'Business details',domain:'directory.example',path:'/business/north-star-wholesale',state:'complete',detail:'Details read',quote:'North Star Wholesale — outdoor equipment and seasonal inventory.'}
+   ],
+   rows:[
+    {business_name:'Worthington Outdoor Supply',location:'Worthington, MN',product_categories:'Camping, tents',minimum_order:'$500',qualification:'Qualified',evidence:'Supported · directory + detail'},
+    {business_name:'Prairie Industrial Supply',location:'Worthington, MN',product_categories:'Workwear, outdoor',minimum_order:'Unknown',qualification:'Review',evidence:'Category supported · MOQ unknown'},
+    {business_name:'North Star Wholesale',location:'Worthington, MN',product_categories:'Outdoor equipment',minimum_order:'$1,000',qualification:'Qualified',evidence:'Supported · business detail'}
+   ],captures:['Directory results','Candidate listing','Business detail','Qualification evidence']
+  }
+ };
+
+ function launchDetectScenario(){
+  const selected=document.querySelector('[data-beta-template][aria-selected="true"]')?.dataset.betaTemplate;
+  if(launchTemplateMap[selected])return launchTemplateMap[selected];
+  const prompt=((activeAuthoring==='prompt'?document.getElementById('agent-prompt')?.value:document.getElementById('task-goal')?.value)||'')+'\n'+(document.getElementById('sources')?.value||'');
+  if(/hubspot|mailchimp|brevo|activecampaign|saas|pricing page|nested plans|pricing across domains/i.test(prompt))return 'research';
+  if(/catalog|category|pagination|collect(?:ing)?\s+(?:the\s+)?products/i.test(prompt)||location.hash==='#collect')return 'collect';
+  if(/qualified suppliers?|business directory|worthington|contractors?|deduplicat(?:e|ing).*business/i.test(prompt))return 'discover';
+  if(/compare|competitor|retailer|trailhead|same product|northwind-outdoors|summit-supply|trail-shop/i.test(prompt))return 'compare';
+  if(launchTemplateMap[currentPatternKey])return launchTemplateMap[currentPatternKey];
+  return 'compare';
+ }
+ function launchScenario(){return launchScenarios[launchScenarioName]||launchScenarios.compare}
+ function launchFieldLabel(field){return field.replace(/_/g,' ').replace(/\b\w/g,char=>char.toUpperCase())}
+ function launchDetectedFields(scenario){
+  return scenario.fields.slice();
+ }
+ function launchProductPage(worker){
+  const brand=launchEscape(worker.name),focus=/trail-shop/i.test(worker.domain)?'Availability not stated':'Reading product card';
+  return '<div class="source-brand run-brand"><b>'+brand+'</b><span>Tents&nbsp;&nbsp; Packs&nbsp;&nbsp; Equipment</span></div><div class="run-products"><article class="run-product"><div class="run-product-image"></div><b>Summit Solo Tent</b><small>1 person · ultralight</small><strong>€179.00</strong></article><article class="run-product agent-focus"><span class="agent-label">'+focus+'</span><div class="run-product-image"></div><b>Trailhead 2P Tent</b><small>2 person · 3 season</small><strong>'+(/summit/i.test(worker.domain)?'€239.95 · Low stock':/trail-shop/i.test(worker.domain)?'€259.00 · Availability unknown':'€249.00 · In stock')+'</strong></article><article class="run-product"><div class="run-product-image"></div><b>Basecamp 4 Tent</b><small>4 person · family</small><strong>€399.00</strong></article></div>';
+ }
+ function launchPricingPage(worker){
+  if(/brevo/i.test(worker.domain)&&launchResearchDisposition==='pending')return '<div class="source-brand run-brand"><b>Brevo</b><span>Products&nbsp;&nbsp; Solutions&nbsp;&nbsp; Pricing</span></div><div class="launch-cookie-card"><span class="agent-label">Needs input</span><h3>Choose cookie preferences</h3><p>The worker stopped safely because this choice changes browser state.</p><div class="dialog-actions"><button class="button primary" data-cookie-action="accept">Accept necessary only</button><button class="button" data-cookie-action="skip">Skip domain</button><button class="button" data-cookie-action="control">Take control</button></div></div>';
+  return '<div class="source-brand run-brand"><b>'+launchEscape(worker.name)+'</b><span>Products&nbsp;&nbsp; Solutions&nbsp;&nbsp; Pricing</span></div><div class="run-products"><article class="run-product"><b>Free</b><small>Core features</small><strong>$0</strong></article><article class="run-product agent-focus"><span class="agent-label">Reading plan card</span><b>Starter</b><small>Annual billing</small><strong>$15 / month</strong></article><article class="run-product"><b>Business</b><small>Advanced limits</small><strong>Contact sales</strong></article></div>';
+ }
+ function launchDirectoryPage(worker){return '<div class="source-brand run-brand"><b>Worthington supplier directory</b><span>Directory&nbsp;&nbsp; Categories&nbsp;&nbsp; Details</span></div><div class="run-products"><article class="run-product agent-focus"><span class="agent-label">Reading candidate</span><b>Worthington Outdoor Supply</b><small>Camping · tents · Worthington, MN</small><strong>Qualified</strong></article><article class="run-product"><b>Prairie Industrial Supply</b><small>Workwear · outdoor</small><strong>Review MOQ</strong></article><article class="run-product"><b>North Star Wholesale</b><small>Outdoor equipment</small><strong>Qualified</strong></article></div>'}
+ function launchBrowserPage(scenario,worker){return scenario===launchScenarios.research?launchPricingPage(worker):scenario===launchScenarios.discover?launchDirectoryPage(worker):launchProductPage(worker)}
+ function launchTimeline(scenario,worker){
+  const items=scenario===launchScenarios.research?[['Opened official domain','Final URL and capture retained.'],['Located the pricing page','Navigation and page links inspected.'],[worker.state==='input'&&launchResearchDisposition==='pending'?'Waiting for cookie choice':'Read pricing cards',worker.state==='input'&&launchResearchDisposition==='pending'?'The worker paused without guessing.':'Plan terms and evidence retained.']]:scenario===launchScenarios.collect?[['Opened Northwind category','Category page and final URL retained.'],['Followed pagination','Product cards on page 2 inspected.'],['Extracted typed records','Price, availability and URLs retained.']]:scenario===launchScenarios.discover?[['Opened Worthington directory','Public listings retained.'],['Visited business details','Qualification fields inspected.'],['Deduplicated candidates','Evidence remains linked to each record.']]:[['Opened approved retailer','Final URL and capture retained.'],['Read the product page','The requested product card was inspected.'],['Extracted retailer record',worker.detail+'; evidence retained.']];
+  return items.map((item,index)=>'<li><span class="step-check '+(index===items.length-1?'current':'')+'">'+(index===items.length-1?'•':'✓')+'</span><div><b>'+item[0]+'</b><small>'+item[1]+'</small></div></li>').join('')
+ }
+ function launchWorkerTabs(scenario){return scenario.workers.map((worker,index)=>'<button type="button" data-launch-worker="'+launchEscape(worker.domain)+'" aria-selected="'+(index===0?'true':'false')+'">'+launchEscape(worker.name)+' · '+(worker.state==='input'?'needs input':worker.state==='review'?'review':'complete')+'</button>').join('')}
+ function launchRecords(scenario){return scenario.rows.map((row,index)=>{const title=row.retailer||row.company||row.product_name||row.business_name;const detail=row.price?(row.currency==='EUR'?'€':'')+row.price+' · '+(row.availability||''):row.starting_price||row.location||row.qualification;return '<div class="record-pill"><b>'+launchEscape(title)+'</b><small>'+launchEscape(detail)+' · '+launchEscape(row.evidence)+'</small></div>'}).join('')}
+ function launchThumbMarkup(scenario,label,index,worker){
+  const isCookie=scenario===launchScenarios.research&&/cookie/i.test(label),body=isCookie?'<div class="launch-mini-cookie"><i></i><i></i><i></i></div>':scenario===launchScenarios.research?'<div class="launch-mini-plans"><i></i><i></i><i></i></div>':scenario===launchScenarios.discover?'<div class="launch-mini-directory"><i></i><i></i><i></i><i></i></div>':'<div class="launch-mini-products"><i></i><i></i><i></i></div>';
+  return '<div class="launch-screen-preview"><div class="launch-screen-chrome"><i></i><i></i><i></i><span>'+launchEscape(worker.domain)+'</span></div>'+body+'</div><span class="capture-label"><b>'+String(index+1).padStart(2,'0')+' · '+launchEscape(label)+'</b><small>'+launchEscape(worker.domain)+'</small></span>'
+ }
+ function launchCaptures(scenario){return '<section class="panel records-preview launch-captures"><div class="panel-title"><h2>Evidence captures</h2><span class="mono">'+scenario.captures.length+' RETAINED</span></div><div class="frame-strip">'+scenario.captures.map((label,index)=>{const worker=scenario.workers[index%scenario.workers.length];return '<button class="frame-thumb launch-screen-thumb" type="button" data-launch-capture="'+index+'" aria-current="'+(index===scenario.captures.length-1?'true':'false')+'">'+launchThumbMarkup(scenario,label,index,worker)+'</button>'}).join('')+'</div></section>'}
+ function launchBindBrowser(scenario){
+  const browser=unifiedFlow.querySelector('.sample-browser'),title=unifiedFlow.querySelector('.run-board>.panel .panel-title h2'),domain=unifiedFlow.querySelector('.run-board>.panel .panel-title .mono'),address=unifiedFlow.querySelector('.run-board>.panel .address span'),timeline=unifiedFlow.querySelector('.activity.timeline'),timelineStatus=unifiedFlow.querySelector('.run-board>aside .panel-title span');
+  const select=worker=>{if(!worker)return;unifiedFlow.querySelectorAll('[data-launch-worker]').forEach(button=>button.setAttribute('aria-selected',String(button.dataset.launchWorker===worker.domain)));title.textContent='Live browser · '+worker.name+' worker';domain.textContent=worker.domain;address.textContent='https://'+worker.domain+worker.path;browser.innerHTML=launchBrowserPage(scenario,worker);timeline.innerHTML=launchTimeline(scenario,worker);timelineStatus.className=worker.state==='input'&&launchResearchDisposition==='pending'?'chip-state warn':'chip-state success';timelineStatus.textContent=worker.state==='input'&&launchResearchDisposition==='pending'?'Needs input':'Complete';browser.querySelectorAll('[data-cookie-action]').forEach(button=>button.onclick=()=>{const action=button.dataset.cookieAction;if(action==='accept'){launchResearchDisposition='accepted';scenario.rows[2]={...scenario.rows[2],starting_price:'€9 / month',free_plan:'Yes',free_trial:'No',evidence:'Supported · pricing page'};select(worker)}else if(action==='skip'){launchResearchDisposition='skipped';scenario.rows[2]={...scenario.rows[2],starting_price:'Skipped',free_plan:'Unknown',free_trial:'Unknown',evidence:'Skipped by user'};select(worker)}else{button.closest('.launch-cookie-card').innerHTML='<span class="agent-label">You have control</span><h3>Browser control handed to you</h3><p>Finish the cookie choice, then hand the page back to Studio.</p><button class="button primary" data-hand-back>Hand back to Studio</button>';browser.querySelector('[data-hand-back]').onclick=()=>{launchResearchDisposition='accepted';scenario.rows[2]={...scenario.rows[2],starting_price:'€9 / month',free_plan:'Yes',free_trial:'No',evidence:'Supported · pricing page'};select(worker)}}})};
+  unifiedFlow.querySelectorAll('[data-launch-worker]').forEach(button=>button.onclick=()=>select(scenario.workers.find(worker=>worker.domain===button.dataset.launchWorker)));
+  unifiedFlow.querySelectorAll('[data-launch-capture]').forEach(button=>button.onclick=()=>{unifiedFlow.querySelectorAll('[data-launch-capture]').forEach(item=>item.setAttribute('aria-current',String(item===button)));select(scenario.workers[Number(button.dataset.launchCapture)%scenario.workers.length]);browser.closest('.panel').scrollIntoView({behavior:'smooth',block:'start'})});
+  select(scenario.workers[0]);
+ }
+
+ const launchBaseShowPlan=showPlan;
+ showPlan=function(){
+  launchScenarioName=launchDetectScenario();launchBaseShowPlan();const scenario=launchScenario();launchFields=launchDetectedFields(scenario);
+  const steps=unifiedFlow.querySelectorAll('.plan-step');scenario.steps.forEach((step,index)=>{const row=steps[index];if(!row)return;row.querySelector('b').textContent=step[0];row.querySelector('small').textContent=step[1];row.querySelector('code').textContent=step[2]});
+  const schema=unifiedFlow.querySelector('#schema-editor')||unifiedFlow.querySelector('.schema-preview');if(schema){const heading=schema.querySelector('.eyebrow, h3');schema.querySelectorAll('.schema-edit-row,.schema-chip').forEach(row=>row.remove());launchFields.forEach(field=>schema.insertAdjacentHTML('beforeend','<div class="schema-chip"><span>'+launchEscape(field)+'</span><small>'+(/price/.test(field)?'number':/currency/.test(field)?'code':'text')+'</small></div>'));if(heading)heading.textContent='OUTPUT SCHEMA'}
+  const estimate=unifiedFlow.querySelector('.flow-head>p,.beta-plan-head-actions>p');if(estimate)estimate.textContent='ESTIMATED · '+scenario.workers.length+' SOURCE'+(scenario.workers.length===1?'':'S');
+ };
+
+ showRun=function(){
+  launchScenarioName=launchDetectScenario();const scenario=launchScenario();if(!launchFields.length)launchFields=launchDetectedFields(scenario);setWorkflowStage(2);
+  unifiedFlow.innerHTML='<div class="run-intro"><p class="eyebrow">RUN PREVIEW · RUN_7F3A</p><h2>'+launchEscape(scenario.title)+'</h2><p>Studio is browsing the requested sources, extracting records and preserving evidence as it works.</p></div>'+(scenario===launchScenarios.research?'<section class="intervention"><div><b>Brevo may need a cookie decision</b><small>Completed domains continue while that worker waits.</small></div><button class="button" type="button" data-open-brevo>Review worker</button></section>':'')+'<div class="run-board"><section class="panel"><div class="panel-title"><h2>Live browser</h2><span class="mono"></span></div><div class="worker-tabs">'+launchWorkerTabs(scenario)+'</div><div class="browser-chrome"><div class="browser-dots"><i></i><i></i><i></i></div><div class="address"><span></span></div><span class="status">Live capture</span></div><div class="sample-browser live"></div></section><aside class="panel"><div class="panel-title"><h2>Worker timeline</h2><span class="status">Running</span></div><ol class="activity timeline"></ol></aside></div><section class="panel records-preview"><div class="panel-title"><h2>Records found</h2><span class="status">Updating live</span></div><div class="record-pills">'+launchRecords(scenario)+'</div></section>'+launchCaptures(scenario)+'<div class="flow-actions" style="background:var(--io-surface);border:1px solid var(--io-border);border-radius:10px"><span>Static concept · no website is contacted</span><button class="button" data-back-plan>Back to plan</button><button class="button primary" data-finish-preview>Review data →</button></div>';
+  unifiedFlow.querySelector('[data-back-plan]').onclick=showPlan;unifiedFlow.querySelector('[data-finish-preview]').onclick=showResult;unifiedFlow.querySelector('[data-open-brevo]')?.addEventListener('click',()=>unifiedFlow.querySelector('[data-launch-worker="brevo.com"]')?.click());launchBindBrowser(scenario);conceptStepper.scrollIntoView({behavior:'smooth',block:'start'});
+ };
+
+ function launchCell(field,value,row){const display=(field==='price'&&row.currency==='EUR'?'€':'')+String(value??'Unknown');return '<td><button type="button" class="text-button" data-launch-evidence="'+launchEscape(field)+'" data-launch-value="'+launchEscape(value)+'" data-launch-source="'+launchEscape(row.pricing_url||row.url||row.retailer||row.company||row.business_name||'source')+'">'+launchEscape(display)+'</button></td>'}
+ function launchTable(scenario){return '<table class="launch-result-table"><thead><tr>'+launchFields.map(field=>'<th>'+launchFieldLabel(field)+'</th>').join('')+'<th>Evidence</th></tr></thead><tbody>'+scenario.rows.map(row=>'<tr>'+launchFields.map(field=>launchCell(field,row[field]??'Unknown',row)).join('')+'<td class="cell-source"><button type="button" class="text-button" data-launch-evidence="evidence" data-launch-value="'+launchEscape(row.evidence)+'" data-launch-source="'+launchEscape(row.pricing_url||row.url||row.retailer||row.company||row.business_name||'source')+'">'+launchEscape(row.evidence)+'</button></td></tr>').join('')+'</tbody></table>'}
+ function launchEvidenceCards(scenario){return '<div class="frame-strip launch-captures">'+scenario.captures.map((capture,index)=>{const worker=scenario.workers[index%scenario.workers.length];return '<div class="frame-thumb launch-screen-thumb">'+launchThumbMarkup(scenario,capture,index,worker)+'</div>'}).join('')+'</div>'}
+ showResult=function(){
+  const scenario=launchScenario();setWorkflowStage(3);const table=launchTable(scenario);
+  unifiedFlow.innerHTML='<div class="flow-panel"><div class="flow-head"><div><p class="eyebrow">PREVIEW COMPLETE · RUN_7F3A</p><h2>'+launchEscape(scenario.complete)+'</h2></div><span class="status '+(scenario.status==='Succeeded'?'success':'')+'">'+launchEscape(scenario.status)+'</span></div><div class="result-warning"><b>'+launchEscape(scenario.warning)+'</b></div><div class="result-header"><div class="result-tabs"><button type="button" data-result-tab="table" aria-selected="true">Table</button><button type="button" data-result-tab="json" aria-selected="false">JSON</button><button type="button" data-result-tab="evidence" aria-selected="false">Evidence screens</button></div><span class="mono">'+scenario.rows.length+' RECORDS · '+launchFields.length+' FIELDS</span></div><div id="unified-result-content">'+table+'</div><aside class="evidence-drawer" id="launch-evidence-drawer"><p class="eyebrow">FIELD EVIDENCE</p><h3>Select a value to inspect its evidence</h3><p class="proof-evidence"><span class="quote-mark">“</span><span>Retained source quotes remain linked to every supported value.</span></p></aside><div class="flow-actions"><span>Preview only · review before saving</span><button class="button" data-edit-request>Edit request</button><button class="button primary" data-save-pipeline>Save pipeline</button></div><div id="unified-save" class="save-notice"><b>Pipeline saved.</b> This local concept has not scheduled a live run.</div></div>';
+  const area=unifiedFlow.querySelector('#unified-result-content');const bindEvidence=()=>area.querySelectorAll('[data-launch-evidence]').forEach(button=>button.onclick=()=>{const drawer=unifiedFlow.querySelector('#launch-evidence-drawer');drawer.querySelector('h3').textContent=launchFieldLabel(button.dataset.launchEvidence);drawer.querySelector('.proof-evidence span:last-child').innerHTML='<b>“'+launchEscape(button.dataset.launchValue)+'”</b><br><small>'+launchEscape(button.dataset.launchSource)+' · supported by retained capture</small>';drawer.scrollIntoView({behavior:'smooth',block:'nearest'})});bindEvidence();
+  unifiedFlow.querySelectorAll('[data-result-tab]').forEach(button=>button.onclick=()=>{unifiedFlow.querySelectorAll('[data-result-tab]').forEach(item=>item.setAttribute('aria-selected',String(item===button)));if(button.dataset.resultTab==='table'){area.innerHTML=table;bindEvidence()}else if(button.dataset.resultTab==='json')area.innerHTML='<pre>'+launchEscape(JSON.stringify({scenario:launchScenarioName,status:scenario.status.toLowerCase().replace(' ','_'),records:scenario.rows},null,2))+'</pre>';else area.innerHTML=launchEvidenceCards(scenario)});
+  unifiedFlow.querySelector('[data-edit-request]').onclick=()=>{setWorkflowStage(0);workflowGrid.scrollIntoView({behavior:'smooth',block:'start'})};unifiedFlow.querySelector('[data-save-pipeline]').onclick=event=>{unifiedFlow.querySelector('#unified-save').classList.add('show');event.currentTarget.disabled=true;event.currentTarget.textContent='Pipeline saved'};conceptStepper.scrollIntoView({behavior:'smooth',block:'start'});
+ };
+
+ /* The operational run detail uses the same Compare browser, instead of SaaS plan cards. */
+ const launchBasePageSketch=pageSketch;
+ pageSketch=function(source,mode='live'){
+  if(source&&/northwind-outdoors|summit-supply|trail-shop/i.test(source.domain||''))return launchProductPage({name:source.label||source.name||source.domain,domain:source.domain,path:source.path||'/'});
+  return launchBasePageSketch(source,mode);
+ };
+ function launchRepairOperationalRun(){
+  if(location.hash!=='#run-detail')return;const page=document.querySelector('#run-detail');if(!page||!/Competitor prices|northwind-outdoors|summit-supply|trail-shop/i.test(page.textContent))return;
+  const address=page.querySelector('.address span'),domain=(address?.textContent.match(/(?:https?:\/\/)?([^/]+)/)||[])[1]||'northwind-outdoors.example',worker=launchScenarios.compare.workers.find(item=>item.domain===domain)||launchScenarios.compare.workers[0],sample=page.querySelector('.sample-browser');
+  if(sample)sample.innerHTML=launchProductPage(worker);if(address)address.textContent='https://'+worker.domain+worker.path;
+  const browserTitle=page.querySelector('.run-board>.panel .panel-title h2');if(browserTitle)browserTitle.textContent='Live browser · '+worker.name+' worker';
+  const labels=launchScenarios.compare.captures;page.querySelectorAll('.frame-thumb').forEach((thumb,index)=>{const label=labels[index%labels.length];thumb.classList.add('launch-screen-thumb');thumb.innerHTML=launchThumbMarkup(launchScenarios.compare,label,index,worker)});
+  const timeline=page.querySelector('.activity.timeline');if(timeline)timeline.innerHTML=launchTimeline(launchScenarios.compare,worker);
+ }
+ const launchRefreshOperational=()=>{setTimeout(launchRepairOperationalRun,120);setTimeout(launchRepairOperationalRun,650)};
+ window.addEventListener('hashchange',launchRefreshOperational);document.addEventListener('click',event=>{if(event.target.closest('#run-detail,.runs-page'))launchRefreshOperational()});
+ requestAnimationFrame(()=>{if(location.hash==='#run-detail'&&typeof selectRunSource==='function'&&typeof liveRunDomain!=='undefined')selectRunSource(liveRunDomain);launchRefreshOperational()});
+})();
 </script></body></html>
