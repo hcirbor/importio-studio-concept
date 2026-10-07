@@ -2100,6 +2100,20 @@ function setPreviewRun(progress){const completed=progress>=100,statusText=comple
 @media(prefers-reduced-motion:reduce){.expanded-run,.expanded-run *{scroll-behavior:auto!important;animation-duration:.01ms!important;transition-duration:.01ms!important}}
 .expanded-run [data-expand-run]{display:none}
 .expanded-state-slot>.intervention{display:flex;flex-direction:column;align-items:stretch}.expanded-state-slot>.intervention .button{width:100%;white-space:normal}.expanded-state-slot>.intervention>div{width:100%}
+html.expanded-run-open,html.expanded-run-open body,html:has(.expanded-run[open]),body:has(.expanded-run[open]){width:100%;height:100%;overflow:hidden!important;overscroll-behavior:none}
+.expanded-run{position:fixed;inset:12px;box-sizing:border-box;margin:auto;overscroll-behavior:none}
+.expanded-run-shell{width:100%;min-width:0;min-height:0;overflow:hidden}
+.expanded-run-body{width:100%;min-width:0;min-height:0;overflow:hidden}
+.expanded-run-left{overflow:hidden}
+.expanded-worker-slot{flex:0 0 auto;min-width:0;overflow:hidden}
+.expanded-worker-slot .worker-tabs{max-width:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain}
+.expanded-timeline-slot{flex:1 1 auto;min-width:0;min-height:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.expanded-state-slot{flex:0 0 auto;min-width:0;overflow:hidden}
+.expanded-run-right{width:auto;max-width:none;margin:0;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.expanded-browser-slot,.expanded-captures-slot{min-width:0;max-width:100%}
+.expanded-browser-slot>.panel,.expanded-captures-slot>.panel{width:100%;max-width:100%;box-sizing:border-box}
+.expanded-captures-slot .frame-strip{max-width:100%;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain}
+@media(max-width:760px){.expanded-run{inset:6px}.expanded-run-left{overflow:hidden}.expanded-timeline-slot{overflow-x:auto;overflow-y:hidden;scrollbar-gutter:auto}.expanded-run-right{overflow-x:hidden;overflow-y:auto}}
 </style>
 <script>
 (()=>{
