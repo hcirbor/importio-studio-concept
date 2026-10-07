@@ -1933,8 +1933,10 @@ function setPreviewRun(progress){const completed=progress>=100,statusText=comple
 .launch-result-table td button{font:inherit;color:inherit;text-align:left}.launch-result-table .cell-source{color:var(--io-link);cursor:pointer}
 .runs-page .p2-open-id{display:grid;grid-template-columns:minmax(180px,1fr) auto;align-items:end;gap:10px;min-width:0}.runs-page .p2-open-id label{min-width:0}.runs-page .p2-open-id input{width:100%!important}.runs-page .ops-toolbar{grid-template-columns:minmax(420px,1fr) minmax(300px,390px) auto}
 .deploy-dialog:has([data-promote-confirm]){width:min(680px,calc(100vw - 32px))}.deploy-dialog:has([data-promote-confirm]) .deploy-shell{padding:26px}.deploy-dialog:has([data-promote-confirm]) .deploy-head{align-items:flex-start}.deploy-dialog:has([data-promote-confirm]) .deploy-head .icon-button{width:36px;height:36px;min-height:36px;flex:none}.promote-diff{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:22px 0}.promote-diff>.panel{display:block;min-width:0;padding:16px}.promote-diff b,.promote-diff small{display:block}.promote-diff b{margin-bottom:7px;font-size:18px}.promote-diff small{color:var(--io-muted);line-height:1.45}.deploy-dialog:has([data-promote-confirm]) .dialog-actions{display:flex;justify-content:flex-end;gap:10px;padding-top:18px;border-top:1px solid var(--io-border)}
+.destination-grid{align-items:start}.destination-grid>[data-aperture]{grid-column:1/-1;display:grid;grid-template-columns:minmax(170px,.7fr) minmax(340px,1.5fr) minmax(120px,.45fr) auto;align-items:center;align-content:center;gap:18px;min-height:0;padding:18px 20px}.destination-grid>[data-aperture]>.panel-title{min-width:0;padding:0;border:0}.destination-grid>[data-aperture]>.panel-title h3{margin:0}.destination-grid>[data-aperture] .aperture-map{display:flex;min-width:0;gap:8px;flex-wrap:wrap}.destination-grid>[data-aperture] .aperture-map span{max-width:100%;padding:7px 9px;border:1px solid var(--io-border);border-radius:6px;background:var(--io-bg);font:11px var(--io-mono);overflow-wrap:anywhere}.destination-grid>[data-aperture]>small{white-space:nowrap}.destination-grid>[data-aperture]>.button{justify-self:end;width:auto;white-space:nowrap}
 @media(max-width:1050px){.runs-page .ops-toolbar{grid-template-columns:minmax(0,1fr) minmax(280px,.7fr)}.runs-page .system-runs{grid-column:1/-1}}
-@media(max-width:760px){.runs-page .ops-toolbar{grid-template-columns:minmax(0,1fr)}.runs-page .p2-open-id,.runs-page .system-runs{grid-column:1}.promote-diff{grid-template-columns:minmax(0,1fr)}}
+@media(max-width:900px){.destination-grid>[data-aperture]{grid-template-columns:minmax(150px,.7fr) minmax(240px,1.3fr) auto}.destination-grid>[data-aperture]>small{grid-column:1}.destination-grid>[data-aperture]>.button{grid-column:3;grid-row:1/3}}
+@media(max-width:760px){.runs-page .ops-toolbar{grid-template-columns:minmax(0,1fr)}.runs-page .p2-open-id,.runs-page .system-runs{grid-column:1}.promote-diff{grid-template-columns:minmax(0,1fr)}.destination-grid>[data-aperture]{grid-column:1;grid-template-columns:minmax(0,1fr);gap:12px}.destination-grid>[data-aperture]>small,.destination-grid>[data-aperture]>.button{grid-column:1;grid-row:auto}.destination-grid>[data-aperture]>.button{justify-self:stretch;width:100%}}
 </style>
 <script>
 /* One resolver now drives Review plan, Watch run and Review data. */
@@ -2074,8 +2076,8 @@ function setPreviewRun(progress){const completed=progress>=100,statusText=comple
  };
 
  /* The operational run detail uses the same Compare browser, instead of SaaS plan cards. */
- const launchBasePageSketch=pageSketch;
- pageSketch=function(source,mode='live'){
+ const launchBasePageSketch=typeof pageSketch==='function'?pageSketch:null;
+ if(launchBasePageSketch)pageSketch=function(source,mode='live'){
   if(source&&/northwind-outdoors|summit-supply|trail-shop/i.test(source.domain||''))return launchProductPage({name:source.label||source.name||source.domain,domain:source.domain,path:source.path||'/'});
   return launchBasePageSketch(source,mode);
  };
