@@ -6,7 +6,6 @@ html { background: var(--io-color-background); }
 body { min-width: 320px; }
 button, a, select, textarea { font: inherit; }
 a { text-decoration: none; }
-button { color: inherit; }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
 .sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; border-right: 1px solid var(--io-color-border); background: var(--io-color-surface); padding: 0 14px 14px; }
 .brand { height: 72px; display: flex; align-items: center; gap: 9px; color: var(--io-color-foreground); font-size: 24px; font-weight: 750; letter-spacing: -.045em; }
@@ -178,6 +177,7 @@ main { min-width: 0; padding: 38px 34px 64px; }
 .form-error { margin: -8px 20px 16px; color: var(--io-color-danger); font-size: 12px; }
 .dialog-form { display: grid; gap: 16px; }
 .dialog-form label { display: grid; gap: 7px; color: var(--io-color-subtle); font: 600 10px/1.4 var(--io-font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.dialog-file-note { margin: -4px 0 0; color: var(--io-color-success); font: 500 11px/1.4 var(--io-font-mono); }
 .secret-reveal { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin: 0 0 16px; padding: 12px 14px; border: 1px solid var(--io-color-primary); border-radius: 8px; background: var(--io-color-selected); }
 .secret-reveal code { overflow: hidden; color: var(--io-color-link); font: 12px var(--io-font-mono); text-overflow: ellipsis; white-space: nowrap; }
 .ops-toolbar input, .ops-toolbar select, .run-filters input, .run-filters select, .search-bar input, .search-bar select, .form-grid input, .form-grid select, .condition-row input, .panel-body select { min-height: 38px; padding: 0 12px; border: 1px solid var(--io-color-border); border-radius: 6px; background: var(--io-color-surface); color: var(--io-color-foreground); }
@@ -375,6 +375,7 @@ main { min-width: 0; padding: 38px 34px 64px; }
 @media (prefers-reduced-motion: reduce) {
   .workflow-card { transition: none; }
   .source-chip.pulse { animation: none; }
+  .hero-graphic .signal, .hero-graphic .source-node, .hero-graphic .result-node, .hero-graphic .hero-hub { animation: none; }
 }
 
 /* Hosted concept parity — ?v=8354d68 is the visual source of truth. */
@@ -431,7 +432,18 @@ main { padding: 30px 32px 64px; }
 .hero-graphic .accent { fill: var(--io-color-brand); }
 .hero-graphic .tint { fill: var(--io-color-selected); }
 .hero-graphic .wire { fill: none; stroke: var(--io-color-border); stroke-width: 1.5; }
-.hero-graphic .signal { fill: none; stroke: var(--io-color-brand); stroke-width: 1.5; }
+.hero-graphic .signal { fill: none; stroke: var(--io-color-brand); stroke-width: 1.5; stroke-dasharray: 10 9; animation: hero-signal-flow 1.8s linear infinite; }
+.hero-graphic .source-node { transform-box: fill-box; transform-origin: center; animation: hero-source-float 4.2s var(--io-ease-standard) infinite; }
+.hero-graphic .node-2 { animation-delay: -1.4s; }
+.hero-graphic .node-3 { animation-delay: -2.8s; }
+.hero-graphic .result-node { transform-box: fill-box; transform-origin: center; animation: hero-result-pulse 3.6s var(--io-ease-standard) infinite; }
+.hero-graphic .node-5 { animation-delay: -1.2s; }
+.hero-graphic .node-6 { animation-delay: -2.4s; }
+.hero-graphic .hero-hub { transform-box: fill-box; transform-origin: center; animation: hero-hub-pulse 2.4s var(--io-ease-standard) infinite; }
+@keyframes hero-signal-flow { to { stroke-dashoffset: -38; } }
+@keyframes hero-source-float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+@keyframes hero-result-pulse { 0%, 100% { opacity: .72; transform: translateX(0); } 50% { opacity: 1; transform: translateX(2px); } }
+@keyframes hero-hub-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.045); } }
 .section-head { padding: 0 0 20px; border: 0; }
 .section-head h2 { margin: 0; font-size: 20px; letter-spacing: -.025em; }
 .workflow-grid { gap: 18px; }
@@ -525,6 +537,13 @@ main { padding: 30px 32px 64px; }
 .templates { padding-top: 76px; gap: 7px; }
 .templates-head { margin: 0 4px 10px; }
 .template-pill { width: max-content; max-width: 100%; min-height: 36px; padding: 6px 11px; color: var(--io-color-foreground); font-size: 12px; }
+.template-browser-dialog { width: min(720px, calc(100vw - 32px)) !important; max-width: 720px !important; }
+.template-browser-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 4px; }
+.template-browser-option { min-height: 112px; height: auto !important; display: flex !important; align-items: center !important; justify-content: space-between !important; gap: 18px !important; padding: 16px !important; text-align: left; white-space: normal !important; }
+.template-browser-option > span:first-child { min-width: 0; display: grid; gap: 5px; }
+.template-browser-option strong { font-size: 14px; font-weight: 600; }
+.template-browser-option small { color: var(--io-color-muted); font-size: 11.5px; font-weight: 400; line-height: 1.45; }
+.template-browser-option.active { border-color: var(--io-color-primary); background: var(--io-color-selected); color: var(--io-color-link); }
 .templates-closed { padding-top: 76px; }
 .understood { min-height: 54px; margin-top: 12px; gap: 8px; }
 .understood > strong { margin-right: 6px; }
@@ -556,6 +575,11 @@ main { padding: 30px 32px 64px; }
   .builder-layout { grid-template-columns: minmax(0, 1fr) 228px; }
 }
 @media (max-width: 1180px) {
+  .composer-tools { gap: 5px; padding-inline: 7px; }
+  .composer-tools button { gap: 4px; padding-inline: 4px; font-size: 10.5px; }
+  .composer-tools .send { width: 40px; min-height: 40px; flex-basis: 40px; }
+}
+@media (max-width: 1000px) {
   .builder-layout, .builder-layout.templates-collapsed { grid-template-columns: 1fr; }
   .templates, .templates-closed { grid-row: 1; padding-top: 0; }
   .builder-main { grid-row: 2; }
@@ -568,4 +592,5 @@ main { padding: 30px 32px 64px; }
   .workflow-grid { grid-template-columns: 1fr; }
   .home-support { grid-template-columns: 1fr; }
   .guided-source-card { grid-template-columns: 1fr; gap: 14px; }
+  .template-browser-grid { grid-template-columns: 1fr; }
 }

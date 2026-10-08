@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowUp, ChevronLeft, ChevronRight, Database, FileText, Globe2, Hand, ListFilter, Sparkles, Tags, X } from 'lucide-react';
-import { Badge, Button, Eyebrow, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsList, TabsTrigger, Textarea } from '@/components/design-system';
+import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, Eyebrow, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsList, TabsTrigger, Textarea } from '@/components/design-system';
 import { resolveWorkflowTemplate, visibleStarterKeys, workflowTemplates, type WorkflowTemplateKey } from './workflow-config';
 import { RunSession } from './run-session';
 import { DatasetReview } from './dataset-review';
@@ -53,18 +53,20 @@ function ScenarioReview({ scenario }: { scenario: WorkflowTemplateKey }) {
 export function WorkflowComposer() {
   const searchParams = useSearchParams();
   const initialTemplate = resolveWorkflowTemplate(searchParams.get('template'));
-  return <WorkflowComposerContent key={initialTemplate} initialTemplate={initialTemplate} />;
+  const initialInput: InputMethod = searchParams.get('input') === 'prior' ? 'research' : 'urls';
+  return <WorkflowComposerContent key={`${initialTemplate}-${initialInput}`} initialTemplate={initialTemplate} initialInput={initialInput} />;
 }
 
-function WorkflowComposerContent({ initialTemplate }: { initialTemplate: WorkflowTemplateKey }) {
+function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTemplate: WorkflowTemplateKey; initialInput: InputMethod }) {
   const [stage, setStage] = useState(0);
-  const [mode, setMode] = useState('prompt');
+  const [mode, setMode] = useState(initialInput === 'research' ? 'guided' : 'prompt');
   const [selected, setSelected] = useState<WorkflowTemplateKey>(initialTemplate);
   const [prompt, setPrompt] = useState<string>(workflowTemplates[initialTemplate].text);
   const [sources, setSources] = useState<string>(workflowTemplates[initialTemplate].sourceUrls.join('\n'));
-  const [inputMethod, setInputMethod] = useState<InputMethod>('urls');
+  const [inputMethod, setInputMethod] = useState<InputMethod>(initialInput);
   const [sourcePulse, setSourcePulse] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(true);
+  const [templateBrowserOpen, setTemplateBrowserOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<ComposerTool | null>(null);
   const [fields, setFields] = useState(templateFields[initialTemplate]);
   const [access, setAccess] = useState('Approved public sources');
@@ -181,7 +183,7 @@ function WorkflowComposerContent({ initialTemplate }: { initialTemplate: Workflo
                 ['Limits', ListFilter],
                 ['Rules', FileText],
                 ['Improve prompt', Sparkles],
-              ] as const).map(([tool, Icon]) => <Button variant="ghost" size="sm" className={activeTool === tool ? 'active' : ''} aria-expanded={activeTool === tool} aria-controls="workflow-tool-panel" onClick={() => toggleTool(tool)} key={tool}><Icon size={16} /> {tool}</Button>)}
+              ] as const).map(([tool, Icon]) => <Button variant="ghost" size="sm" className={`${activeTool === tool ? 'active ' : ''}${tool === 'Improve prompt' ? 'improve-tool' : ''}`.trim()} aria-label={tool} title={tool} aria-expanded={activeTool === tool} aria-controls="workflow-tool-panel" onClick={() => toggleTool(tool)} key={tool}><Icon size={16} /><span>{tool}</span></Button>)}
             </div><div className="composer-submit">{prompt.trim() ? <span className="keyboard-hint">⌘↵ to plan</span> : null}<Button variant="primary" className="send" aria-label="Plan workflow" title={prompt.trim() || sourceCount ? 'Plan workflow' : 'Add a source or say what to find'} disabled={!prompt.trim() && sourceCount === 0} onClick={() => setStage(1)}><ArrowUp size={17} /></Button></div></div> : null}
             {mode === 'prompt' && activeTool ? <section className="composer-tool-panel" id="workflow-tool-panel" aria-labelledby="workflow-tool-title">
               <header><div><h2 id="workflow-tool-title">{activeTool}</h2><p>{activeTool === 'Sources' ? 'Add public HTTPS URLs or domains, one per line.' : activeTool === 'Browser actions' ? 'Choose how Studio may navigate the public web.' : activeTool === 'Fields' ? 'Make the expected output explicit.' : activeTool === 'Limits' ? 'Bound browser work before the plan is approved.' : activeTool === 'Rules' ? 'Set evidence and missing-data behavior.' : 'Review the proposed rewrite before changing your draft.'}</p></div><Button variant="ghost" size="icon" aria-label={`Close ${activeTool}`} onClick={() => setActiveTool(null)}><X size={16} /></Button></header>
@@ -202,7 +204,18 @@ function WorkflowComposerContent({ initialTemplate }: { initialTemplate: Workflo
             const Icon = key === 'research' ? Globe2 : key === 'extract' ? Tags : key === 'collect' ? Database : ListFilter;
             return <Button variant="secondary" className={selected === key ? 'template-pill active' : 'template-pill'} onClick={() => applyTemplate(key)} key={key}><Icon size={14} style={{display:'inline',marginRight:8}} />{item.label}</Button>;
           })}
-          <Button variant="ghost" className="template-pill" style={{border:0,color:'var(--io-color-link)'}} asChild><Link href="/build?template=compare">Browse all templates →</Link></Button>
+          <Dialog open={templateBrowserOpen} onOpenChange={setTemplateBrowserOpen}>
+            <DialogTrigger asChild><Button variant="ghost" className="template-pill" style={{border:0,color:'var(--io-color-link)'}}>Browse all templates →</Button></DialogTrigger>
+            <DialogContent className="template-browser-dialog">
+              <DialogHeader><DialogTitle>Browse workflow templates</DialogTitle><DialogDescription>Choose a starting point. Studio will insert its request, sources, fields and rules into this builder.</DialogDescription></DialogHeader>
+              <div className="template-browser-grid">
+                {(Object.keys(workflowTemplates) as WorkflowTemplateKey[]).map((key) => {
+                  const item = workflowTemplates[key];
+                  return <Button variant="secondary" className={selected === key ? 'template-browser-option active' : 'template-browser-option'} onClick={() => { applyTemplate(key); setTemplateBrowserOpen(false); }} key={key}><span><Eyebrow>{item.type}</Eyebrow><strong>{item.label}</strong><small>{item.description}</small></span><span aria-hidden="true">→</span></Button>;
+                })}
+              </div>
+            </DialogContent>
+          </Dialog>
         </aside> : <aside className="templates-closed"><Button variant="secondary" onClick={() => setTemplateVisibility(true)} aria-label="Show templates" title="Show templates"><ChevronLeft size={14}/> Templates</Button></aside>}
       </div>
     </>

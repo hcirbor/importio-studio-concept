@@ -86,8 +86,8 @@ function Runs() {
   const runs = [
     { id:'run_batch_91af', when:'Running now', pipeline:'SaaS pricing research', coverage:'12 / 20 domains', records:'12', usage:'Not yet measured', state:'Running', outcome:'Running', tone:'info' as Tone, href:'/runs/run_batch_91af' },
     { id:'run_7f3a', when:'2 minutes ago', pipeline:'Competitor prices', coverage:'3 / 3 sources', records:'3', usage:'Not yet measured', state:'Completed', outcome:'Partial', tone:'warning' as Tone, href:'/runs/run_7f3a' },
-    { id:'run_7e91', when:'1 hour ago', pipeline:'Outdoor catalogue', coverage:'1,284 / 1,284 pages', records:'1,284', usage:'Not yet measured', state:'Completed', outcome:'Succeeded', tone:'success' as Tone, href:'/runs/run_7f3a' },
-    { id:'run_failed_9d11', when:'Yesterday', pipeline:'Retail availability', coverage:'2 / 3 sources', records:'2', usage:'$0.18', state:'Failed', outcome:'Blocked', tone:'danger' as Tone, href:'/runs/run_batch_91af' },
+    { id:'run_7e91', when:'1 hour ago', pipeline:'Outdoor catalogue', coverage:'1,284 / 1,284 pages', records:'1,284', usage:'Not yet measured', state:'Completed', outcome:'Succeeded', tone:'success' as Tone, href:'/runs/run_7e91' },
+    { id:'run_failed_9d11', when:'Yesterday', pipeline:'Retail availability', coverage:'2 / 3 sources', records:'2', usage:'$0.18', state:'Failed', outcome:'Blocked', tone:'danger' as Tone, href:'/runs/run_failed_9d11' },
   ];
   const visible = runs.filter((run) => (workflow === 'all' || run.pipeline === workflow) && (state === 'all' || run.state === state) && (outcome === 'all' || run.outcome === outcome));
   const openRun = () => { const run = runs.find((item) => item.id === runId.trim()); if (!run) { setError('Run ID not found in this interactive demo.'); return; } setError(''); router.push(run.href); };
@@ -144,9 +144,10 @@ function Groups() {
 function Enrich() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [name, setName] = useState('New supplier enrichment');
+  const [fileName, setFileName] = useState('');
   const [message, setMessage] = useState('');
-  const create = () => { setDialogOpen(false); setMessage(`${name} created. Upload validation is ready.`); };
-  return <><PageHead group="Library" title="Enrich" description="CSV enrichment with a verdict and evidence per cell." /><Dialog open={dialogOpen} onOpenChange={setDialogOpen}><DialogContent><DialogHeader><DialogTitle>Create an enrichment</DialogTitle><DialogDescription>Choose a CSV and name the enrichment. This demo validates the interaction without uploading data.</DialogDescription></DialogHeader><div className="dialog-form"><label>NAME<Input value={name} onChange={(event) => setName(event.target.value)} /></label><label>CSV FILE<Input type="file" accept=".csv,text/csv" /></label></div><DialogFooter><Button variant="secondary" onClick={() => setDialogOpen(false)}>Cancel</Button><Button variant="primary" onClick={create} disabled={!name.trim()}>Create enrichment</Button></DialogFooter></DialogContent></Dialog><Feedback>{message}</Feedback><TablePanel title="Enrichments" action={<Button variant="primary" onClick={() => setDialogOpen(true)}>Create from CSV</Button>} headings={['Enrichment','Rows','State → outcome','']} rows={[
+  const create = () => { setDialogOpen(false); setMessage(`${name} created from ${fileName}. Upload validation is ready.`); };
+  return <><PageHead group="Library" title="Enrich" description="CSV enrichment with a verdict and evidence per cell." /><Dialog open={dialogOpen} onOpenChange={setDialogOpen}><DialogContent><DialogHeader><DialogTitle>Create an enrichment</DialogTitle><DialogDescription>Choose a CSV and name the enrichment. This demo validates the file locally without uploading data.</DialogDescription></DialogHeader><div className="dialog-form"><label>NAME<Input value={name} onChange={(event) => setName(event.target.value)} /></label><label>CSV FILE<Input type="file" accept=".csv,text/csv" onChange={(event) => setFileName(event.target.files?.[0]?.name ?? '')} /></label>{fileName ? <p className="dialog-file-note">Ready to validate · {fileName}</p> : null}</div><DialogFooter><Button variant="secondary" onClick={() => setDialogOpen(false)}>Cancel</Button><Button variant="primary" onClick={create} disabled={!name.trim() || !fileName}>Create enrichment</Button></DialogFooter></DialogContent></Dialog><Feedback>{message}</Feedback><TablePanel title="Enrichments" action={<Button variant="primary" onClick={() => setDialogOpen(true)}>Create from CSV</Button>} headings={['Enrichment','Rows','State → outcome','']} rows={[
     ['Supplier enrichment','248 rows',<Status key="s" tone="warning">Completed → Partial</Status>,<Button key="b" variant="ghost" size="sm" onClick={() => setMessage('Supplier enrichment selected · 248 rows · 17 unresolved cells.')}>Open</Button>],
     ['Retailer domain match','74 rows',<Status key="s">Completed → Succeeded</Status>,<Button key="b" variant="ghost" size="sm" onClick={() => setMessage('Retailer domain match selected · all 74 rows supported.')}>Open</Button>],
   ]} /></>;
@@ -211,7 +212,14 @@ function Settings() {
 function DevelopersLive() {
   const [message, setMessage] = useState('');
   const curl = "curl -X POST https://api.import.io/v1/tasks \\\n+  -H 'Authorization: Bearer $IMPORTIO_API_KEY' \\\n+  -H 'Content-Type: application/json' \\\n+  -d '{\"workflow\":\"compare\",\"sources\":[...]}'";
-  const copy = async () => { await navigator.clipboard.writeText(curl); setMessage('cURL copied to clipboard.'); };
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(curl);
+      setMessage('cURL copied to clipboard.');
+    } catch {
+      setMessage('Clipboard access is unavailable here. Select the cURL command above to copy it.');
+    }
+  };
   return <><PageHead group="Reference" title="Developers" description="The same task model through API and MCP." /><Feedback>{message}</Feedback><section className="developer-grid"><article className="panel"><PanelHead title="Task API" meta="POST /v1/tasks"/><div className="panel-body"><p>Submit a task, keep its ID, and retrieve the result when it is ready.</p><pre className="code-block">{curl}</pre><Button variant="secondary" onClick={copy}>Copy cURL</Button></div></article><article className="panel"><PanelHead title="MCP quickstart" meta="Free developer entry"/><div className="panel-body"><p>Search public pages from an MCP client, then move proven workflows into your workspace.</p><pre className="code-block">npx -y @importio/mcp-server{`\n`}# no account required for Search preview</pre><Button variant="primary" onClick={() => setMessage('MCP setup: run the command above, then add the server to your MCP client.')}>View MCP setup</Button></div></article></section></>;
 }
 
@@ -225,7 +233,7 @@ function WebhooksLive() {
   const addWebhook = () => {
     try { const parsed = new URL(endpoint); if (parsed.protocol !== 'https:') throw new Error(); }
     catch { setError('Enter a valid public HTTPS endpoint.'); setMessage(''); return; }
-    const generated = `whsec_${crypto.randomUUID().replaceAll('-','').slice(0,16)}`;
+    const generated = `whsec_demo_${Date.now().toString(36)}`;
     setSecret(generated);
     setEndpoints((current) => [{url:endpoint,events:eventName,health:'Validating'},...current]);
     setError('');
@@ -240,8 +248,21 @@ function SettingsLive() {
   const [newKey, setNewKey] = useState('');
   const [retention, setRetention] = useState('30 days');
   const [message, setMessage] = useState('');
-  const createKey = () => { const value = `sk_live_${crypto.randomUUID().replaceAll('-','').slice(0,20)}`; setKeys((current) => [...current,{name:'New key',display:`${value.slice(0,12)}•••• · created now`}]); setNewKey(value); setMessage('API key created. Copy it now; it will not be shown again.'); };
-  return <><PageHead group="Reference" title="Settings" description="Workspace configuration, limits and operational preferences." /><Feedback>{message}</Feedback>{newKey ? <div className="secret-reveal"><code>{newKey}</code><Button variant="secondary" size="sm" onClick={() => navigator.clipboard.writeText(newKey)}>Copy key</Button></div> : null}<section className="settings-grid"><article className="panel"><PanelHead title="API keys" action={<Button variant="primary" onClick={createKey}>Create key</Button>}/>{keys.length ? keys.map((key) => <div className="settings-row" key={key.display}><span><strong>{key.name}</strong><small>{key.display}</small></span><Button variant="secondary" onClick={() => { setKeys((current) => current.filter((item) => item.display !== key.display)); setMessage(`${key.name} revoked.`); }}>Revoke</Button></div>) : <div className="panel-body"><p>No active API keys.</p></div>}</article><article className="panel"><PanelHead title="Team" meta="View only"/><div className="settings-row"><span><strong>Jordan Davis</strong><small>jordan@example.com</small></span><span>Owner</span></div><div className="settings-row"><span><strong>Maya Chen</strong><small>maya@example.com</small></span><span>Editor</span></div></article><article className="panel"><PanelHead title="Data handling"/><div className="panel-body"><label>DEFAULT RETENTION<DSSelect label="Default retention" value={retention} onValueChange={(value) => { setRetention(value); setMessage(`Default retention updated to ${value}.`); }} options={[{value:'30 days',label:'30 days'},{value:'90 days',label:'90 days'},{value:'1 year',label:'1 year'}]} /></label><p>Encrypted in transit and at rest · zero-retention processing available.</p></div></article><article className="panel"><PanelHead title="Trust and security"/><div className="panel-body"><dl className="security-list"><div><dt>Compliance</dt><dd>SOC 2 Type 2</dd></div><div><dt>Training</dt><dd>Customer data excluded</dd></div><div><dt>Region</dt><dd>EU workspace</dd></div></dl></div></article><article className="panel"><PanelHead title="Plan and limits" meta="Studio"/><div className="panel-body"><div className="usage-meter"><span /></div><p>42 of 100 monthly runs · 10 records per task · 30 steps</p></div></article></section></>;
+  const createKey = () => {
+    const value = `sk_live_demo_${Date.now().toString(36)}`;
+    setKeys((current) => [...current,{name:'New key',display:`${value.slice(0,16)}•••• · created now`}]);
+    setNewKey(value);
+    setMessage('API key created. Copy it now; it will not be shown again.');
+  };
+  const copyKey = async () => {
+    try {
+      await navigator.clipboard.writeText(newKey);
+      setMessage('API key copied to clipboard.');
+    } catch {
+      setMessage('Clipboard access is unavailable here. Select the key above to copy it.');
+    }
+  };
+  return <><PageHead group="Reference" title="Settings" description="Workspace configuration, limits and operational preferences." /><Feedback>{message}</Feedback>{newKey ? <div className="secret-reveal"><code>{newKey}</code><Button variant="secondary" size="sm" onClick={copyKey}>Copy key</Button></div> : null}<section className="settings-grid"><article className="panel"><PanelHead title="API keys" action={<Button variant="primary" onClick={createKey}>Create key</Button>}/>{keys.length ? keys.map((key) => <div className="settings-row" key={key.display}><span><strong>{key.name}</strong><small>{key.display}</small></span><Button variant="secondary" onClick={() => { setKeys((current) => current.filter((item) => item.display !== key.display)); if (key.name === 'New key') setNewKey(''); setMessage(`${key.name} revoked.`); }}>Revoke</Button></div>) : <div className="panel-body"><p>No active API keys.</p></div>}</article><article className="panel"><PanelHead title="Team" meta="View only"/><div className="settings-row"><span><strong>Jordan Davis</strong><small>jordan@example.com</small></span><span>Owner</span></div><div className="settings-row"><span><strong>Maya Chen</strong><small>maya@example.com</small></span><span>Editor</span></div></article><article className="panel"><PanelHead title="Data handling"/><div className="panel-body"><label>DEFAULT RETENTION<DSSelect label="Default retention" value={retention} onValueChange={(value) => { setRetention(value); setMessage(`Default retention updated to ${value}.`); }} options={[{value:'30 days',label:'30 days'},{value:'90 days',label:'90 days'},{value:'1 year',label:'1 year'}]} /></label><p>Encrypted in transit and at rest · zero-retention processing available.</p></div></article><article className="panel"><PanelHead title="Trust and security"/><div className="panel-body"><dl className="security-list"><div><dt>Compliance</dt><dd>SOC 2 Type 2</dd></div><div><dt>Training</dt><dd>Customer data excluded</dd></div><div><dt>Region</dt><dd>EU workspace</dd></div></dl></div></article><article className="panel"><PanelHead title="Plan and limits" meta="Studio"/><div className="panel-body"><div className="usage-meter"><span /></div><p>42 of 100 monthly runs · 10 records per task · 30 steps</p></div></article></section></>;
 }
 
 const sections: Record<string, () => React.ReactNode> = { pipelines: Pipelines, runs: Runs, datasets: Datasets, monitors: Monitors, memories: Memories, groups: Groups, enrich: Enrich, search: SearchPage, candidates: Candidates, qualify: Qualify, developers: DevelopersLive, webhooks: WebhooksLive, usage: Usage, settings: SettingsLive };

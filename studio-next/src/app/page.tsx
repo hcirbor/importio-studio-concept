@@ -10,6 +10,21 @@ const workflows = [
   { title: 'Monitor', description: 'Keep approved pipelines current and review meaningful changes.', hint: 'A page that needs a trusted baseline', meta: 'Baseline first', icon: Activity, href: '/build?template=monitor' },
 ];
 
+const capabilityRoutes: Record<string, string> = {
+  Search: '/search',
+  'Fetch & render': '/build?template=extract',
+  'Browser actions': '/build?template=extract',
+  Extract: '/build?template=extract',
+  Compare: '/build?template=compare',
+  Collect: '/build?template=collect',
+  Qualify: '/candidates',
+  Enrich: '/enrich',
+  Batch: '/groups',
+  Monitor: '/monitors',
+  API: '/developers',
+  MCP: '/developers',
+};
+
 export default function HomePage() {
   return (
     <div className="page">
@@ -48,12 +63,12 @@ export default function HomePage() {
 
       <section className="dashboard-grid" aria-label="Workspace activity">
         <HomeAttention />
-        <article className="panel"><div className="section-head"><h2>Recent pipelines</h2><Link href="/pipelines" className="text-link">View all</Link></div><table className="data-table"><thead><tr><th>Pipeline</th><th>Status</th><th>Records</th></tr></thead><tbody><tr><td><Link href="/pipelines/competitor-prices">Competitor prices</Link></td><td><Badge tone="warning">Needs review</Badge></td><td>3</td></tr><tr><td>Outdoor catalogue</td><td><Badge tone="success">Completed</Badge></td><td>1,284</td></tr><tr><td>MAP watch</td><td><Badge tone="success">Healthy</Badge></td><td>9,316</td></tr></tbody></table></article>
+        <article className="panel"><div className="section-head"><h2>Recent pipelines</h2><Link href="/pipelines" className="text-link">View all</Link></div><table className="data-table"><thead><tr><th>Pipeline</th><th>Status</th><th>Records</th></tr></thead><tbody><tr><td><Link href="/pipelines/competitor-prices">Competitor prices</Link></td><td><Badge tone="warning">Needs review</Badge></td><td>3</td></tr><tr><td><Link href="/pipelines">Outdoor catalogue</Link></td><td><Badge tone="success">Completed</Badge></td><td>1,284</td></tr><tr><td><Link href="/monitors">MAP watch</Link></td><td><Badge tone="success">Healthy</Badge></td><td>9,316</td></tr></tbody></table></article>
       </section>
       <section className="lifecycle-band" aria-labelledby="lifecycle-title">
         <h2 id="lifecycle-title">One workflow, the full web-data lifecycle.</h2>
         <p>Open a capability to see its working example with the relevant request and inputs already selected.</p>
-        <div className="capability-links">{['Search','Fetch & render','Browser actions','Extract','Compare','Collect','Qualify','Enrich','Batch','Monitor','API','MCP'].map((item) => <Link href={item === 'API' || item === 'MCP' ? '/developers' : item === 'Monitor' ? '/monitors' : '/build'} key={item}>{item} ↗</Link>)}</div>
+        <div className="capability-links">{Object.entries(capabilityRoutes).map(([item, href]) => <Link href={href} key={item}>{item} ↗</Link>)}</div>
         <div className="free-preview"><strong>Free preview</strong><span>Search and single-page Fetch/Extract are free within live caps.</span></div>
       </section>
       <section className="home-support">
