@@ -79,12 +79,14 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
   const [maxPages, setMaxPages] = useState('3');
   const [maxRecords, setMaxRecords] = useState('10');
   const [timeout, setTimeoutValue] = useState('5 minutes');
-  const [promptBeforeRewrite, setPromptBeforeRewrite] = useState<string | null>(null);
   const [datasetSelection, setDatasetSelection] = useState('Competitor prices · v4');
   const [runtimeKey, setRuntimeKey] = useState('product_url');
   const [discoveryQuery, setDiscoveryQuery] = useState('Official pricing pages for the supplied companies');
   const [researchSet, setResearchSet] = useState('SaaS pricing research · 74 records');
   const template = useMemo(() => workflowTemplates[selected], [selected]);
+  useEffect(() => {
+    window.dispatchEvent(new CustomEvent('studio:workflow-title', { detail: template.title }));
+  }, [template.title]);
   useEffect(() => {
     const timer = window.setTimeout(() => setTemplatesOpen(sessionStorage.getItem('studio-templates-open') !== 'false'), 0);
     return () => window.clearTimeout(timer);
@@ -133,8 +135,8 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
   }
 
   function acceptRewrite() {
-    setPromptBeforeRewrite(prompt);
     setPrompt(improvedPrompt);
+    setActiveTool(null);
   }
 
   const guidedInputDetail = inputMethod === 'urls'
@@ -192,7 +194,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
               {activeTool === 'Fields' ? <div className="tool-grid"><label className="tool-field tool-field-span-2"><span>Output fields</span><Input value={fields} onChange={(event) => setFields(event.target.value)} aria-label="Output fields" /></label><ToolSelect label="Missing values" value={missingData} onValueChange={setMissingData} options={['Use null; never invent','Omit missing fields','Send to review']} /><ToolSelect label="Validation" value={validation} onValueChange={setValidation} options={['Require type match','Coerce safe values','Review mismatches']} /></div> : null}
               {activeTool === 'Limits' ? <div className="tool-grid"><label className="tool-field"><span>Maximum pages</span><Input type="number" min="1" value={maxPages} onChange={(event) => setMaxPages(event.target.value)} /></label><label className="tool-field"><span>Maximum records</span><Input type="number" min="1" value={maxRecords} onChange={(event) => setMaxRecords(event.target.value)} /></label><ToolSelect label="Timeout" value={timeout} onValueChange={setTimeoutValue} options={['2 minutes','5 minutes','15 minutes']} /></div> : null}
               {activeTool === 'Rules' ? <div className="tool-grid"><ToolSelect label="Missing data" value={missingData} onValueChange={setMissingData} options={['Use null; never invent','Omit missing fields','Send to review']} /><ToolSelect label="Evidence" value={evidence} onValueChange={setEvidence} options={['Source quote per value','Page evidence per record','No evidence required']} /><ToolSelect label="Deduplication" value={deduplication} onValueChange={setDeduplication} options={['Canonical URL + primary key','Canonical URL only','Keep every result']} /></div> : null}
-              {activeTool === 'Improve prompt' ? <div className="prompt-rewrite"><p>{prompt.trim() ? improvedPrompt : `No complete prompt yet. ${improvedPrompt}`}</p><div><Button variant="secondary" disabled={promptBeforeRewrite === null} onClick={() => { if (promptBeforeRewrite !== null) setPrompt(promptBeforeRewrite); }}>Undo</Button><Button variant="primary" onClick={acceptRewrite}>Accept rewrite</Button></div></div> : null}
+              {activeTool === 'Improve prompt' ? <div className="prompt-rewrite"><div className="prompt-rewrite-diff"><del>{prompt.trim() || 'No complete prompt yet.'}</del><ins>{improvedPrompt}</ins></div><div className="prompt-rewrite-actions"><Button variant="secondary" onClick={() => setActiveTool(null)}>Undo</Button><Button variant="primary" onClick={acceptRewrite}>Accept rewrite</Button></div></div> : null}
             </section> : null}
           </div>
           <div className="understood"><strong>STUDIO UNDERSTOOD</strong><Badge tone="info">{template.type}</Badge><span className={sourcePulse ? 'source-chip pulse' : 'source-chip'}><Badge tone="success">{sourceLabel}</Badge></span><Badge tone="success">{fieldCount} fields</Badge><Badge tone="success">{evidence}</Badge><Badge tone="success">{missingData}</Badge><Badge tone="warning">{maxPages ? `Capped at ${maxPages} pages` : 'No page limit set'}</Badge></div>

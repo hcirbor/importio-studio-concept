@@ -51,9 +51,18 @@ function pageTitle(pathname: string): [string, string] {
 
 function Breadcrumbs({ pathname }: { pathname: string }) {
   const searchParams = useSearchParams();
+  const [liveBuildTitle, setLiveBuildTitle] = useState<string | null>(null);
+  useEffect(() => {
+    function updateBuildTitle(event: Event) {
+      const title = (event as CustomEvent<string>).detail;
+      if (typeof title === 'string' && title) setLiveBuildTitle(title);
+    }
+    window.addEventListener('studio:workflow-title', updateBuildTitle);
+    return () => window.removeEventListener('studio:workflow-title', updateBuildTitle);
+  }, []);
   const [parent, defaultCurrent] = pageTitle(pathname);
   const current = pathname === '/build'
-    ? workflowTemplates[resolveWorkflowTemplate(searchParams.get('template'))].title
+    ? liveBuildTitle ?? workflowTemplates[resolveWorkflowTemplate(searchParams.get('template'))].title
     : defaultCurrent;
   return <div className="breadcrumbs"><span>{parent}</span><i>/</i><strong>{current}</strong></div>;
 }
