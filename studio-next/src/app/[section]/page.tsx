@@ -1,4 +1,6 @@
-import { sectionSlugs, WorkspaceSection } from '@/components/workspace-section';
+import { WorkspaceSection } from '@/components/workspace-section';
+
+const sectionSlugs = ['pipelines','runs','datasets','monitors','memories','groups','enrich','search','candidates','qualify','developers','webhooks','usage','settings'];
 
 export function generateStaticParams() { return sectionSlugs.map((section) => ({ section })); }
 

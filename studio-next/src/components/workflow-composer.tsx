@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { ArrowUp, ChevronLeft, ChevronRight, Database, FileText, Globe2, Hand, ListFilter, Sparkles, Tags } from 'lucide-react';
 import { Badge, Button, Eyebrow, Tabs, TabsList, TabsTrigger } from '@/components/design-system';
@@ -28,9 +29,11 @@ const reviewFixtures: Partial<Record<WorkflowTemplateKey, { headings: string[]; 
 };
 
 function ScenarioReview({ scenario }: { scenario: WorkflowTemplateKey }) {
+  const [feedback, setFeedback] = useState('');
   if (scenario === 'compare') return <DatasetReview />;
   const fixture = reviewFixtures[scenario] ?? reviewFixtures.collect!;
-  return <section className="panel scenario-review"><div className="review-summary"><span>PREVIEW COMPLETE</span><strong>{fixture.rows.length} supported {fixture.rows.length === 1 ? 'record' : 'records'} ready to review.</strong></div><div className="table-scroll"><table className="data-table"><thead><tr>{fixture.headings.map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{fixture.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>)}</tbody></table></div><footer className="review-footer"><span>Evidence retained with every supported value</span><Button variant="secondary">Export JSON</Button><Button variant="primary">Save dataset</Button></footer></section>;
+  const exportRows = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(fixture.rows, null, 2)], {type:'application/json'})); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${scenario}-preview.json`; anchor.click(); URL.revokeObjectURL(url); setFeedback('Preview exported as JSON.'); };
+  return <section className="panel scenario-review"><div className="review-summary"><span>PREVIEW COMPLETE</span><strong>{fixture.rows.length} supported {fixture.rows.length === 1 ? 'record' : 'records'} ready to review.</strong></div>{feedback ? <p className="review-feedback" role="status">{feedback}</p> : null}<div className="table-scroll"><table className="data-table"><thead><tr>{fixture.headings.map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{fixture.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>)}</tbody></table></div><footer className="review-footer"><span>Evidence retained with every supported value</span><Button variant="secondary" onClick={exportRows}>Export JSON</Button><Button variant="primary" onClick={() => setFeedback('Dataset saved to the Studio workspace.')}>Save dataset</Button></footer></section>;
 }
 
 export function WorkflowComposer() {
@@ -48,6 +51,7 @@ function WorkflowComposerContent({ initialTemplate }: { initialTemplate: Workflo
   const [inputMethod, setInputMethod] = useState<InputMethod>('urls');
   const [sourcePulse, setSourcePulse] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(true);
+  const [activeTool, setActiveTool] = useState('');
   const template = useMemo(() => workflowTemplates[selected], [selected]);
   useEffect(() => {
     const timer = window.setTimeout(() => setTemplatesOpen(sessionStorage.getItem('studio-templates-open') !== 'false'), 0);
@@ -84,7 +88,7 @@ function WorkflowComposerContent({ initialTemplate }: { initialTemplate: Workflo
             : 'Prior research · 74 records';
 
   const stepper = <div className="stepper" aria-label="Workflow progress">
-    {['Describe', 'Review plan', 'Watch run', 'Review data'].map((label, index) => <div className="step-segment" key={label}><button className={index === stage ? 'step active' : index < stage ? 'step done' : 'step'} onClick={() => index <= stage && setStage(index)} disabled={index > stage}><i>{index < stage ? '✓' : index + 1}</i>{label}</button>{index < 3 ? <i className="step-line" /> : null}</div>)}
+    {['Describe', 'Review plan', 'Watch run', 'Review data'].map((label, index) => <div className="step-segment" key={label}><Button variant="ghost" className={index === stage ? 'step active' : index < stage ? 'step done' : 'step'} onClick={() => index <= stage && setStage(index)} disabled={index > stage}><i>{index < stage ? '✓' : index + 1}</i>{label}</Button>{index < 3 ? <i className="step-line" /> : null}</div>)}
   </div>;
   const runId = selected === 'research' ? 'run_batch_91af' : selected === 'collect' ? 'run_collect' : selected === 'discover' ? 'run_discover' : selected === 'extract' ? 'run_extract' : selected === 'monitor' ? 'run_monitor' : 'run_7f3a';
 
@@ -92,7 +96,7 @@ function WorkflowComposerContent({ initialTemplate }: { initialTemplate: Workflo
 
   if (stage === 2) return <>{stepper}<section className="workflow-stage"><header className="stage-head"><div><Eyebrow>Watch run</Eyebrow><h1>{selected === 'research' ? `${template.type} is working through the approved sources.` : `${template.type} run complete.`}</h1><p>{selected === 'research' ? 'Follow each worker, replay captured steps and resolve input when needed.' : 'Replay every captured step, then inspect the records and retained evidence.'}</p></div><Badge tone={selected === 'research' ? 'info' : 'success'}>{selected === 'research' ? 'Running' : 'Completed'}</Badge></header><RunSession runId={runId} /><div className="stage-actions"><Button variant="secondary" onClick={() => setStage(1)}>Review plan</Button><Button variant="primary" onClick={() => setStage(3)}>Review data →</Button></div></section></>;
 
-  if (stage === 3) return <>{stepper}<section className="workflow-stage"><header className="stage-head"><div><Eyebrow>Review data</Eyebrow><h1>Check the records and their evidence.</h1><p>Every supported value stays linked to the page and capture it came from.</p></div><Badge tone={selected === 'compare' || selected === 'research' ? 'warning' : 'success'}>{selected === 'compare' || selected === 'research' ? '1 field needs review' : 'Ready to save'}</Badge></header><ScenarioReview scenario={selected} /><div className="stage-actions"><Button variant="secondary" onClick={() => setStage(2)}>Back to run</Button><Button variant="primary">Save dataset</Button></div></section></>;
+  if (stage === 3) return <>{stepper}<section className="workflow-stage"><header className="stage-head"><div><Eyebrow>Review data</Eyebrow><h1>Check the records and their evidence.</h1><p>Every supported value stays linked to the page and capture it came from.</p></div><Badge tone={selected === 'compare' || selected === 'research' ? 'warning' : 'success'}>{selected === 'compare' || selected === 'research' ? '1 field needs review' : 'Ready to save'}</Badge></header><ScenarioReview scenario={selected} /><div className="stage-actions"><Button variant="secondary" onClick={() => setStage(2)}>Back to run</Button><Button variant="primary" asChild><Link href="/datasets/competitor-prices">Open saved dataset</Link></Button></div></section></>;
 
   return (
     <>
@@ -108,20 +112,20 @@ function WorkflowComposerContent({ initialTemplate }: { initialTemplate: Workflo
             <TabsList><TabsTrigger value="prompt">Full prompt</TabsTrigger><TabsTrigger value="guided">Guided setup</TabsTrigger></TabsList>
           </Tabs>
           <div className={mode === 'prompt' ? 'composer prompt-mode' : 'composer guided-mode'}>
-            {mode === 'prompt' ? <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} aria-label="Workflow request" placeholder="e.g. Compare the price and availability of the Trailhead 2P Tent on these retailer pages. Return one row per seller with the source quote." /> : <div className="guided-composer"><section className="input-method-panel"><strong>How will you provide inputs?</strong><div className="input-methods" role="tablist" aria-label="Input method">{inputMethods.map(([key,label]) => <button role="tab" aria-selected={inputMethod === key} className={inputMethod === key ? 'active' : ''} onClick={() => chooseInputMethod(key)} key={key}>{label}</button>)}</div><p>{inputMethod === 'urls' ? `${sources.split('\n').filter(Boolean).length} valid inputs · 0 duplicates · 0 invalid` : sourceLabel}</p></section>{inputMethod === 'urls' ? <label className="guided-field"><strong>Source URLs</strong><textarea value={sources} onChange={(event) => setSources(event.target.value)} aria-label="Source URLs" /><small>Paste up to 50 public HTTPS URLs or domains, one per line.</small></label> : null}<label className="guided-field"><strong>What do you want to know?</strong><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} aria-label="Guided workflow request" /></label></div>}
-            <div className="composer-tools"><div className="composer-tool-list"><button><Globe2 size={16} /> Sources</button><button><Hand size={16} /> Browser actions</button><button><Database size={16} /> Fields</button><button><ListFilter size={16} /> Limits</button><button><FileText size={16} /> Rules</button><button><Sparkles size={16} /> Improve prompt</button></div><div className="composer-submit">{prompt.trim() ? <span className="keyboard-hint">⌘↵ to plan</span> : null}<Button variant="primary" className="send" aria-label="Plan workflow" onClick={() => setStage(1)}><ArrowUp size={17} /></Button></div></div>
+            {mode === 'prompt' ? <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} aria-label="Workflow request" placeholder="e.g. Compare the price and availability of the Trailhead 2P Tent on these retailer pages. Return one row per seller with the source quote." /> : <div className="guided-composer"><section className="input-method-panel"><strong>How will you provide inputs?</strong><div className="input-methods" role="tablist" aria-label="Input method">{inputMethods.map(([key,label]) => <Button variant="secondary" size="sm" role="tab" aria-selected={inputMethod === key} className={inputMethod === key ? 'active' : ''} onClick={() => chooseInputMethod(key)} key={key}>{label}</Button>)}</div><p>{inputMethod === 'urls' ? `${sources.split('\n').filter(Boolean).length} valid inputs · 0 duplicates · 0 invalid` : sourceLabel}</p></section>{inputMethod === 'urls' ? <label className="guided-field"><strong>Source URLs</strong><textarea value={sources} onChange={(event) => setSources(event.target.value)} aria-label="Source URLs" /><small>Paste up to 50 public HTTPS URLs or domains, one per line.</small></label> : null}<label className="guided-field"><strong>What do you want to know?</strong><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} aria-label="Guided workflow request" /></label></div>}
+            {activeTool ? <p className="builder-tool-feedback" role="status">{activeTool} settings selected. This panel uses the current guided values.</p> : null}<div className="composer-tools"><div className="composer-tool-list"><Button variant="ghost" size="sm" onClick={() => setActiveTool('Sources')}><Globe2 size={16} /> Sources</Button><Button variant="ghost" size="sm" onClick={() => setActiveTool('Browser actions')}><Hand size={16} /> Browser actions</Button><Button variant="ghost" size="sm" onClick={() => setActiveTool('Fields')}><Database size={16} /> Fields</Button><Button variant="ghost" size="sm" onClick={() => setActiveTool('Limits')}><ListFilter size={16} /> Limits</Button><Button variant="ghost" size="sm" onClick={() => setActiveTool('Rules')}><FileText size={16} /> Rules</Button><Button variant="ghost" size="sm" onClick={() => { setPrompt((current) => current.trim()); setActiveTool('Prompt improvement'); }}><Sparkles size={16} /> Improve prompt</Button></div><div className="composer-submit">{prompt.trim() ? <span className="keyboard-hint">⌘↵ to plan</span> : null}<Button variant="primary" className="send" aria-label="Plan workflow" onClick={() => setStage(1)}><ArrowUp size={17} /></Button></div></div>
           </div>
           <div className="understood"><strong>STUDIO UNDERSTOOD</strong><Badge tone="info">{template.type}</Badge><span className={sourcePulse ? 'source-chip pulse' : 'source-chip'}><Badge tone="success">{sourceLabel}</Badge></span><Badge tone="success">{template.fields} fields</Badge><Badge tone="success">Source quote per value</Badge><Badge tone="success">Unknowns allowed</Badge></div>
           <div className="builder-foot"><span>Nothing runs until you approve the plan.</span><span>Local mockup only · no extraction is submitted</span>{mode === 'guided' ? <Button variant="primary" onClick={() => setStage(1)}>Plan workflow →</Button> : null}</div>
         </div>
-        {templatesOpen ? <aside className="templates"><div className="templates-head"><p>Start from</p><button onClick={() => setTemplateVisibility(false)} aria-label="Hide templates" title="Hide templates"><ChevronRight size={15}/></button></div>
+        {templatesOpen ? <aside className="templates"><div className="templates-head"><p>Start from</p><Button variant="ghost" size="icon" onClick={() => setTemplateVisibility(false)} aria-label="Hide templates" title="Hide templates"><ChevronRight size={15}/></Button></div>
           {visibleStarterKeys.map((key) => {
             const item = workflowTemplates[key];
             const Icon = key === 'research' ? Globe2 : key === 'extract' ? Tags : key === 'collect' ? Database : ListFilter;
-            return <button className={selected === key ? 'template-pill active' : 'template-pill'} onClick={() => applyTemplate(key)} key={key}><Icon size={14} style={{display:'inline',marginRight:8}} />{item.label}</button>;
+            return <Button variant="secondary" className={selected === key ? 'template-pill active' : 'template-pill'} onClick={() => applyTemplate(key)} key={key}><Icon size={14} style={{display:'inline',marginRight:8}} />{item.label}</Button>;
           })}
-          <button className="template-pill" style={{border:0,color:'var(--io-color-link)'}}>Browse all templates →</button>
-        </aside> : <aside className="templates-closed"><button onClick={() => setTemplateVisibility(true)} aria-label="Show templates" title="Show templates"><ChevronLeft size={14}/> Templates</button></aside>}
+          <Button variant="ghost" className="template-pill" style={{border:0,color:'var(--io-color-link)'}} onClick={() => setActiveTool('Template library')}>Browse all templates →</Button>
+        </aside> : <aside className="templates-closed"><Button variant="secondary" onClick={() => setTemplateVisibility(true)} aria-label="Show templates" title="Show templates"><ChevronLeft size={14}/> Templates</Button></aside>}
       </div>
     </>
   );

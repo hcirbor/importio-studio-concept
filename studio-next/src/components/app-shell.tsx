@@ -11,6 +11,7 @@ import { ImportioLogo } from './importio-logo';
 import { ThemeControl } from './theme-control';
 import { resolveWorkflowTemplate, workflowTemplates } from './workflow-config';
 import { ReviewRailCount } from './review-state';
+import { Button } from '@/components/design-system';
 
 const groups = [
   { label: 'Build', items: [{ href: '/build', label: 'New workflow', icon: Plus }] },
@@ -70,15 +71,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
   return (
     <div className="app-shell">
-      {navOpen ? <button className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} /> : null}
+      {navOpen ? <Button variant="ghost" className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} /> : null}
       <aside className={navOpen ? 'sidebar mobile-open' : 'sidebar'}>
         <Link href="/" className="brand" aria-label="Import.io Studio home">
           <ImportioLogo className="brand-wordmark" />
         </Link>
-        <button className="workspace-card" type="button">
+        <Button variant="ghost" className="workspace-card" asChild>
+          <Link href="/settings">
           <span className="workspace-icon">I</span>
           <span><strong>Import.io Studio</strong><small>Demo workspace</small></span>
-        </button>
+          </Link>
+        </Button>
         <nav aria-label="Primary navigation">
           <Link href="/" onClick={() => setNavOpen(false)} className={pathname === '/' ? 'nav-item active' : 'nav-item'}><Home /><span>Home</span></Link>
           {groups.map((group) => (
@@ -96,7 +99,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
       <div className="workspace">
         <header className="topbar">
-          <button className="mobile-menu" aria-label="Open navigation" onClick={() => setNavOpen(true)}><PanelLeft /></button>
+          <Button variant="ghost" className="mobile-menu" aria-label="Open navigation" onClick={() => setNavOpen(true)}><PanelLeft /></Button>
           <Suspense fallback={<div className="breadcrumbs"><span>Build</span><i>/</i><strong>Workflow</strong></div>}><Breadcrumbs pathname={pathname} /></Suspense>
           <div className="top-actions"><span className="demo-chip">INTERACTIVE DEMO</span><span className="ready-chip"><i /> API &amp; database ready</span><ThemeControl /><span className="avatar">JD</span></div>
         </header>
