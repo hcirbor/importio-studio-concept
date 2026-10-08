@@ -7,11 +7,10 @@ import {
   Activity, BookOpen, Braces, CheckSquare2, Database, FileSearch, Home,
   Layers3, MonitorDot, PanelLeft, Plus, Search, Settings, Table2, Users,
 } from 'lucide-react';
-import { ImportioLogo } from './importio-logo';
 import { ThemeControl } from './theme-control';
 import { resolveWorkflowTemplate, workflowTemplates } from './workflow-config';
 import { ReviewRailCount } from './review-state';
-import { Button } from '@/components/design-system';
+import { BrandMark, Button } from '@/components/design-system';
 
 const groups = [
   { label: 'Build', items: [{ href: '/build', label: 'New workflow', icon: Plus }] },
@@ -74,7 +73,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {navOpen ? <Button variant="ghost" className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} /> : null}
       <aside className={navOpen ? 'sidebar mobile-open' : 'sidebar'}>
         <Link href="/" className="brand" aria-label="Import.io Studio home">
-          <ImportioLogo className="brand-wordmark" />
+          <BrandMark className="brand-mark" title="" />
+          <span className="brand-name">import.io</span>
         </Link>
         <Button variant="ghost" className="workspace-card" asChild>
           <Link href="/settings">
