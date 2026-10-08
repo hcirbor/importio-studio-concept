@@ -137,6 +137,7 @@ main { min-width: 0; padding: 38px 34px 64px; }
 .review-value-entry { display: grid; grid-template-columns: 1fr auto; gap: 8px; margin-top: 16px; }
 .review-value-entry label { grid-column: 1 / -1; color: var(--io-color-subtle); font: 600 10px var(--io-font-mono); letter-spacing: .08em; text-transform: uppercase; }
 .review-feedback { margin: 14px 0 0; color: var(--io-color-link); font-size: 13px; }
+.retry-feedback { padding: 10px 12px; border-left: 3px solid var(--io-color-primary); border-radius: 0 6px 6px 0; background: var(--io-color-selected); color: var(--io-color-muted); }
 .definition-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, .85fr); gap: 18px; }
 .detail-list { margin: 0; }
 .detail-list > div { display: flex; justify-content: space-between; gap: 18px; padding: 13px 20px; border-bottom: 1px solid var(--io-color-border); }
@@ -391,8 +392,35 @@ main { min-width: 0; padding: 38px 34px 64px; }
 main { padding: 30px 32px 64px; }
 .page { width: min(1480px, 100%); }
 
+/* Typography hierarchy: sans for reading and controls, mono only for metadata. */
+.nav-item { font-weight: 500; }
+.page-head h1, .stage-head h1, .run-detail-heading h1 { font-weight: 550; }
+.operation-page-head > div > p:last-child { max-width: 760px; font-size: 15px; line-height: 1.6; }
+.panel > .section-head h2, .lifecycle-band h2, .support-card h2, .workflow-card h2, .review-detail h2 { font-weight: 600; }
+.attention-item strong { font-weight: 600; }
+.metric-grid b { font-size: 22px; font-weight: 600; line-height: 1.25; }
+.compact-table th { font-size: 10px; letter-spacing: .08em; }
+.compact-table td { font-size: 13.5px; line-height: 1.5; }
+.compact-table td strong { font-weight: 600; }
+.compact-table td:first-child strong { font-family: var(--io-font-mono); font-size: 12.5px; font-weight: 500; letter-spacing: -.015em; }
+.compact-table td small { font-size: 11.5px; line-height: 1.4; }
+.run-filters label > button, .run-filters label input,
+.form-grid label > button, .form-grid label input,
+.webhook-form label > button, .webhook-form label input,
+.dialog-form label > button, .dialog-form label input,
+.review-toolbar label > button,
+.tool-field > button, .tool-field > input,
+.input-methods button {
+  font-family: var(--io-font-sans);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.open-run input { font-family: var(--io-font-mono); font-size: 13px; font-weight: 500; letter-spacing: -.01em; }
+
 .hero { grid-template-columns: minmax(0, 1.25fr) minmax(300px, .85fr); gap: 48px; padding: 32px 0 42px; }
-.hero h1 { max-width: none; margin: 18px 0 20px; font-size: 38px; font-weight: 600; line-height: 1.2; letter-spacing: -.045em; }
+.hero h1 { max-width: none; margin: 18px 0 20px; font-size: 38px; font-weight: 550; line-height: 1.2; letter-spacing: -.045em; }
 .hero-copy > p:last-of-type { max-width: 520px; font-size: 16px; line-height: 1.8; }
 .hero-signals { align-items: center; font: 12px var(--io-font-sans); }
 .hero-signals span + span::before { margin-right: 12px; color: var(--io-color-border); }
@@ -443,7 +471,7 @@ main { padding: 30px 32px 64px; }
 .step.done { color: var(--io-color-success); }
 .step.done i { border-color: var(--io-color-success); background: var(--io-color-success-soft); color: var(--io-color-success); }
 .builder-hero { margin: 0 0 24px; }
-.builder-hero h1 { margin: 10px 0 7px; font-size: 34px; font-weight: 650; line-height: 1.18; letter-spacing: -.02em; }
+.builder-hero h1 { margin: 10px 0 7px; font-size: 34px; font-weight: 600; line-height: 1.18; letter-spacing: -.02em; }
 .builder-hero p { margin: 0; color: var(--io-color-muted); font-size: 15px; line-height: 1.55; }
 .builder-layout { grid-template-columns: minmax(0, 916px) 240px; gap: 24px; justify-content: center; }
 .builder-layout.templates-collapsed { grid-template-columns: minmax(0, 1050px) minmax(94px, auto); }
@@ -454,20 +482,22 @@ main { padding: 30px 32px 64px; }
 .composer.prompt-mode { min-height: 214px; }
 .composer.prompt-mode > textarea { min-height: 156px; padding: 20px 26px; font-size: 15px; line-height: 1.5; }
 .composer-tools { min-height: 56px; padding: 5px 8px 5px 11px; }
-.composer-tool-list { gap: 2px; }
+.composer-tool-list { flex: 1 1 auto; gap: 2px; }
 .composer-tools button { min-height: 40px; padding: 7px; font-size: 11.5px; }
 .composer-tools .composer-tool-list button.active { background: var(--io-color-selected); color: var(--io-color-link); }
 .composer-tools .send { width: 46px; min-height: 46px; flex-basis: 46px; }
+.composer-submit .keyboard-hint { display: none; }
 .composer-tool-panel { display: grid; gap: 18px; padding: 20px 24px 24px; border-top: 1px solid var(--io-color-border); background: var(--io-color-background); }
 .composer-tool-panel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
 .composer-tool-panel h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .composer-tool-panel header p { margin: 5px 0 0; color: var(--io-color-muted); font-size: 12px; }
 .composer-tool-panel header button { flex: 0 0 auto; }
-.tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.tool-grid { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
 .tool-field { min-width: 0; display: grid; gap: 7px; }
 .tool-field > span { color: var(--io-color-subtle); font: 600 10px var(--io-font-mono); letter-spacing: .09em; text-transform: uppercase; }
-.tool-field > button, .tool-field > input, .tool-field > textarea { width: 100%; }
-.tool-field > textarea { min-height: 104px; resize: vertical; }
+.tool-field > button, .tool-field > input, .tool-field > textarea { width: 100%; min-width: 0 !important; max-width: 100%; }
+.tool-field > button > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tool-field > textarea { min-height: 148px; resize: vertical; }
 .tool-field-wide { width: 100%; }
 .tool-field-span-2 { grid-column: span 2; }
 .prompt-rewrite { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 20px; }
@@ -486,6 +516,12 @@ main { padding: 30px 32px 64px; }
 .guided-field > strong { color: var(--io-color-subtle); font: 600 11px var(--io-font-mono); letter-spacing: .09em; text-transform: uppercase; }
 .guided-field textarea { width: 100%; min-height: 118px; padding: 12px 14px; border: 1px solid var(--io-color-control-border, var(--io-color-border)); border-radius: 8px; background: var(--io-color-surface); color: var(--io-color-foreground); font-size: 13px; line-height: 1.55; resize: vertical; }
 .guided-field small { color: var(--io-color-subtle); font-size: 12px; }
+.guided-input-detail { min-height: 154px; }
+.guided-input-detail > .guided-field { height: 100%; }
+.guided-source-card { min-height: 154px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(260px, .75fr); align-items: center; gap: 24px; padding: 18px; border: 1px solid var(--io-color-border); border-radius: 8px; background: var(--io-color-surface); }
+.guided-source-card strong { display: block; margin-top: 6px; font-size: 15px; }
+.guided-source-card p { margin: 6px 0 0; color: var(--io-color-muted); font-size: 12px; line-height: 1.55; }
+.guided-source-card input[type='file'] { min-height: 42px; padding: 8px; }
 .templates { padding-top: 76px; gap: 7px; }
 .templates-head { margin: 0 4px 10px; }
 .template-pill { width: max-content; max-width: 100%; min-height: 36px; padding: 6px 11px; color: var(--io-color-foreground); font-size: 12px; }
@@ -519,7 +555,7 @@ main { padding: 30px 32px 64px; }
 @media (max-width: 1100px) {
   .builder-layout { grid-template-columns: minmax(0, 1fr) 228px; }
 }
-@media (max-width: 1000px) {
+@media (max-width: 1180px) {
   .builder-layout, .builder-layout.templates-collapsed { grid-template-columns: 1fr; }
   .templates, .templates-closed { grid-row: 1; padding-top: 0; }
   .builder-main { grid-row: 2; }
@@ -531,4 +567,5 @@ main { padding: 30px 32px 64px; }
   .hero-proof { min-height: 0; max-width: 360px; }
   .workflow-grid { grid-template-columns: 1fr; }
   .home-support { grid-template-columns: 1fr; }
+  .guided-source-card { grid-template-columns: 1fr; gap: 14px; }
 }

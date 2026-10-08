@@ -78,6 +78,10 @@ function WorkflowComposerContent({ initialTemplate }: { initialTemplate: Workflo
   const [maxRecords, setMaxRecords] = useState('10');
   const [timeout, setTimeoutValue] = useState('5 minutes');
   const [promptBeforeRewrite, setPromptBeforeRewrite] = useState<string | null>(null);
+  const [datasetSelection, setDatasetSelection] = useState('Competitor prices · v4');
+  const [runtimeKey, setRuntimeKey] = useState('product_url');
+  const [discoveryQuery, setDiscoveryQuery] = useState('Official pricing pages for the supplied companies');
+  const [researchSet, setResearchSet] = useState('SaaS pricing research · 74 records');
   const template = useMemo(() => workflowTemplates[selected], [selected]);
   useEffect(() => {
     const timer = window.setTimeout(() => setTemplatesOpen(sessionStorage.getItem('studio-templates-open') !== 'false'), 0);
@@ -105,8 +109,9 @@ function WorkflowComposerContent({ initialTemplate }: { initialTemplate: Workflo
   }
   const sourceCount = useMemo(() => new Set(sources.split('\n').map((source) => source.trim()).filter(Boolean)).size, [sources]);
   const fieldCount = useMemo(() => fields.split(',').map((field) => field.trim()).filter(Boolean).length, [fields]);
-  const sourceLabel = inputMethod === 'urls'
-    ? `${sourceCount} ${sourceCount === 1 ? 'source' : 'sources'}`
+  const urlSourceLabel = `${sourceCount} ${sourceCount === 1 ? 'source' : 'sources'}`;
+  const guidedSourceLabel = inputMethod === 'urls'
+    ? urlSourceLabel
     : inputMethod === 'csv'
       ? 'CSV · 120 rows'
       : inputMethod === 'dataset'
@@ -116,6 +121,7 @@ function WorkflowComposerContent({ initialTemplate }: { initialTemplate: Workflo
           : inputMethod === 'discover'
             ? 'Discover sources'
             : 'Prior research · 74 records';
+  const sourceLabel = mode === 'prompt' ? urlSourceLabel : guidedSourceLabel;
   const improvedPrompt = prompt.trim()
     ? `${prompt.trim().replace(/[.\s]+$/, '')}. Return only supported values and retain a source quote for every field.`
     : `Compare the current price and availability of the Trailhead 2P Tent. Return one supported record per retailer.`;
@@ -128,6 +134,18 @@ function WorkflowComposerContent({ initialTemplate }: { initialTemplate: Workflo
     setPromptBeforeRewrite(prompt);
     setPrompt(improvedPrompt);
   }
+
+  const guidedInputDetail = inputMethod === 'urls'
+    ? <label className="guided-field"><strong>Source URLs</strong><textarea value={sources} onChange={(event) => setSources(event.target.value)} aria-label="Source URLs" /><small>Paste up to 50 public HTTPS URLs or domains, one per line.</small></label>
+    : inputMethod === 'csv'
+      ? <section className="guided-source-card"><div><Eyebrow>CSV input</Eyebrow><strong>Upload a bounded list of source records</strong><p>Map a URL or domain column after the file is selected.</p></div><Input type="file" accept=".csv,text/csv" aria-label="Upload CSV" /></section>
+      : inputMethod === 'dataset'
+        ? <section className="guided-source-card"><div><Eyebrow>Existing dataset</Eyebrow><strong>Use rows from a Studio dataset</strong><p>The selected dataset remains unchanged.</p></div><ToolSelect label="Dataset" value={datasetSelection} onValueChange={setDatasetSelection} options={['Competitor prices · v4','Outdoor catalogue · v12','MAP watch · v7']} /></section>
+        : inputMethod === 'runtime'
+          ? <section className="guided-source-card"><div><Eyebrow>Runtime input</Eyebrow><strong>Accept values when the workflow is called</strong><p>Studio will validate this required input before a run starts.</p></div><label className="tool-field"><span>Input key</span><Input value={runtimeKey} onChange={(event) => setRuntimeKey(event.target.value)} aria-label="Runtime input key" /></label></section>
+          : inputMethod === 'discover'
+            ? <section className="guided-source-card"><div><Eyebrow>Live discovery</Eyebrow><strong>Let Studio find candidate sources</strong><p>Discovered domains are shown in the plan before anything runs.</p></div><label className="tool-field"><span>Discovery query</span><Input value={discoveryQuery} onChange={(event) => setDiscoveryQuery(event.target.value)} aria-label="Discovery query" /></label></section>
+            : <section className="guided-source-card"><div><Eyebrow>Prior research</Eyebrow><strong>Continue from reviewed research</strong><p>74 retained records · 6 fields · evidence available</p></div><ToolSelect label="Research set" value={researchSet} onValueChange={setResearchSet} options={['SaaS pricing research · 74 records','Retailer coverage study · 128 records','Supplier discovery · 42 records']} /></section>;
 
   const stepper = <div className="stepper" aria-label="Workflow progress">
     {['Describe', 'Review plan', 'Watch run', 'Review data'].map((label, index) => <div className="step-segment" key={label}><Button variant="ghost" className={index === stage ? 'step active' : index < stage ? 'step done' : 'step'} onClick={() => index <= stage && setStage(index)} disabled={index > stage}><i>{index < stage ? '✓' : index + 1}</i>{label}</Button>{index < 3 ? <i className="step-line" /> : null}</div>)}
@@ -154,7 +172,7 @@ function WorkflowComposerContent({ initialTemplate }: { initialTemplate: Workflo
             <TabsList><TabsTrigger value="prompt">Full prompt</TabsTrigger><TabsTrigger value="guided">Guided setup</TabsTrigger></TabsList>
           </Tabs>
           <div className={mode === 'prompt' ? 'composer prompt-mode' : 'composer guided-mode'}>
-            {mode === 'prompt' ? <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} aria-label="Workflow request" placeholder="e.g. Compare the price and availability of the Trailhead 2P Tent on these retailer pages. Return one row per seller with the source quote." /> : <div className="guided-composer"><section className="input-method-panel"><strong>How will you provide inputs?</strong><div className="input-methods" role="tablist" aria-label="Input method">{inputMethods.map(([key,label]) => <Button variant="secondary" size="sm" role="tab" aria-selected={inputMethod === key} className={inputMethod === key ? 'input-method-button active' : 'input-method-button'} onClick={() => chooseInputMethod(key)} key={key}>{label}</Button>)}</div><p>{inputMethod === 'urls' ? `${sourceCount} valid inputs · 0 duplicates · 0 invalid` : sourceLabel}</p></section>{inputMethod === 'urls' ? <label className="guided-field"><strong>Source URLs</strong><textarea value={sources} onChange={(event) => setSources(event.target.value)} aria-label="Source URLs" /><small>Paste up to 50 public HTTPS URLs or domains, one per line.</small></label> : null}<label className="guided-field"><strong>What do you want to know?</strong><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} aria-label="Guided workflow request" /></label></div>}
+            {mode === 'prompt' ? <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} aria-label="Workflow request" placeholder="e.g. Compare the price and availability of the Trailhead 2P Tent on these retailer pages. Return one row per seller with the source quote." /> : <div className="guided-composer"><section className="input-method-panel"><strong>How will you provide inputs?</strong><div className="input-methods" role="tablist" aria-label="Input method">{inputMethods.map(([key,label]) => <Button variant="secondary" size="sm" role="tab" aria-selected={inputMethod === key} className={inputMethod === key ? 'input-method-button active' : 'input-method-button'} onClick={() => chooseInputMethod(key)} key={key}>{label}</Button>)}</div><p>{inputMethod === 'urls' ? `${sourceCount} valid inputs · 0 duplicates · 0 invalid` : guidedSourceLabel}</p></section><div className="guided-input-detail">{guidedInputDetail}</div><label className="guided-field"><strong>What do you want to know?</strong><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} aria-label="Guided workflow request" /></label></div>}
             {mode === 'prompt' ? <div className="composer-tools"><div className="composer-tool-list">
               {([
                 ['Sources', Globe2],
