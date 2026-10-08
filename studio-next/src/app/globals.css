@@ -35,7 +35,7 @@ button { color: inherit; }
 .demo-chip { background: var(--io-color-selected); color: var(--io-color-link); font: 11px var(--io-font-mono); }
 .ready-chip { border: 1px solid var(--io-color-border); background: var(--io-color-surface); color: var(--io-color-muted); font: 11px var(--io-font-mono); }
 .ready-chip i { width: 7px; height: 7px; border-radius: 50%; background: var(--io-color-success); }
-.theme-control select { min-height: 36px; padding: 0 34px 0 12px; border: 1px solid var(--io-color-border); border-radius: 7px; background: var(--io-color-surface); color: var(--io-color-foreground); }
+.theme-menu { min-width: 104px !important; }
 .mobile-menu { display: none; border: 0; background: transparent; }
 main { min-width: 0; padding: 38px 34px 64px; }
 .page { width: min(1240px, 100%); margin: 0 auto; }

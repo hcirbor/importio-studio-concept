@@ -24,6 +24,6 @@ export function ThemeControl() {
 
   return <Select value={theme} onValueChange={(value) => update(value as Theme)}>
     <SelectTrigger className="theme-control" aria-label="Theme"><SelectValue /></SelectTrigger>
-    <SelectContent><SelectItem value="light">Light</SelectItem><SelectItem value="dark">Dark</SelectItem></SelectContent>
+    <SelectContent className="theme-menu" align="end" sideOffset={6}><SelectItem value="light">Light</SelectItem><SelectItem value="dark">Dark</SelectItem></SelectContent>
   </Select>;
 }
