@@ -39,6 +39,8 @@ const groups = [
 function pageTitle(pathname: string) {
   if (pathname === '/') return ['Studio', 'Home'];
   if (pathname === '/build') return ['Build', 'Research'];
+  if (pathname.startsWith('/runs/')) return ['Runs', pathname.split('/').at(-1) ?? 'Run detail'];
+  if (pathname.startsWith('/datasets/')) return ['Datasets', 'Competitor prices'];
   if (pathname.includes('competitor-prices')) return ['Pipelines', 'Competitor prices'];
   const name = pathname.split('/').filter(Boolean).at(-1)?.replaceAll('-', ' ') ?? 'Home';
   return ['Studio', name.replace(/^./, (letter) => letter.toUpperCase())];
