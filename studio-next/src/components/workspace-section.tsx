@@ -186,7 +186,7 @@ function Qualify() {
     ['Northwind Trade',<Status key="a">Supported</Status>,<Status key="b">Supported</Status>,<Status key="c">Supported</Status>],
     ['Summit Supply Europe',<Status key="a">Supported</Status>,<Status key="b">Supported</Status>,<Status key="c" tone="warning">Unresolved</Status>],
     ['Alpine Trade',<Status key="a">Supported</Status>,<Status key="b" tone="danger">Not supported</Status>,<Status key="c" tone="warning">Unresolved</Status>],
-  ]} /></>;
+  ]} /><div className="page-action-row"><span>2 candidates are ready for a follow-up workflow.</span><Button variant="secondary" asChild><Link href="/candidates">Back to candidates</Link></Button><Button variant="primary" asChild><Link href="/build?template=discover&input=prior">Use qualified candidates</Link></Button></div></>;
 }
 
 // Legacy static snapshots retained temporarily while parity fixtures are consolidated.

@@ -623,8 +623,9 @@ main { padding: 30px 32px 64px; }
   .composer-tools .send { width: 40px; min-height: 40px; flex-basis: 40px; }
 }
 @media (max-width: 1000px) {
-  .builder-layout, .builder-layout.templates-collapsed { grid-template-columns: 1fr; }
+  .builder-layout, .builder-layout.templates-collapsed { grid-template-columns: minmax(0, 1fr); }
   .templates, .templates-closed { grid-row: 1; padding-top: 0; }
+  .templates, .templates-closed, .builder-main { min-width: 0; }
   .builder-main { grid-row: 2; }
   .templates { display: flex; flex-direction: row; flex-wrap: wrap; }
   .templates-head { width: 100%; }
