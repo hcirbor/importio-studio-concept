@@ -26,9 +26,12 @@ const groups = [
   { label: 'Discovery', items: [
     { href: '/search', label: 'Search', icon: Search },
     { href: '/candidates', label: 'Candidates', icon: FileSearch },
+    { href: '/qualify', label: 'Qualify', icon: CheckSquare2 },
   ] },
   { label: 'Reference', items: [
     { href: '/developers', label: 'Developers', icon: Braces },
+    { href: '/webhooks', label: 'Webhooks', icon: Activity },
+    { href: '/usage', label: 'Usage', icon: Database },
     { href: '/settings', label: 'Settings', icon: Settings },
   ] },
 ];
