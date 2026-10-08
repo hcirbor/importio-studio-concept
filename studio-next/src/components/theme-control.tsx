@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/design-system';
 
 type Theme = 'light' | 'dark';
 
@@ -21,13 +22,8 @@ export function ThemeControl() {
     window.localStorage.setItem('importio-studio-theme', next);
   }
 
-  return (
-    <label className="theme-control">
-      <span className="sr-only">Theme</span>
-      <select value={theme} onChange={(event) => update(event.target.value as Theme)} aria-label="Theme">
-        <option value="light">Light</option>
-        <option value="dark">Dark</option>
-      </select>
-    </label>
-  );
+  return <Select value={theme} onValueChange={(value) => update(value as Theme)}>
+    <SelectTrigger className="theme-control" aria-label="Theme"><SelectValue /></SelectTrigger>
+    <SelectContent><SelectItem value="light">Light</SelectItem><SelectItem value="dark">Dark</SelectItem></SelectContent>
+  </Select>;
 }

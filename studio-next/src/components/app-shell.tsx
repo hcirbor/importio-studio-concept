@@ -7,7 +7,7 @@ import {
   Activity, BookOpen, Braces, CheckSquare2, Database, FileSearch, Home,
   Layers3, MonitorDot, PanelLeft, Plus, Search, Settings, Table2, Users,
 } from 'lucide-react';
-import { BrandMark } from '@/components/design-system';
+import { ImportioLogo } from './importio-logo';
 import { ThemeControl } from './theme-control';
 import { resolveWorkflowTemplate, workflowTemplates } from './workflow-config';
 import { ReviewRailCount } from './review-state';
@@ -73,8 +73,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {navOpen ? <button className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} /> : null}
       <aside className={navOpen ? 'sidebar mobile-open' : 'sidebar'}>
         <Link href="/" className="brand" aria-label="Import.io Studio home">
-          <BrandMark className="brand-mark" />
-          <span>import.io</span>
+          <ImportioLogo className="brand-wordmark" />
         </Link>
         <button className="workspace-card" type="button">
           <span className="workspace-icon">I</span>
