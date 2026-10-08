@@ -1,12 +1,13 @@
 import Link from 'next/link';
 import { Activity, Database, Globe2, Search, ShieldCheck } from 'lucide-react';
 import { Badge, Eyebrow } from '@/components/design-system';
+import { HomeAttention } from '@/components/home-attention';
 
 const workflows = [
   { title: 'Research', description: 'Find and compare facts, with a source behind every answer.', hint: 'Pricing, policies or market questions', meta: 'Known sources', icon: Search, href: '/build?template=research' },
   { title: 'Extract', description: 'Turn known pages into the exact typed fields you need.', hint: 'A product, article or company page', meta: 'One source', icon: Globe2, href: '/build?template=extract' },
   { title: 'Build a dataset', description: 'Follow links, qualify records and add researched columns.', hint: 'A catalogue, directory or supplier market', meta: 'Bounded navigation', icon: Database, href: '/build?template=collect' },
-  { title: 'Monitor', description: 'Keep approved pipelines current and review meaningful changes.', hint: 'A page that needs a trusted baseline', meta: 'Baseline first', icon: Activity, href: '/monitors' },
+  { title: 'Monitor', description: 'Keep approved pipelines current and review meaningful changes.', hint: 'A page that needs a trusted baseline', meta: 'Baseline first', icon: Activity, href: '/build?template=monitor' },
 ];
 
 export default function HomePage() {
@@ -45,7 +46,7 @@ export default function HomePage() {
       </section>
 
       <section className="dashboard-grid" aria-label="Workspace activity">
-        <article className="panel"><div className="section-head"><h2>Needs attention</h2><Badge tone="warning">1 item</Badge></div><div className="panel-body"><div className="attention-item"><span>!</span><div><strong>Trailhead availability is unknown</strong><small>Competitor prices · unresolved field</small></div><Link href="/review" className="text-link">Review</Link></div></div></article>
+        <HomeAttention />
         <article className="panel"><div className="section-head"><h2>Recent pipelines</h2><Link href="/pipelines" className="text-link">View all</Link></div><table className="data-table"><thead><tr><th>Pipeline</th><th>Status</th><th>Records</th></tr></thead><tbody><tr><td><Link href="/pipelines/competitor-prices">Competitor prices</Link></td><td><Badge tone="warning">Needs review</Badge></td><td>3</td></tr><tr><td>Outdoor catalogue</td><td><Badge tone="success">Completed</Badge></td><td>1,284</td></tr><tr><td>MAP watch</td><td><Badge tone="success">Healthy</Badge></td><td>9,316</td></tr></tbody></table></article>
       </section>
     </div>

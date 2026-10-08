@@ -1,13 +1,16 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { usePathname, useSearchParams } from 'next/navigation';
 import {
   Activity, BookOpen, Braces, CheckSquare2, Database, FileSearch, Home,
   Layers3, MonitorDot, PanelLeft, Plus, Search, Settings, Table2, Users,
 } from 'lucide-react';
 import { BrandMark } from '@/components/design-system';
 import { ThemeControl } from './theme-control';
+import { resolveWorkflowTemplate, workflowTemplates } from './workflow-config';
+import { ReviewRailCount } from './review-state';
 
 const groups = [
   { label: 'Build', items: [{ href: '/build', label: 'New workflow', icon: Plus }] },
@@ -36,7 +39,7 @@ const groups = [
   ] },
 ];
 
-function pageTitle(pathname: string) {
+function pageTitle(pathname: string): [string, string] {
   if (pathname === '/') return ['Studio', 'Home'];
   if (pathname === '/build') return ['Build', 'Research'];
   if (pathname.startsWith('/runs/')) return ['Runs', pathname.split('/').at(-1) ?? 'Run detail'];
@@ -46,12 +49,29 @@ function pageTitle(pathname: string) {
   return ['Studio', name.replace(/^./, (letter) => letter.toUpperCase())];
 }
 
+function Breadcrumbs({ pathname }: { pathname: string }) {
+  const searchParams = useSearchParams();
+  const [parent, defaultCurrent] = pageTitle(pathname);
+  const current = pathname === '/build'
+    ? workflowTemplates[resolveWorkflowTemplate(searchParams.get('template'))].title
+    : defaultCurrent;
+  return <div className="breadcrumbs"><span>{parent}</span><i>/</i><strong>{current}</strong></div>;
+}
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const [parent, current] = pageTitle(pathname);
+  const [navOpen, setNavOpen] = useState(false);
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === 'Escape') setNavOpen(false);
+    }
+    window.addEventListener('keydown', closeOnEscape);
+    return () => window.removeEventListener('keydown', closeOnEscape);
+  }, []);
   return (
     <div className="app-shell">
-      <aside className="sidebar">
+      {navOpen ? <button className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} /> : null}
+      <aside className={navOpen ? 'sidebar mobile-open' : 'sidebar'}>
         <Link href="/" className="brand" aria-label="Import.io Studio home">
           <BrandMark className="brand-mark" />
           <span>import.io</span>
@@ -61,14 +81,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <span><strong>Import.io Studio</strong><small>Demo workspace</small></span>
         </button>
         <nav aria-label="Primary navigation">
-          <Link href="/" className={pathname === '/' ? 'nav-item active' : 'nav-item'}><Home /><span>Home</span></Link>
+          <Link href="/" onClick={() => setNavOpen(false)} className={pathname === '/' ? 'nav-item active' : 'nav-item'}><Home /><span>Home</span></Link>
           {groups.map((group) => (
             <section className="nav-group" key={group.label}>
               <p>{group.label}</p>
               {group.items.map((item) => {
                 const active = pathname === item.href || (item.href === '/pipelines' && pathname.startsWith('/pipelines/'));
                 const Icon = item.icon;
-                return <Link href={item.href} className={active ? 'nav-item active' : 'nav-item'} key={item.href}><Icon /><span>{item.label}</span>{item.count ? <em>{item.count}</em> : null}</Link>;
+                return <Link href={item.href} onClick={() => setNavOpen(false)} className={active ? 'nav-item active' : 'nav-item'} key={item.href}><Icon /><span>{item.label}</span>{item.label === 'Review' ? <ReviewRailCount /> : item.count ? <em>{item.count}</em> : null}</Link>;
               })}
             </section>
           ))}
@@ -77,8 +97,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </aside>
       <div className="workspace">
         <header className="topbar">
-          <button className="mobile-menu" aria-label="Open navigation"><PanelLeft /></button>
-          <div className="breadcrumbs"><span>{parent}</span><i>/</i><strong>{current}</strong></div>
+          <button className="mobile-menu" aria-label="Open navigation" onClick={() => setNavOpen(true)}><PanelLeft /></button>
+          <Suspense fallback={<div className="breadcrumbs"><span>Build</span><i>/</i><strong>Workflow</strong></div>}><Breadcrumbs pathname={pathname} /></Suspense>
           <div className="top-actions"><span className="demo-chip">INTERACTIVE DEMO</span><span className="ready-chip"><i /> API &amp; database ready</span><ThemeControl /><span className="avatar">JD</span></div>
         </header>
         <main id="main">{children}</main>
