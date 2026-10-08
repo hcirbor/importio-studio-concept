@@ -105,8 +105,9 @@ main { min-width: 0; padding: 38px 34px 64px; }
 .guided-composer textarea { width: 100%; min-height: 126px; font-size: 15px; }
 .input-method-panel { min-height: 150px; padding: 14px; border-radius: 8px; background: var(--io-color-background); }
 .input-methods { display: flex; gap: 7px; flex-wrap: wrap; margin-top: 12px; }
-.input-methods button { min-height: 34px; padding: 0 10px; border: 1px solid var(--io-color-border); border-radius: 6px; background: var(--io-color-surface); color: var(--io-color-muted); }
-.input-methods button.active { border-color: var(--io-color-primary); background: var(--io-color-selected); color: var(--io-color-link); }
+.input-methods .input-method-button { min-height: 34px; justify-content: flex-start; padding: 0 10px; border: 1px solid var(--io-color-border); border-radius: 6px; background: var(--io-color-surface); color: var(--io-color-muted); box-shadow: none; }
+.input-methods .input-method-button:hover { border-color: color-mix(in srgb, var(--io-color-primary) 45%, var(--io-color-border)); background: var(--io-color-raised); color: var(--io-color-foreground); }
+.input-methods .input-method-button.active { border-color: var(--io-color-primary); background: var(--io-color-selected); color: var(--io-color-link); box-shadow: 0 0 0 1px var(--io-color-primary); }
 .input-method-panel p { margin: 14px 0 0; color: var(--io-color-success); font: 11px var(--io-font-mono); }
 .templates { display: grid; gap: 8px; }
 .templates-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
@@ -455,12 +456,31 @@ main { padding: 30px 32px 64px; }
 .composer-tools { min-height: 56px; padding: 5px 8px 5px 11px; }
 .composer-tool-list { gap: 2px; }
 .composer-tools button { min-height: 40px; padding: 7px; font-size: 11.5px; }
+.composer-tools .composer-tool-list button.active { background: var(--io-color-selected); color: var(--io-color-link); }
 .composer-tools .send { width: 46px; min-height: 46px; flex-basis: 46px; }
-.composer.guided-mode { padding: 28px; box-shadow: none; }
+.composer-tool-panel { display: grid; gap: 18px; padding: 20px 24px 24px; border-top: 1px solid var(--io-color-border); background: var(--io-color-background); }
+.composer-tool-panel > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 20px; }
+.composer-tool-panel h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
+.composer-tool-panel header p { margin: 5px 0 0; color: var(--io-color-muted); font-size: 12px; }
+.composer-tool-panel header button { flex: 0 0 auto; }
+.tool-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.tool-field { min-width: 0; display: grid; gap: 7px; }
+.tool-field > span { color: var(--io-color-subtle); font: 600 10px var(--io-font-mono); letter-spacing: .09em; text-transform: uppercase; }
+.tool-field > button, .tool-field > input, .tool-field > textarea { width: 100%; }
+.tool-field > textarea { min-height: 104px; resize: vertical; }
+.tool-field-wide { width: 100%; }
+.tool-field-span-2 { grid-column: span 2; }
+.prompt-rewrite { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 20px; }
+.prompt-rewrite > p { margin: 0; padding: 14px 16px; border-left: 2px solid var(--io-color-primary); border-radius: 0 7px 7px 0; background: var(--io-color-surface); color: var(--io-color-muted); font-size: 13px; line-height: 1.6; }
+.prompt-rewrite > div { display: flex; gap: 8px; }
+.composer.guided-mode { min-height: 588px; padding: 28px; box-shadow: none; }
 .composer.guided-mode .composer-tools { display: none; }
-.guided-composer { display: grid; grid-template-columns: 1fr; gap: 24px; min-height: 0; }
+.guided-composer { display: grid; grid-template-columns: 1fr; align-content: start; gap: 24px; min-height: 0; }
 .input-method-panel { min-height: 166px; padding: 16px; border: 1px solid var(--io-color-border); border-radius: 8px; background: var(--io-color-background); }
 .input-methods button { min-height: 38px; padding: 0 11px; }
+.builder-main .input-methods .input-method-button { border-color: var(--io-color-border); border-radius: 6px; background: var(--io-color-surface); color: var(--io-color-muted); box-shadow: none; }
+.builder-main .input-methods .input-method-button:hover { border-color: color-mix(in srgb, var(--io-color-primary) 45%, var(--io-color-border)); background: var(--io-color-raised); color: var(--io-color-foreground); }
+.builder-main .input-methods .input-method-button.active { border-color: var(--io-color-primary); background: var(--io-color-selected); color: var(--io-color-link); box-shadow: 0 0 0 1px var(--io-color-primary); }
 .input-method-panel p { margin-top: 22px; }
 .guided-field { display: grid; gap: 8px; }
 .guided-field > strong { color: var(--io-color-subtle); font: 600 11px var(--io-font-mono); letter-spacing: .09em; text-transform: uppercase; }
