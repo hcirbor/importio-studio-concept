@@ -1,8 +1,9 @@
 import { WorkspaceSection } from '@/components/workspace-section';
+import { workspaceSectionSlugs } from '@/components/workspace/registry';
 
-const sectionSlugs = ['pipelines','runs','datasets','monitors','memories','groups','enrich','search','candidates','qualify','developers','webhooks','usage','settings'];
-
-export function generateStaticParams() { return sectionSlugs.map((section) => ({ section })); }
+export function generateStaticParams() {
+  return workspaceSectionSlugs.map((section) => ({ section }));
+}
 
 export default async function WorkspacePage({ params }: { params: Promise<{ section: string }> }) {
   const { section } = await params;

@@ -1,13 +1,45 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { ArrowUp, ChevronLeft, ChevronRight, Database, FileText, Globe2, Hand, ListFilter, Sparkles, Tags, X } from 'lucide-react';
-import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger, Eyebrow, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsList, TabsTrigger, Textarea } from '@/components/design-system';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ArrowUp,
+  ChevronLeft,
+  ChevronRight,
+  Database,
+  FileText,
+  Globe2,
+  Hand,
+  ListFilter,
+  Sparkles,
+  Tags,
+  X,
+} from 'lucide-react';
+import {
+  Badge,
+  Button,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  Eyebrow,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Tabs,
+  TabsList,
+  TabsTrigger,
+  Textarea,
+} from '@/components/design-system';
 import { resolveWorkflowTemplate, visibleStarterKeys, workflowTemplates, type WorkflowTemplateKey } from './workflow-config';
 import { RunSession } from './run-session';
-import { DatasetReview } from './dataset-review';
+import { WorkflowScenarioReview } from './workflow-scenario-review';
 
 const inputMethods = [
   ['urls', 'Paste URLs or domains'],
@@ -18,7 +50,7 @@ const inputMethods = [
   ['research', 'Prior research'],
 ] as const;
 
-type InputMethod = typeof inputMethods[number][0];
+type InputMethod = (typeof inputMethods)[number][0];
 type ComposerTool = 'Sources' | 'Browser actions' | 'Fields' | 'Limits' | 'Rules' | 'Improve prompt';
 
 const templateFields: Record<WorkflowTemplateKey, string> = {
@@ -54,24 +86,34 @@ function parseCsvRows(text: string) {
   });
 }
 
-function ToolSelect({ label, value, onValueChange, options }: { label: string; value: string; onValueChange: (value: string) => void; options: string[] }) {
-  return <label className="tool-field"><span>{label}</span><Select value={value} onValueChange={onValueChange}><SelectTrigger aria-label={label}><SelectValue /></SelectTrigger><SelectContent>{options.map((option) => <SelectItem value={option} key={option}>{option}</SelectItem>)}</SelectContent></Select></label>;
-}
-
-const reviewFixtures: Partial<Record<WorkflowTemplateKey, { headings: string[]; rows: string[][] }>> = {
-  research: { headings: ['Company', 'Pricing URL', 'Starting price', 'Free plan', 'Evidence'], rows: [['HubSpot', 'hubspot.com/pricing', '$20 / month', 'Yes', 'Supported · plan card'], ['Mailchimp', 'mailchimp.com/pricing', '$13 / month', 'Yes', 'Supported · pricing page'], ['Brevo', 'brevo.com/pricing', 'Pending input', '—', 'Cookie decision required']] },
-  collect: { headings: ['Product', 'Price', 'Availability', 'URL', 'Evidence'], rows: [['Summit Solo Tent', '€179', 'In stock', '/tents/summit-solo', 'Supported · page 1'], ['Trailhead 2P Tent', '€249', 'In stock', '/tents/trailhead-2p', 'Supported · page 2'], ['Basecamp 4 Tent', '€399', 'Low stock', '/tents/basecamp-4', 'Supported · page 2']] },
-  extract: { headings: ['Product', 'Price', 'Availability', 'URL', 'Evidence'], rows: [['Trailhead 2P Tent', '€249', 'In stock', '/tents/trailhead-2p', 'Supported · product page']] },
-  discover: { headings: ['Company', 'Location', 'Categories', 'Minimum order', 'Evidence'], rows: [['Northwind Trade', 'Rotterdam', 'Tents, packs', '€500', 'Supported · directory'], ['Summit Supply Europe', 'Lyon', 'Camping equipment', '€750', 'Supported · detail page'], ['Alpine Trade', 'Innsbruck', 'Outdoor equipment', '€400', 'Supported · detail page']] },
-  monitor: { headings: ['Field', 'Baseline', 'Status', 'Source', 'Evidence'], rows: [['Price', '€249', 'Baseline saved', 'northwind-outdoors.example', 'Supported · product page'], ['Availability', 'In stock', 'Baseline saved', 'northwind-outdoors.example', 'Supported · product page']] },
-};
-
-function ScenarioReview({ scenario }: { scenario: WorkflowTemplateKey }) {
-  const [feedback, setFeedback] = useState('');
-  if (scenario === 'compare') return <DatasetReview />;
-  const fixture = reviewFixtures[scenario] ?? reviewFixtures.collect!;
-  const exportRows = () => { const url = URL.createObjectURL(new Blob([JSON.stringify(fixture.rows, null, 2)], {type:'application/json'})); const anchor = document.createElement('a'); anchor.href = url; anchor.download = `${scenario}-preview.json`; anchor.click(); URL.revokeObjectURL(url); setFeedback('Preview exported as JSON.'); };
-  return <section className="panel scenario-review"><div className="review-summary"><span>PREVIEW COMPLETE</span><strong>{fixture.rows.length} supported {fixture.rows.length === 1 ? 'record' : 'records'} ready to review.</strong></div>{feedback ? <p className="review-feedback" role="status">{feedback}</p> : null}<div className="table-scroll"><table className="data-table"><thead><tr>{fixture.headings.map((heading) => <th key={heading}>{heading}</th>)}</tr></thead><tbody>{fixture.rows.map((row, rowIndex) => <tr key={rowIndex}>{row.map((cell, cellIndex) => <td key={cellIndex}>{cell}</td>)}</tr>)}</tbody></table></div><footer className="review-footer"><span>Evidence retained with every supported value</span><Button variant="secondary" onClick={exportRows}>Export JSON</Button><Button variant="primary" onClick={() => setFeedback('Dataset saved to the Studio workspace.')}>Save dataset</Button></footer></section>;
+function ToolSelect({
+  label,
+  value,
+  onValueChange,
+  options,
+}: {
+  label: string;
+  value: string;
+  onValueChange: (value: string) => void;
+  options: string[];
+}) {
+  return (
+    <label className="tool-field">
+      <span>{label}</span>
+      <Select value={value} onValueChange={onValueChange}>
+        <SelectTrigger aria-label={label}>
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {options.map((option) => (
+            <SelectItem value={option} key={option}>
+              {option}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </label>
+  );
 }
 
 export function WorkflowComposer() {
@@ -249,16 +291,174 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
             ? <section className="guided-source-card"><div className="guided-source-intro"><Eyebrow>Live discovery</Eyebrow><strong>Let Studio find candidate sources</strong><p>Discovery finds candidates only. Qualification remains a separate, evidence-backed step.</p></div><div className="guided-option-controls"><div className="guided-option-grid guided-option-grid-three"><label className="tool-field"><span>Search query</span><Input value={discoveryQuery} onChange={(event) => { setDiscoveryQuery(event.target.value); setGuidedFeedback(''); }} aria-label="Discovery query" /></label><ToolSelect label="Entity type" value={discoveryEntity} onValueChange={(value) => { setDiscoveryEntity(value); setGuidedFeedback(''); }} options={['Company','Product','Any web result']} /><ToolSelect label="Result limit" value={discoveryLimit} onValueChange={(value) => { setDiscoveryLimit(value); setGuidedFeedback(''); }} options={['10','20','50']} /></div><Button variant="secondary" type="button" onClick={useDiscoveryInput}>Use live-web discovery</Button>{guidedFeedback ? <p className="guided-option-status" role="status">{guidedFeedback}</p> : null}</div></section>
             : <section className="guided-source-card"><div className="guided-source-intro"><Eyebrow>Prior research</Eyebrow><strong>Continue from reviewed research</strong><p>Reuse retained leads as labelled context, then verify every requested fact against live sources.</p></div><div className="guided-option-controls"><div className="guided-option-grid guided-option-grid-three"><ToolSelect label="Prior research" value={researchSet} onValueChange={(value) => { setResearchSet(value); setGuidedFeedback(''); }} options={['SaaS pricing research · 74 records','Retailer coverage study · 128 records','Supplier discovery · 42 records']} /><ToolSelect label="Reuse policy" value={researchPolicy} onValueChange={(value) => { setResearchPolicy(value); setGuidedFeedback(''); }} options={['Use as leads; re-verify every fact','Use only to seed discovery']} /><div className="guided-retention"><span>Retention</span><strong>24 days remaining</strong></div></div><Button variant="secondary" type="button" onClick={usePriorResearch}>Use selected research</Button>{guidedFeedback ? <p className="guided-option-status" role="status">{guidedFeedback}</p> : null}</div></section>;
 
-  const stepper = <div className="stepper" aria-label="Workflow progress">
-    {['Describe', 'Review plan', 'Watch run', 'Review data'].map((label, index) => <div className="step-segment" key={label}><Button variant="ghost" className={index === stage ? 'step active' : index < stage ? 'step done' : 'step'} onClick={() => index <= stage && setStage(index)} disabled={index > stage}><i>{index < stage ? '✓' : index + 1}</i>{label}</Button>{index < 3 ? <i className="step-line" /> : null}</div>)}
-  </div>;
-  const runId = selected === 'research' ? 'run_batch_91af' : selected === 'collect' ? 'run_collect' : selected === 'discover' ? 'run_discover' : selected === 'extract' ? 'run_extract' : selected === 'monitor' ? 'run_monitor' : 'run_7f3a';
+  const stepper = (
+    <div className="stepper" aria-label="Workflow progress">
+      {['Describe', 'Review plan', 'Watch run', 'Review data'].map((label, index) => (
+        <div className="step-segment" key={label}>
+          <Button
+            variant="ghost"
+            className={index === stage ? 'step active' : index < stage ? 'step done' : 'step'}
+            onClick={() => index <= stage && setStage(index)}
+            disabled={index > stage}
+          >
+            <i>{index < stage ? '✓' : index + 1}</i>
+            {label}
+          </Button>
+          {index < 3 ? <i className="step-line" /> : null}
+        </div>
+      ))}
+    </div>
+  );
 
-  if (stage === 1) return <>{stepper}<section className="workflow-stage"><header className="stage-head"><div><Eyebrow>Review plan</Eyebrow><h1>Confirm what Studio will do.</h1><p>Review the sources, browser work and output before anything runs.</p></div><Badge tone="info">{template.type}</Badge></header><div className="plan-grid"><article className="panel plan-steps"><div className="section-head"><h2>Plan</h2><span>{sourceLabel}</span></div><ol><li><span>1</span><div><strong>Open approved sources</strong><p>Visit only the supplied URLs and retain each final URL.</p></div></li><li><span>2</span><div><strong>Inspect the relevant content</strong><p>Read product, pricing or directory content required by the request.</p></div></li><li><span>3</span><div><strong>Return supported records</strong><p>Produce {fieldCount} fields with a source quote for every supported value.</p></div></li></ol></article><aside className="panel plan-contract"><div className="section-head"><h2>Run contract</h2></div><dl className="detail-list"><div><dt>Workflow</dt><dd>{template.type}</dd></div><div><dt>Sources</dt><dd>{sourceLabel}</dd></div><div><dt>Fields</dt><dd>{fieldCount}</dd></div><div><dt>Missing data</dt><dd>{missingData}</dd></div><div><dt>Evidence</dt><dd>{evidence}</dd></div></dl></aside></div><div className="stage-actions"><Button variant="secondary" onClick={() => setStage(0)}>Back to describe</Button><Button variant="primary" onClick={() => setStage(2)}>Approve and run →</Button></div></section></>;
+  const runId = selected === 'research'
+    ? 'run_batch_91af'
+    : selected === 'collect'
+      ? 'run_collect'
+      : selected === 'discover'
+        ? 'run_discover'
+        : selected === 'extract'
+          ? 'run_extract'
+          : selected === 'monitor'
+            ? 'run_monitor'
+            : 'run_7f3a';
 
-  if (stage === 2) return <>{stepper}<section className="workflow-stage"><header className="stage-head"><div><Eyebrow>Watch run</Eyebrow><h1>{selected === 'research' ? `${template.type} is working through the approved sources.` : `${template.type} run complete.`}</h1><p>{selected === 'research' ? 'Follow each worker, replay captured steps and resolve input when needed.' : 'Replay every captured step, then inspect the records and retained evidence.'}</p></div><Badge tone={selected === 'research' ? 'info' : 'success'}>{selected === 'research' ? 'Running' : 'Completed'}</Badge></header><RunSession runId={runId} /><div className="stage-actions"><Button variant="secondary" onClick={() => setStage(1)}>Review plan</Button><Button variant="primary" onClick={() => setStage(3)}>Review data →</Button></div></section></>;
+  if (stage === 1) {
+    return (
+      <>
+        {stepper}
+        <section className="workflow-stage">
+          <header className="stage-head">
+            <div>
+              <Eyebrow>Review plan</Eyebrow>
+              <h1>Confirm what Studio will do.</h1>
+              <p>Review the sources, browser work and output before anything runs.</p>
+            </div>
+            <Badge tone="info">{template.type}</Badge>
+          </header>
 
-  if (stage === 3) return <>{stepper}<section className="workflow-stage"><header className="stage-head"><div><Eyebrow>Review data</Eyebrow><h1>Check the records and their evidence.</h1><p>Every supported value stays linked to the page and capture it came from.</p></div><Badge tone={selected === 'compare' || selected === 'research' ? 'warning' : 'success'}>{selected === 'compare' || selected === 'research' ? '1 field needs review' : 'Ready to save'}</Badge></header><ScenarioReview scenario={selected} /><div className="stage-actions"><Button variant="secondary" onClick={() => setStage(2)}>Back to run</Button><Button variant="primary" asChild><Link href="/datasets/competitor-prices">Open saved dataset</Link></Button></div></section></>;
+          <div className="plan-grid">
+            <article className="panel plan-steps">
+              <div className="section-head">
+                <h2>Plan</h2>
+                <span>{sourceLabel}</span>
+              </div>
+              <ol>
+                <li>
+                  <span>1</span>
+                  <div>
+                    <strong>Open approved sources</strong>
+                    <p>Visit only the supplied URLs and retain each final URL.</p>
+                  </div>
+                </li>
+                <li>
+                  <span>2</span>
+                  <div>
+                    <strong>Inspect the relevant content</strong>
+                    <p>Read product, pricing or directory content required by the request.</p>
+                  </div>
+                </li>
+                <li>
+                  <span>3</span>
+                  <div>
+                    <strong>Return supported records</strong>
+                    <p>
+                      Produce {fieldCount} fields with a source quote for every supported value.
+                    </p>
+                  </div>
+                </li>
+              </ol>
+            </article>
+
+            <aside className="panel plan-contract">
+              <div className="section-head">
+                <h2>Run contract</h2>
+              </div>
+              <dl className="detail-list">
+                <div><dt>Workflow</dt><dd>{template.type}</dd></div>
+                <div><dt>Sources</dt><dd>{sourceLabel}</dd></div>
+                <div><dt>Fields</dt><dd>{fieldCount}</dd></div>
+                <div><dt>Missing data</dt><dd>{missingData}</dd></div>
+                <div><dt>Evidence</dt><dd>{evidence}</dd></div>
+              </dl>
+            </aside>
+          </div>
+
+          <div className="stage-actions">
+            <Button variant="secondary" onClick={() => setStage(0)}>Back to describe</Button>
+            <Button variant="primary" onClick={() => setStage(2)}>Approve and run →</Button>
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  if (stage === 2) {
+    const isRunning = selected === 'research';
+
+    return (
+      <>
+        {stepper}
+        <section className="workflow-stage">
+          <header className="stage-head">
+            <div>
+              <Eyebrow>Watch run</Eyebrow>
+              <h1>
+                {isRunning
+                  ? `${template.type} is working through the approved sources.`
+                  : `${template.type} run complete.`}
+              </h1>
+              <p>
+                {isRunning
+                  ? 'Follow each worker, replay captured steps and resolve input when needed.'
+                  : 'Replay every captured step, then inspect the records and retained evidence.'}
+              </p>
+            </div>
+            <Badge tone={isRunning ? 'info' : 'success'}>
+              {isRunning ? 'Running' : 'Completed'}
+            </Badge>
+          </header>
+
+          <RunSession runId={runId} />
+
+          <div className="stage-actions">
+            <Button variant="secondary" onClick={() => setStage(1)}>Review plan</Button>
+            <Button variant="primary" onClick={() => setStage(3)}>Review data →</Button>
+          </div>
+        </section>
+      </>
+    );
+  }
+
+  if (stage === 3) {
+    const needsReview = selected === 'compare' || selected === 'research';
+
+    return (
+      <>
+        {stepper}
+        <section className="workflow-stage">
+          <header className="stage-head">
+            <div>
+              <Eyebrow>Review data</Eyebrow>
+              <h1>Check the records and their evidence.</h1>
+              <p>Every supported value stays linked to the page and capture it came from.</p>
+            </div>
+            <Badge tone={needsReview ? 'warning' : 'success'}>
+              {needsReview ? '1 field needs review' : 'Ready to save'}
+            </Badge>
+          </header>
+
+          <WorkflowScenarioReview scenario={selected} />
+
+          <div className="stage-actions">
+            <Button variant="secondary" onClick={() => setStage(2)}>Back to run</Button>
+            <Button variant="primary" asChild>
+              <Link href="/datasets/competitor-prices">Open saved dataset</Link>
+            </Button>
+          </div>
+        </section>
+      </>
+    );
+  }
 
   return (
     <>
