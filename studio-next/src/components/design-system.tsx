@@ -23,6 +23,7 @@ export {
   SelectValue,
   Textarea,
   Tabs,
+  TabsContent,
   TabsList,
   TabsTrigger,
 } from '@importio/design-system';

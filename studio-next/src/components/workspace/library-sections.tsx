@@ -51,13 +51,13 @@ const enrichmentFixtures = [
   { name: 'Retailer domain match', rows: '74 rows', status: 'Completed → Succeeded', tone: 'success' as const },
 ];
 
-export function MemoriesSection() {
+export function SavedRunsSection({ showHeader = true }: { showHeader?: boolean }) {
   return (
     <>
-      <PageHead group="Library" title="Memories" description="Remembered runs available as labelled prior research." />
+      {showHeader ? <PageHead group="Operate" title="Saved runs" description="Saved runs available as labelled prior research." /> : null}
       <TablePanel
-        title="Remembered runs"
-        meta="2 memories"
+        title="Saved runs"
+        meta="2 saved runs"
         headings={['Label', 'Run', 'Retention', 'State → outcome', '']}
         rows={memoryRows}
       />
@@ -65,7 +65,7 @@ export function MemoriesSection() {
   );
 }
 
-export function GroupsSection() {
+export function BatchesSection({ showHeader = true }: { showHeader?: boolean }) {
   const [message, setMessage] = useState<string>();
   const rows: TableRow[] = groupFixtures.map((group) => ({
     id: group.name,
@@ -85,20 +85,20 @@ export function GroupsSection() {
 
   return (
     <>
-      <PageHead group="Library" title="Groups" description="Bounded batches of 2–10 items with per-item status." />
+      {showHeader ? <PageHead group="Operate" title="Batches" description="Bounded batches of 2–10 items with per-item status." /> : null}
       <Feedback tone="info">{message}</Feedback>
       <TablePanel
-        title="Groups"
-        meta="2 groups"
-        headings={['Group', 'Items', 'State → outcome', '']}
+        title="Batches"
+        meta="2 batches"
+        headings={['Batch', 'Items', 'State → outcome', '']}
         rows={rows}
       />
     </>
   );
 }
 
-export function EnrichSection() {
-  const [dialogOpen, setDialogOpen] = useState(false);
+export function EnrichmentsSection({ showHeader = true, openCreateOnMount = false }: { showHeader?: boolean; openCreateOnMount?: boolean }) {
+  const [dialogOpen, setDialogOpen] = useState(openCreateOnMount);
   const [name, setName] = useState('New supplier enrichment');
   const [fileName, setFileName] = useState('');
   const [message, setMessage] = useState('');
@@ -131,7 +131,7 @@ export function EnrichSection() {
 
   return (
     <>
-      <PageHead group="Library" title="Enrich" description="CSV enrichment with a verdict and evidence per cell." />
+      {showHeader ? <PageHead group="Operate" title="Enrichments" description="CSV enrichment with a verdict and evidence per cell." /> : null}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>

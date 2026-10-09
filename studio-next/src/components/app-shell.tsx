@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { Suspense, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
-  Activity, BookOpen, Braces, CheckSquare2, Database, FileSearch, Home,
-  Layers3, MonitorDot, PanelLeft, Plus, Search, Settings, Table2, Users,
+  Activity, Braces, CheckSquare2, Database, Home,
+  Layers3, MonitorDot, PanelLeft, Plus, Search, Settings, Table2,
 } from 'lucide-react';
 import { ThemeControl } from './theme-control';
 import { resolveWorkflowTemplate, workflowTemplates } from './workflow-config';
@@ -13,40 +13,52 @@ import { ReviewRailCount } from './review-state';
 import { BrandMark, Button } from '@/components/design-system';
 
 const groups = [
-  { label: 'Build', items: [{ href: '/build', label: 'New workflow', icon: Plus }] },
+  { label: 'Build', items: [
+    { href: '/build', label: 'New workflow', icon: Plus },
+    { href: '/search', label: 'Search', icon: Search },
+  ] },
   { label: 'Operate', items: [
     { href: '/pipelines', label: 'Pipelines', icon: Layers3 },
     { href: '/runs', label: 'Runs', icon: Activity, count: 3 },
+    { href: '/review', label: 'Review', icon: CheckSquare2, count: 1 },
     { href: '/datasets', label: 'Datasets', icon: Table2 },
     { href: '/monitors', label: 'Monitors', icon: MonitorDot },
-    { href: '/review', label: 'Review', icon: CheckSquare2, count: 1 },
   ] },
-  { label: 'Library', items: [
-    { href: '/memories', label: 'Memories', icon: BookOpen },
-    { href: '/groups', label: 'Groups', icon: Users },
-    { href: '/enrich', label: 'Enrich', icon: Database },
-  ] },
-  { label: 'Discovery', items: [
-    { href: '/search', label: 'Search', icon: Search },
-    { href: '/candidates', label: 'Candidates', icon: FileSearch },
-    { href: '/qualify', label: 'Qualify', icon: CheckSquare2 },
-  ] },
-  { label: 'Reference', items: [
+  { label: 'Develop', items: [
     { href: '/developers', label: 'Developers', icon: Braces },
-    { href: '/webhooks', label: 'Webhooks', icon: Activity },
     { href: '/usage', label: 'Usage', icon: Database },
-    { href: '/settings', label: 'Settings', icon: Settings },
   ] },
 ];
 
-function pageTitle(pathname: string): [string, string] {
-  if (pathname === '/') return ['Studio', 'Home'];
-  if (pathname === '/build') return ['Build', 'Research'];
-  if (pathname.startsWith('/runs/')) return ['Runs', pathname.split('/').at(-1) ?? 'Run detail'];
-  if (pathname.startsWith('/datasets/')) return ['Datasets', 'Competitor prices'];
-  if (pathname.includes('competitor-prices')) return ['Pipelines', 'Competitor prices'];
+type QueryReader = { get: (name: string) => string | null };
+
+function pageTitle(pathname: string, searchParams: QueryReader): [string, string, string] {
+  if (pathname === '/') return ['Studio', 'Home', 'Home'];
+  if (pathname === '/build') return ['Build', 'Research', 'Build'];
+  if (pathname === '/runs') {
+    const tab = searchParams.get('tab');
+    if (tab === 'saved') return ['Runs', 'Saved', 'Saved runs'];
+    if (tab === 'batches') return ['Runs', 'Batches', 'Batches'];
+    return ['Runs', 'All runs', 'All runs'];
+  }
+  if (pathname === '/search') {
+    const current = searchParams.get('tab') === 'companies' ? 'Companies' : 'Pages';
+    return ['Search', current, current];
+  }
+  if (pathname === '/developers') {
+    const current = searchParams.get('tab') === 'webhooks' ? 'Webhooks' : 'API & MCP';
+    return ['Developers', current, current];
+  }
+  if (pathname === '/datasets') {
+    const current = searchParams.get('type') === 'enrichment' ? 'Enrichments' : 'Datasets';
+    return ['Datasets', current, current];
+  }
+  if (pathname.startsWith('/runs/')) return ['Runs', pathname.split('/').at(-1) ?? 'Run detail', 'Run detail'];
+  if (pathname.startsWith('/datasets/')) return ['Datasets', 'Competitor prices', 'Competitor prices'];
+  if (pathname.includes('competitor-prices')) return ['Pipelines', 'Competitor prices', 'Competitor prices'];
   const name = pathname.split('/').filter(Boolean).at(-1)?.replaceAll('-', ' ') ?? 'Home';
-  return ['Studio', name.replace(/^./, (letter) => letter.toUpperCase())];
+  const current = name.replace(/^./, (letter) => letter.toUpperCase());
+  return ['Studio', current, current];
 }
 
 function parentBreadcrumbHref(pathname: string) {
@@ -67,18 +79,32 @@ function Breadcrumbs({ pathname }: { pathname: string }) {
     window.addEventListener('studio:workflow-title', updateBuildTitle);
     return () => window.removeEventListener('studio:workflow-title', updateBuildTitle);
   }, []);
-  const [parent, defaultCurrent] = pageTitle(pathname);
+  const [parent, defaultCurrent, documentPageTitle] = pageTitle(pathname, searchParams);
   const current = pathname === '/build'
     ? liveBuildTitle ?? workflowTemplates[resolveWorkflowTemplate(searchParams.get('template'))].title
     : defaultCurrent;
   const parentHref = parentBreadcrumbHref(pathname);
+  const fullDocumentTitle = `${documentPageTitle} · Import.io Studio`;
+
+  useEffect(() => {
+    const syncDocumentTitle = () => {
+      if (document.title !== fullDocumentTitle) document.title = fullDocumentTitle;
+    };
+    syncDocumentTitle();
+    const observer = new MutationObserver(syncDocumentTitle);
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [fullDocumentTitle]);
 
   return (
-    <nav className="breadcrumbs" aria-label="Breadcrumb">
-      {parentHref ? <Link href={parentHref}>{parent}</Link> : <span>{parent}</span>}
-      <i aria-hidden="true">/</i>
-      <strong aria-current="page">{current}</strong>
-    </nav>
+    <>
+      <title>{fullDocumentTitle}</title>
+      <nav className="breadcrumbs" aria-label="Breadcrumb">
+        {parentHref ? <Link href={parentHref}>{parent}</Link> : <span>{parent}</span>}
+        <i aria-hidden="true">/</i>
+        <strong aria-current="page">{current}</strong>
+      </nav>
+    </>
   );
 }
 
@@ -138,12 +164,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <BrandMark className="brand-mark" title="" />
           <span className="brand-name">import.io</span>
         </Link>
-        <Button variant="ghost" className="workspace-card" asChild>
-          <Link href="/settings" onClick={handleSidebarNavigation}>
-          <span className="workspace-icon">I</span>
-          <span><strong>Import.io Studio</strong><small>Demo workspace</small></span>
-          </Link>
-        </Button>
         <nav aria-label="Primary navigation">
           <Link href="/" onClick={handleSidebarNavigation} className={pathname === '/' ? 'nav-item active' : 'nav-item'}><Home /><span>Home</span></Link>
           {groups.map((group) => (
@@ -157,7 +177,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </section>
           ))}
         </nav>
-        <div className="profile"><span>JD</span><div><strong>Jordan Davis</strong><small>Personal workspace</small></div></div>
+        <div className="sidebar-footer">
+          <Link href="/settings" onClick={handleSidebarNavigation} className={pathname === '/settings' ? 'nav-item active' : 'nav-item'}><Settings /><span>Settings</span></Link>
+          <Button variant="ghost" className="workspace-card" asChild>
+            <Link href="/settings" onClick={handleSidebarNavigation}>
+              <span className="workspace-icon">I</span>
+              <span><strong>Import.io Studio</strong><small>Demo workspace</small></span>
+            </Link>
+          </Button>
+          <div className="profile"><span>JD</span><div><strong>Jordan Davis</strong><small>Personal workspace</small></div></div>
+        </div>
       </aside>
       <div className="workspace">
         <header className="topbar">

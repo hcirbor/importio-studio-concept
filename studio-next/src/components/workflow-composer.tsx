@@ -519,6 +519,9 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
             const Icon = key === 'research' ? Globe2 : key === 'extract' ? Tags : key === 'collect' ? Database : ListFilter;
             return <Button variant="secondary" className={selected === key ? 'template-pill active' : 'template-pill'} onClick={() => applyTemplate(key)} key={key}><Icon size={14} style={{display:'inline',marginRight:8}} />{item.label}</Button>;
           })}
+          <Button variant="secondary" className="template-pill" asChild>
+            <Link href="/datasets?type=enrichment&create=csv"><Database size={14} style={{display:'inline',marginRight:8}} />Enrich a CSV</Link>
+          </Button>
           <Dialog open={templateBrowserOpen} onOpenChange={setTemplateBrowserOpen}>
             <DialogTrigger asChild><Button variant="ghost" className="template-pill" style={{border:0,color:'var(--io-color-link)'}}>Browse all templates →</Button></DialogTrigger>
             <DialogContent className="template-browser-dialog">
@@ -528,6 +531,9 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
                   const item = workflowTemplates[key];
                   return <Button variant="secondary" className={selected === key ? 'template-browser-option active' : 'template-browser-option'} onClick={() => { applyTemplate(key); setTemplateBrowserOpen(false); }} key={key}><span><Eyebrow>{item.type}</Eyebrow><strong>{item.label}</strong><small>{item.description}</small></span><span aria-hidden="true">→</span></Button>;
                 })}
+                <Button variant="secondary" className="template-browser-option" asChild>
+                  <Link href="/datasets?type=enrichment&create=csv"><span><Eyebrow>Enrich</Eyebrow><strong>Enrich a CSV</strong><small>Upload a bounded list and add evidence-backed fields to each row.</small></span><span aria-hidden="true">→</span></Link>
+                </Button>
               </div>
             </DialogContent>
           </Dialog>

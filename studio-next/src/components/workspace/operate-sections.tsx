@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import {
   Button,
@@ -25,6 +25,8 @@ import {
   type TableRow,
   type Tone,
 } from './shared';
+import { EnrichmentsSection } from './library-sections';
+import { SectionTabs, useSectionTab } from './section-tabs';
 
 const pipelines = [
   {
@@ -225,7 +227,7 @@ export function PipelinesSection() {
   );
 }
 
-export function RunsSection() {
+export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
   const router = useRouter();
   const [workflow, setWorkflow] = useState('all');
   const [state, setState] = useState('all');
@@ -266,7 +268,7 @@ export function RunsSection() {
 
   return (
     <>
-      <PageHead group="Operate" title="Runs" description="Every execution, with scope, status, usage and actionable exceptions." />
+      {showHeader ? <PageHead group="Operate" title="All runs" description="Every execution, with scope, status, usage and actionable exceptions." /> : null}
       <section className="metric-grid">
         <article><small>Running</small><b>1</b></article>
         <article><small>Partial</small><b>1</b></article>
@@ -337,6 +339,13 @@ export function RunsSection() {
 }
 
 export function DatasetsSection() {
+  const searchParams = useSearchParams();
+  const typeTabs = [
+    { value: 'all', label: 'All' },
+    { value: 'dataset', label: 'Datasets' },
+    { value: 'enrichment', label: 'Enrichments' },
+  ];
+  const type = useSectionTab('type', typeTabs, 'all');
   const [query, setQuery] = useState('');
   const [validation, setValidation] = useState('all');
   const [message, setMessage] = useState('');
@@ -353,7 +362,8 @@ export function DatasetsSection() {
   return (
     <>
       <PageHead group="Operate" title="Datasets" description="Versioned structured outputs ready for review, export and delivery." />
-      <Toolbar search="Search datasets" value={query} onChange={setQuery}>
+      <SectionTabs value={type} tabs={typeTabs} param="type" fallback="all" />
+      {type !== 'enrichment' ? <><Toolbar search="Search datasets" value={query} onChange={setQuery}>
         <SelectField
           label="Dataset validation"
           value={validation}
@@ -393,7 +403,10 @@ export function DatasetsSection() {
             </footer>
           </article>
         ))}
-      </section>
+      </section></> : null}
+      {type !== 'dataset' ? (
+        <EnrichmentsSection showHeader={false} openCreateOnMount={searchParams.get('create') === 'csv'} />
+      ) : null}
     </>
   );
 }

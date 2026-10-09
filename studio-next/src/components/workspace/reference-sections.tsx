@@ -45,7 +45,7 @@ const usageRows: TableRow[] = [
   { id: 'qualified-suppliers', cells: ['Qualified suppliers', '120', '2,204', '42 min', '$0.84'] },
 ];
 
-export function DevelopersSection() {
+export function DevelopersSection({ showHeader = true }: { showHeader?: boolean }) {
   const [message, setMessage] = useState('');
 
   async function copyCurl() {
@@ -59,7 +59,7 @@ export function DevelopersSection() {
 
   return (
     <>
-      <PageHead group="Reference" title="Developers" description="The same task model through API and MCP." />
+      {showHeader ? <PageHead group="Develop" title="API & MCP" description="The same task model through API and MCP." /> : null}
       <Feedback>{message}</Feedback>
       <section className="developer-grid">
         <article className="panel">
@@ -88,7 +88,7 @@ export function DevelopersSection() {
   );
 }
 
-export function WebhooksSection() {
+export function WebhooksSection({ showHeader = true }: { showHeader?: boolean }) {
   const [endpoint, setEndpoint] = useState('https://api.example.com/importio/events');
   const [eventName, setEventName] = useState('Run completed');
   const [secret, setSecret] = useState('Generated after save');
@@ -135,11 +135,11 @@ export function WebhooksSection() {
 
   return (
     <>
-      <PageHead
-        group="Reference"
+      {showHeader ? <PageHead
+        group="Develop"
         title="Webhooks"
         description="Deliver completed runs and meaningful monitor changes to your systems."
-      />
+      /> : null}
       <Feedback>{message}</Feedback>
       <section className="panel">
         <PanelHead title="Add an endpoint" meta="HMAC-SHA256" />

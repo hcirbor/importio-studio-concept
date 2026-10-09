@@ -1,7 +1,9 @@
 'use client';
 
 import { X } from 'lucide-react';
+import { useRef } from 'react';
 import { Button } from '@/components/design-system';
+import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet';
 
 export type EvidenceDetail = {
   field: string;
@@ -14,23 +16,34 @@ export type EvidenceDetail = {
 };
 
 export function EvidencePanel({ evidence, onClose }: { evidence: EvidenceDetail | null; onClose: () => void }) {
-  if (!evidence) return null;
+  const titleRef = useRef<HTMLHeadingElement>(null);
+  const openerRef = useRef<HTMLElement | null>(null);
 
   return (
-    <div className="evidence-panel-scrim" role="presentation" onClick={onClose}>
-      <aside
+    <Sheet open={Boolean(evidence)} onOpenChange={(open) => { if (!open) onClose(); }}>
+      {evidence ? <SheetContent
+        side="right"
         className="evidence-side-panel"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="evidence-panel-title"
-        onClick={(event) => event.stopPropagation()}
+        onOpenAutoFocus={(event) => {
+          event.preventDefault();
+          openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+          titleRef.current?.focus();
+        }}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault();
+          openerRef.current?.focus();
+        }}
       >
         <header>
           <div>
             <span className="mono-label">Field evidence</span>
-            <h2 id="evidence-panel-title">{evidence.record} · {evidence.field}</h2>
+            <SheetTitle asChild>
+              <h2 ref={titleRef} tabIndex={-1}>{evidence.record} · {evidence.field}</h2>
+            </SheetTitle>
           </div>
-          <Button variant="ghost" size="icon" aria-label="Close evidence" onClick={onClose}><X size={18} /></Button>
+          <SheetClose asChild>
+            <Button variant="ghost" size="icon" aria-label="Close evidence"><X size={18} /></Button>
+          </SheetClose>
         </header>
         <div className="evidence-panel-body">
           <section>
@@ -50,7 +63,7 @@ export function EvidencePanel({ evidence, onClose }: { evidence: EvidenceDetail 
             </div>
           </section>
         </div>
-      </aside>
-    </div>
+      </SheetContent> : null}
+    </Sheet>
   );
 }

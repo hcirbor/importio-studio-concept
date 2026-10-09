@@ -13,18 +13,18 @@ const workflows = [
 ];
 
 const capabilityRoutes: Record<string, string> = {
-  Search: '/search',
+  Search: '/search?tab=pages',
   'Fetch & render': '/build?template=extract',
   'Browser actions': '/build?template=extract',
   Extract: '/build?template=extract',
   Compare: '/build?template=compare',
   Collect: '/build?template=collect',
-  Qualify: '/candidates',
-  Enrich: '/enrich',
-  Batch: '/groups',
+  Qualify: '/search?tab=companies&view=qualified',
+  Enrich: '/datasets?type=enrichment',
+  Batch: '/runs?tab=batches',
   Monitor: '/monitors',
-  API: '/developers',
-  MCP: '/developers',
+  API: '/developers?tab=api',
+  MCP: '/developers?tab=api',
 };
 
 export default function HomePage() {

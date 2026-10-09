@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { Button, Eyebrow, Input } from '@/components/design-system';
 import { Feedback, PageHead, SelectField, Status, TablePanel, type TableRow } from './shared';
@@ -62,7 +62,7 @@ const qualificationRows: TableRow[] = [
   },
 ];
 
-export function SearchSection() {
+export function SearchSection({ showHeader = true }: { showHeader?: boolean }) {
   const router = useRouter();
   const [query, setQuery] = useState(initialSearchQuery);
   const [limit, setLimit] = useState('3');
@@ -81,7 +81,7 @@ export function SearchSection() {
 
   return (
     <>
-      <PageHead group="Discovery" title="Search" description="Ranked sources to inspect, not verified answers." />
+      {showHeader ? <PageHead group="Build" title="Pages" description="Ranked sources to inspect, not verified answers." /> : null}
       <section className="panel search-bar">
         <Input value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Search query" />
         <SelectField
@@ -120,7 +120,9 @@ export function SearchSection() {
   );
 }
 
-export function CandidatesSection() {
+export function CandidatesSection({ showHeader = true }: { showHeader?: boolean }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [entityType, setEntityType] = useState('Supplier');
   const [query, setQuery] = useState('European outdoor equipment suppliers');
   const [limit, setLimit] = useState('6');
@@ -129,6 +131,7 @@ export function CandidatesSection() {
   const [selected, setSelected] = useState(candidates.map((candidate) => candidate.name));
   const [expandedEvidence, setExpandedEvidence] = useState<string>();
   const [message, setMessage] = useState('');
+  const [showQualifications, setShowQualifications] = useState(searchParams.get('view') === 'qualified');
   const estimatedMatches = Math.max(6, conditions.length * 18);
 
   function addCondition() {
@@ -146,9 +149,17 @@ export function CandidatesSection() {
     ));
   }
 
+  function setQualificationView(open: boolean) {
+    setShowQualifications(open);
+    const next = new URLSearchParams(searchParams.toString());
+    if (open) next.set('view', 'qualified');
+    else next.delete('view');
+    router.replace(`/search?${next.toString()}`, { scroll: false });
+  }
+
   return (
     <>
-      <PageHead group="Discovery" title="Candidates" description="Discover first; qualify selected candidates separately." />
+      {showHeader ? <PageHead group="Build" title="Companies" description="Discover first; qualify selected candidates separately." /> : null}
       <section className="panel candidate-builder">
         <div className="form-grid">
           <label>
@@ -240,23 +251,24 @@ export function CandidatesSection() {
       <div className="page-action-row">
         <span>{selected.length} unqualified candidate{selected.length === 1 ? '' : 's'} selected</span>
         {selected.length ? (
-          <Button variant="primary" asChild><Link href="/qualify">Qualify selected</Link></Button>
+          <Button variant="primary" onClick={() => setQualificationView(true)}>Qualify selected</Button>
         ) : (
           <Button variant="primary" disabled>Qualify selected</Button>
         )}
       </div>
+      {showQualifications ? <QualifySection showHeader={false} onBack={() => setQualificationView(false)} /> : null}
     </>
   );
 }
 
-export function QualifySection() {
+export function QualifySection({ showHeader = true, onBack }: { showHeader?: boolean; onBack?: () => void }) {
   return (
     <>
-      <PageHead
+      {showHeader ? <PageHead
         group="Discovery"
         title="Qualifications"
         description="Criterion verdicts with evidence; unresolved is never rejection."
-      />
+      /> : null}
       <TablePanel
         title="Selected candidates"
         headings={['Candidate', 'EU presence', 'Wholesale', 'Contact published']}
@@ -264,7 +276,11 @@ export function QualifySection() {
       />
       <div className="page-action-row">
         <span>2 candidates are ready for a follow-up workflow.</span>
-        <Button variant="secondary" asChild><Link href="/candidates">Back to candidates</Link></Button>
+        {onBack ? (
+          <Button variant="secondary" onClick={onBack}>Back to candidates</Button>
+        ) : (
+          <Button variant="secondary" asChild><Link href="/search?tab=companies">Back to candidates</Link></Button>
+        )}
         <Button variant="primary" asChild>
           <Link href="/build?template=discover&input=prior">Use qualified candidates</Link>
         </Button>
