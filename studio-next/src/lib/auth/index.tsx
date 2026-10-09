@@ -362,7 +362,7 @@ export function DemoAuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
   const addRun = useCallback((run: WorkspaceRun) => updateWorkspaceCollection<WorkspaceRun>('runsByWorkspace', (runs) => [run, ...runs.filter((item) => item.id !== run.id)]), [updateWorkspaceCollection]);
   const updateRun = useCallback((id: string, updates: Partial<WorkspaceRun>) => updateWorkspaceCollection<WorkspaceRun>('runsByWorkspace', (runs) => runs.map((run) => run.id === id ? { ...run, ...updates } : run)), [updateWorkspaceCollection]);
-  const addDataset = useCallback((dataset: WorkspaceDataset) => updateWorkspaceCollection<WorkspaceDataset>('datasetsByWorkspace', (datasets) => [dataset, ...datasets.filter((item) => item.id !== dataset.id && item.title !== dataset.title)]), [updateWorkspaceCollection]);
+  const addDataset = useCallback((dataset: WorkspaceDataset) => updateWorkspaceCollection<WorkspaceDataset>('datasetsByWorkspace', (datasets) => [dataset, ...datasets.filter((item) => item.id !== dataset.id)]), [updateWorkspaceCollection]);
   const updateDatasetValue = useCallback((datasetId: string, recordId: string, field: string, value: string, reviewedBy?: string, note?: string) => updateWorkspaceCollection<WorkspaceDataset>('datasetsByWorkspace', (datasets) => datasets.map((dataset) => dataset.id !== datasetId ? dataset : {
     ...dataset,
     lastUpdated: 'Just now',

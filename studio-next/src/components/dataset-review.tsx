@@ -39,7 +39,7 @@ const exportRecords: DatasetRecord[] = records.map((record) => ({
   evidence: Object.fromEntries(['Retailer','Product','Price','Availability'].map((field) => [field, { sourceUrl: record.sourceUrl, quote: `${record.product} — ${record.price}${record.availability !== 'Unknown' ? ` · ${record.availability}` : ''}.` }])),
 }));
 
-export function DatasetReview({ onSaved, workspaceName = 'Import.io Studio' }: { onSaved?: (records?: DatasetRecord[], fields?: string[]) => void; workspaceName?: string } = {}) {
+export function DatasetReview({ onSaved, workspaceName = 'Import.io Studio', datasetName = 'Competitor prices', savedDatasetId = '' }: { onSaved?: (records?: DatasetRecord[], fields?: string[]) => void; workspaceName?: string; datasetName?: string; savedDatasetId?: string } = {}) {
   const [tab, setTab] = useState('table');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [feedback, setFeedback] = useState('');
@@ -91,7 +91,7 @@ export function DatasetReview({ onSaved, workspaceName = 'Import.io Studio' }: {
               <thead>
                 <tr>
                   <th>Retailer</th>
-                  <th>Product</th>
+                  <th>Product name</th>
                   <th>Price</th>
                   <th>Availability</th>
                   <th>Evidence</th>
@@ -186,10 +186,8 @@ export function DatasetReview({ onSaved, workspaceName = 'Import.io Studio' }: {
       )}
       <footer className="review-footer">
         <span>Preview only · review before saving</span>
-        <DatasetExportMenu dataset={{ title: 'Competitor prices', records: exportRecords }} />
-        <Button variant="primary" onClick={saveDataset}>
-          Save dataset
-        </Button>
+        <DatasetExportMenu dataset={{ title: datasetName, records: exportRecords }} />
+        {savedDatasetId ? <><Button variant="primary" disabled>Saved</Button><Button variant="ghost" asChild><a href={`/datasets/${savedDatasetId}`}>Open dataset</a></Button></> : <Button variant="primary" onClick={saveDataset}>Save dataset</Button>}
       </footer>
       <EvidencePanel evidence={evidence} onClose={() => setEvidence(null)} />
     </section>

@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/design-system';
@@ -119,7 +120,7 @@ export function DevelopersSection({ showHeader = true }: { showHeader?: boolean 
             <div><dt>Transport</dt><dd>Streamable HTTP</dd></div>
             <div><dt>Authentication</dt><dd>OAuth or bearer token</dd></div>
           </dl>
-          <Button variant="secondary" onClick={() => setMessage('Manage MCP keys in Settings.')}>Manage keys</Button>
+          <Button variant="secondary" asChild><Link href="/settings?tab=api-keys">Manage keys</Link></Button>
         </aside>
       </section>
       <section className="panel developer-concept-card">

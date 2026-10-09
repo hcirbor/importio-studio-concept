@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/design-system';
 import type { DatasetRecord } from '@/lib/auth';
+import { formatFieldLabel } from '@/lib/field-label';
 import { mockDomainRecords } from '@/lib/mock-web-data';
 import { DatasetReview } from './dataset-review';
 import { DatasetExportMenu } from './dataset-export-menu';
@@ -137,6 +138,8 @@ export function WorkflowScenarioReview({
   workspaceName = 'Import.io Studio',
   customDomains = [],
   customFields = [],
+  datasetName,
+  savedDatasetId = '',
 }: {
   scenario: WorkflowTemplateKey;
   researchResolved?: boolean;
@@ -145,12 +148,14 @@ export function WorkflowScenarioReview({
   workspaceName?: string;
   customDomains?: string[];
   customFields?: string[];
+  datasetName: string;
+  savedDatasetId?: string;
 }) {
   const [feedback, setFeedback] = useState('');
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
 
   if (scenario === 'compare') {
-    return <DatasetReview onSaved={onSaved} workspaceName={workspaceName} />;
+    return <DatasetReview onSaved={onSaved} workspaceName={workspaceName} datasetName={datasetName} savedDatasetId={savedDatasetId} />;
   }
 
   const customRecords = customDomains.length ? mockDomainRecords(customDomains, customFields) : [];
@@ -205,7 +210,7 @@ export function WorkflowScenarioReview({
           <thead>
             <tr>
               {fixture.headings.map((heading) => (
-                <th key={heading}>{heading}</th>
+                <th key={heading}>{formatFieldLabel(heading)}</th>
               ))}
             </tr>
           </thead>
@@ -231,8 +236,8 @@ export function WorkflowScenarioReview({
 
       <footer className="review-footer">
         <span>Evidence retained with every supported value</span>
-        <DatasetExportMenu dataset={{ title: scenario === 'research' ? 'SaaS pricing research' : scenario, records: datasetRecords }} />
-        <Button
+        <DatasetExportMenu dataset={{ title: datasetName, records: datasetRecords }} />
+        {savedDatasetId ? <><Button variant="primary" disabled>Saved</Button><Button variant="ghost" asChild><a href={`/datasets/${savedDatasetId}`}>Open dataset</a></Button></> : <Button
           variant="primary"
           onClick={() => {
             if (scenario === 'monitor') {
@@ -244,7 +249,7 @@ export function WorkflowScenarioReview({
           }}
         >
           {scenario === 'monitor' ? 'Create monitor' : 'Save dataset'}
-        </Button>
+        </Button>}
       </footer>
       <EvidencePanel evidence={evidence} onClose={() => setEvidence(null)} />
     </section>

@@ -560,6 +560,7 @@ main { padding: 30px 32px 64px; }
 .composer.prompt-mode .prompt-field > textarea { position: relative; z-index: 1; width: 100%; min-height: 156px; display: block; padding: 20px 26px; background: transparent; font-size: 15px; line-height: 1.5; }
 .prompt-ghost { position: absolute; z-index: 0; top: 20px; right: 26px; left: 26px; color: var(--io-color-subtle); font-size: 15px; line-height: 1.5; pointer-events: none; }
 .prompt-ghost i { width: 1px; height: 1em; display: inline-block; margin-left: 2px; background: var(--io-color-primary); vertical-align: -.14em; animation: prompt-cursor 850ms steps(1, end) infinite; }
+.prompt-ghost.stopped i { display: none; animation: none; }
 @keyframes prompt-cursor { 50% { opacity: 0; } }
 @media (prefers-reduced-motion: reduce) { .prompt-ghost i { animation: none; } }
 .composer-tools { min-height: 56px; padding: 5px 8px 5px 11px; }
@@ -713,6 +714,10 @@ main { padding: 30px 32px 64px; }
   .csv-drop-zone > button { align-self: flex-start; }
   .csv-mapping-controls { grid-template-columns: 1fr; }
   .template-browser-grid { grid-template-columns: 1fr; }
+}
+@media (max-width: 767px) {
+  .builder-main { grid-row: 1; }
+  .templates, .templates-closed { grid-row: 2; }
 }
 
 /* Restored Studio Beta interactions, expressed with the current design tokens. */

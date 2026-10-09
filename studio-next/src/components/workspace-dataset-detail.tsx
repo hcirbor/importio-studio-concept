@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { Eyebrow } from '@/components/design-system';
 import { useAuth } from '@/lib/auth';
+import { formatFieldLabel } from '@/lib/field-label';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
 import { useState } from 'react';
@@ -48,7 +49,7 @@ export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
         </dl>
       </section>
       <section className="panel dataset-detail-table">
-        <div className="table-scroll"><table className="data-table"><thead><tr>{fields.map((field)=><th key={field}>{field}</th>)}</tr></thead><tbody>{records.map((record)=><tr key={record.id}>{fields.map((field)=><td key={field}><button type="button" className="value-evidence-button" onClick={()=>showEvidence(record.id,field)}>{record.values[field] ?? '—'}{record.reviewedBy?.[field] ? <small className="reviewed-by">Reviewed by {record.reviewedBy[field]}</small> : null}</button></td>)}</tr>)}</tbody></table></div>
+        <div className="table-scroll"><table className="data-table"><thead><tr>{fields.map((field)=><th key={field}>{formatFieldLabel(field)}</th>)}</tr></thead><tbody>{records.map((record)=><tr key={record.id}>{fields.map((field)=><td key={field}><button type="button" className="value-evidence-button" onClick={()=>showEvidence(record.id,field)}>{record.values[field] ?? '—'}{record.reviewedBy?.[field] ? <small className="reviewed-by">Reviewed by {record.reviewedBy[field]}</small> : null}</button></td>)}</tr>)}</tbody></table></div>
         {!records.length ? <div className="panel-body"><p className="muted">No records have been saved yet.</p></div> : null}
       </section>
       <EvidencePanel evidence={evidence} onClose={()=>setEvidence(null)} />
