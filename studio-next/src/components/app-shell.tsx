@@ -50,7 +50,8 @@ function pageTitle(pathname: string, searchParams: QueryReader): [string, string
     return ['Developers', current, current];
   }
   if (pathname === '/datasets') {
-    const current = searchParams.get('type') === 'enrichment' ? 'Enrichments' : 'Datasets';
+    const type = searchParams.get('type');
+    const current = type === 'enrichment' ? 'Enrichments' : type === 'dataset' ? 'Datasets' : 'All';
     return ['Datasets', current, current];
   }
   if (pathname.startsWith('/runs/')) return ['Runs', pathname.split('/').at(-1) ?? 'Run detail', 'Run detail'];
@@ -164,6 +165,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <BrandMark className="brand-mark" title="" />
           <span className="brand-name">import.io</span>
         </Link>
+        <Button variant="ghost" className="workspace-card" asChild>
+          <Link href="/settings" onClick={handleSidebarNavigation}>
+            <span className="workspace-icon">I</span>
+            <span><strong>Import.io Studio</strong><small>Demo workspace</small></span>
+          </Link>
+        </Button>
         <nav aria-label="Primary navigation">
           <Link href="/" onClick={handleSidebarNavigation} className={pathname === '/' ? 'nav-item active' : 'nav-item'}><Home /><span>Home</span></Link>
           {groups.map((group) => (
@@ -179,13 +186,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </nav>
         <div className="sidebar-footer">
           <Link href="/settings" onClick={handleSidebarNavigation} className={pathname === '/settings' ? 'nav-item active' : 'nav-item'}><Settings /><span>Settings</span></Link>
-          <Button variant="ghost" className="workspace-card" asChild>
-            <Link href="/settings" onClick={handleSidebarNavigation}>
-              <span className="workspace-icon">I</span>
-              <span><strong>Import.io Studio</strong><small>Demo workspace</small></span>
-            </Link>
-          </Button>
-          <div className="profile"><span>JD</span><div><strong>Jordan Davis</strong><small>Personal workspace</small></div></div>
+          <div className="profile"><span>JD</span><div><strong>Jordan Davis</strong><small>Owner</small></div></div>
         </div>
       </aside>
       <div className="workspace">

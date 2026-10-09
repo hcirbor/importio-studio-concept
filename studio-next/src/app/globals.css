@@ -25,7 +25,6 @@ a { text-decoration: none; }
 .nav-item svg { width: 18px; height: 18px; stroke-width: 1.8; }
 .nav-item em { margin-left: auto; min-width: 22px; padding: 2px 6px; border: 1px solid var(--io-color-border); border-radius: 5px; color: var(--io-color-muted); font: normal 11px var(--io-font-mono); text-align: center; }
 .sidebar-footer { display: grid; gap: 8px; margin-top: auto; padding-top: 14px; border-top: 1px solid var(--io-color-border); }
-.sidebar-footer .workspace-card { margin: 0; }
 .profile { display: flex; align-items: center; gap: 10px; padding: 6px 10px 0; }
 .profile > span, .avatar { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; background: #2b155d; color: white; font-size: 12px; font-weight: 700; }
 .workspace { min-width: 0; }

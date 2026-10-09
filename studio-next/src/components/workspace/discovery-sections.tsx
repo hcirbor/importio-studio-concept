@@ -62,6 +62,8 @@ const qualificationRows: TableRow[] = [
   },
 ];
 
+const readyCandidateIds = new Set(['northwind-trade', 'summit-supply-europe']);
+
 export function SearchSection({ showHeader = true }: { showHeader?: boolean }) {
   const router = useRouter();
   const [query, setQuery] = useState(initialSearchQuery);
@@ -256,12 +258,30 @@ export function CandidatesSection({ showHeader = true }: { showHeader?: boolean 
           <Button variant="primary" disabled>Qualify selected</Button>
         )}
       </div>
-      {showQualifications ? <QualifySection showHeader={false} onBack={() => setQualificationView(false)} /> : null}
+      {showQualifications ? (
+        <QualifySection
+          showHeader={false}
+          selectedCandidates={selected}
+          onBack={() => setQualificationView(false)}
+        />
+      ) : null}
     </>
   );
 }
 
-export function QualifySection({ showHeader = true, onBack }: { showHeader?: boolean; onBack?: () => void }) {
+export function QualifySection({
+  showHeader = true,
+  onBack,
+  selectedCandidates = candidates.map((candidate) => candidate.name),
+}: {
+  showHeader?: boolean;
+  onBack?: () => void;
+  selectedCandidates?: string[];
+}) {
+  const selectedRows = qualificationRows.filter((row) => selectedCandidates.includes(String(row.cells[0])));
+  const readyRows = selectedRows.filter((row) => readyCandidateIds.has(row.id));
+  const candidateParam = readyRows.map((row) => row.id).join(',');
+
   return (
     <>
       {showHeader ? <PageHead
@@ -272,18 +292,20 @@ export function QualifySection({ showHeader = true, onBack }: { showHeader?: boo
       <TablePanel
         title="Selected candidates"
         headings={['Candidate', 'EU presence', 'Wholesale', 'Contact published']}
-        rows={qualificationRows}
+        rows={selectedRows}
       />
       <div className="page-action-row">
-        <span>2 candidates are ready for a follow-up workflow.</span>
+        <span>{readyRows.length} candidate{readyRows.length === 1 ? '' : 's'} {readyRows.length === 1 ? 'is' : 'are'} ready for a follow-up workflow.</span>
         {onBack ? (
           <Button variant="secondary" onClick={onBack}>Back to candidates</Button>
         ) : (
           <Button variant="secondary" asChild><Link href="/search?tab=companies">Back to candidates</Link></Button>
         )}
-        <Button variant="primary" asChild>
-          <Link href="/build?template=discover&input=prior">Use qualified candidates</Link>
-        </Button>
+        {readyRows.length ? (
+          <Button variant="primary" asChild>
+            <Link href={`/build?template=discover&input=prior&candidates=${candidateParam}`}>Use qualified candidates</Link>
+          </Button>
+        ) : <Button variant="primary" disabled>Use qualified candidates</Button>}
       </div>
     </>
   );

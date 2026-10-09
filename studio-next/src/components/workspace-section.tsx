@@ -29,7 +29,7 @@ function RunsWorkspace() {
   const headings = {
     all: ['All runs', 'Every execution, with scope, status, usage and actionable exceptions.'],
     batches: ['Batches', 'Bounded batches of 2–10 items with per-item status.'],
-    saved: ['Saved runs', 'Saved runs available as labelled prior research.'],
+    saved: ['Saved', 'Saved runs available as labelled prior research.'],
   } as const;
   const [title, description] = headings[tab as keyof typeof headings];
 

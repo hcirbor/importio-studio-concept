@@ -349,6 +349,10 @@ export function DatasetsSection() {
   const [query, setQuery] = useState('');
   const [validation, setValidation] = useState('all');
   const [message, setMessage] = useState('');
+  const heading = type === 'enrichment' ? 'Enrichments' : type === 'dataset' ? 'Datasets' : 'All';
+  const description = type === 'enrichment'
+    ? 'CSV enrichment with a verdict and evidence per cell.'
+    : 'Versioned structured outputs ready for review, export and delivery.';
   const visibleDatasets = datasets.filter((dataset) => (
     dataset.title.toLowerCase().includes(query.toLowerCase())
     && (validation === 'all' || dataset.status === validation)
@@ -361,7 +365,7 @@ export function DatasetsSection() {
 
   return (
     <>
-      <PageHead group="Operate" title="Datasets" description="Versioned structured outputs ready for review, export and delivery." />
+      <PageHead group="Operate" title={heading} description={description} />
       <SectionTabs value={type} tabs={typeTabs} param="type" fallback="all" />
       {type !== 'enrichment' ? <><Toolbar search="Search datasets" value={query} onChange={setQuery}>
         <SelectField
