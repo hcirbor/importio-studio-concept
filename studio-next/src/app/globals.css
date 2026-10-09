@@ -247,12 +247,14 @@ main { min-width: 0; padding: 38px 34px 64px; }
 .expanded-session-grid { min-height: 0; display: grid; grid-template-columns: 350px minmax(0, 1fr); gap: 12px; }
 .timeline-panel { overflow: hidden; }
 .session-timeline { margin: 0; padding: 14px; list-style: none; }
-.session-timeline li { position: relative; padding: 0 0 8px; }
-.session-timeline li::before { content: ''; position: absolute; left: 14px; top: 28px; bottom: -3px; width: 1px; background: var(--io-color-border); }
+.session-timeline li { position: relative; padding: 0 0 6px; }
+.session-timeline li::before { content: ''; position: absolute; z-index: 1; left: 25px; top: 25px; bottom: -25px; width: 1px; background: var(--io-color-border); }
+.session-timeline li.current::before { width: 2px; background: var(--io-color-primary); }
 .session-timeline li:last-child::before { display: none; }
-.session-timeline button { width: 100%; display: grid; grid-template-columns: 28px 1fr; gap: 10px; padding: 11px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; }
-.session-timeline li.current button { border-color: var(--io-color-primary); background: var(--io-color-selected); }
-.session-timeline button > span { position: relative; z-index: 1; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--io-color-raised); color: var(--io-color-subtle); }
+.session-timeline button { position: relative; width: 100%; display: grid; grid-template-columns: 28px minmax(0, 1fr); align-items: start; gap: 10px; padding: 11px; border: 1px solid transparent; border-radius: 8px; background: transparent; text-align: left; }
+.session-timeline li.current button { border-color: var(--io-color-primary); background: var(--io-color-selected); box-shadow: inset 3px 0 0 var(--io-color-primary); }
+.session-timeline button > span { position: relative; z-index: 2; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--io-color-raised); color: var(--io-color-subtle); }
+.session-timeline button > div { position: relative; z-index: 2; min-width: 0; }
 .session-timeline li.done button > span { background: var(--io-color-success); color: white; }
 .session-timeline li.current button > span { background: var(--io-color-primary); color: white; }
 .session-timeline strong, .session-timeline small, .session-timeline em { display: block; }
@@ -269,8 +271,8 @@ main { min-width: 0; padding: 38px 34px 64px; }
 .mock-site-head { display: flex; align-items: center; justify-content: space-between; padding: 18px 20px; border-bottom: 1px solid var(--io-color-border); background: var(--io-color-surface); }
 .pricing-cards, .product-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; padding: 34px 20px; background: var(--io-color-surface); }
 .pricing-cards article, .product-cards article { position: relative; min-height: 190px; display: flex; flex-direction: column; padding: 15px; border: 1px solid var(--io-color-border); border-radius: 7px; }
-.pricing-cards article.observed, .product-cards article.observed { outline: 3px solid var(--io-color-primary); outline-offset: 0; }
-.pricing-cards label, .product-cards label { position: absolute; left: -3px; top: -31px; padding: 7px 10px; border-radius: 5px 5px 0 0; background: var(--io-color-primary); color: white; font: 11px var(--io-font-mono); }
+.pricing-cards article.observed, .product-cards article.observed { border-color: var(--io-color-primary); box-shadow: 0 0 0 2px var(--io-color-primary); }
+.pricing-cards label, .product-cards label { position: absolute; left: -1px; top: -32px; padding: 7px 10px; border-radius: 5px 5px 0 0; background: var(--io-color-primary); color: white; font: 11px var(--io-font-mono); }
 .pricing-cards i, .product-cards i { height: 82px; margin-bottom: 16px; border-radius: 5px; background: linear-gradient(135deg, var(--io-color-border), var(--io-color-raised)); }
 .pricing-cards span, .product-cards span { margin-top: auto; padding-top: 12px; font-weight: 650; }
 .cookie-frame section { max-width: 520px; margin: 70px auto 0; padding: 24px; border: 1px solid var(--io-color-border); border-radius: 10px; background: var(--io-color-surface); text-align: center; box-shadow: var(--io-shadow-panel); }
