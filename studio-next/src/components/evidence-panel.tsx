@@ -46,7 +46,7 @@ export function EvidencePanel({ evidence, onClose }: { evidence: EvidenceDetail 
             <div className={`evidence-capture-thumbnail ${evidence.kind === 'product' ? 'product' : 'pricing'}`}>
               <div><i /><i /><i /></div>
               <strong>{evidence.captureLabel}</strong>
-              <small>{evidence.field}: {evidence.value}</small>
+              <small>{evidence.quote}</small>
             </div>
           </section>
         </div>

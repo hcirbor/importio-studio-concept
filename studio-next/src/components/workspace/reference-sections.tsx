@@ -40,9 +40,9 @@ const initialWebhookEndpoints: WebhookEndpoint[] = [
 ];
 
 const usageRows: TableRow[] = [
-  { id: 'outdoor-catalogue', cells: ['Outdoor catalogue', '742', '81,412', '246 min', '$42.18'] },
-  { id: 'competitor-prices', cells: ['Competitor prices', '422', '8,996', '130 min', '$29.62'] },
-  { id: 'qualified-suppliers', cells: ['Qualified suppliers', '120', '2,204', '42 min', '$12.40'] },
+  { id: 'outdoor-catalogue', cells: ['Outdoor catalogue', '742', '81,412', '246 min', '$5.19'] },
+  { id: 'competitor-prices', cells: ['Competitor prices', '422', '8,996', '130 min', '$2.95'] },
+  { id: 'qualified-suppliers', cells: ['Qualified suppliers', '120', '2,204', '42 min', '$0.84'] },
 ];
 
 export function DevelopersSection() {
@@ -187,10 +187,10 @@ export function UsageSection() {
         description="Understand activity, limits and estimated cost before workflows become production dependencies."
       />
       <section className="metric-grid">
-        <article><small>Runs · 30 days</small><b>1,137</b></article>
+        <article><small>Runs · 30 days</small><b>1,284</b></article>
         <article><small>Browser minutes</small><b>418</b></article>
         <article><small>Records returned</small><b>92.6k</b></article>
-        <article><small>Estimated cost</small><b>$84.20</b></article>
+        <article><small>Estimated cost</small><b>$8.98</b></article>
       </section>
       <TablePanel
         title="Usage by workflow"

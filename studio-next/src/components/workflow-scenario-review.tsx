@@ -51,10 +51,51 @@ function researchFixture(resolved: boolean): ReviewFixture {
       ['CloudHarbor', 'cloudharbor.example/pricing', '$18 / month', 'Yes', '14 days', 'Starter · 3 seats · core automation', 'Supported · plan card'],
       ['Letterloop', 'letterloop.example/pricing', '$12 / month', 'Yes', '30 days', 'Essentials · 500 contacts · email support', 'Supported · pricing page'],
       resolved
-        ? ['BrightSend', 'brightsend.example/pricing', '$9 / month', 'Yes', '14 days', 'Launch · 2,000 emails · basic reports', 'Supported · plan card']
+        ? ['BrightSend', 'brightsend.example/pricing', '$9 / month', 'Yes', '14 days', 'Starter · 2,000 emails · basic reports', 'Supported · plan card']
         : ['BrightSend', 'brightsend.example/pricing', 'Pending input', '—', '—', 'Cookie decision required', 'Cookie decision required'],
     ],
   };
+}
+
+const pricingPageCopy: Record<string, {
+  company: string;
+  url: string;
+  plan: string;
+  freePlan: string;
+  trial: string;
+}> = {
+  CloudHarbor: {
+    company: 'CloudHarbor plans and pricing.',
+    url: 'Pricing · cloudharbor.example/pricing',
+    plan: 'Starter — $18/month. 3 seats, core automation.',
+    freePlan: 'Free plan available.',
+    trial: 'Try any paid plan free for 14 days.',
+  },
+  Letterloop: {
+    company: 'Letterloop plans and pricing.',
+    url: 'Pricing · letterloop.example/pricing',
+    plan: 'Essentials — $12/month. 500 contacts, email support.',
+    freePlan: 'Free plan available.',
+    trial: 'Try any paid plan free for 30 days.',
+  },
+  BrightSend: {
+    company: 'BrightSend plans and pricing.',
+    url: 'Pricing · brightsend.example/pricing',
+    plan: 'Starter — $9/month. 2,000 emails, basic reports.',
+    freePlan: 'Free plan available.',
+    trial: 'Try any paid plan free for 14 days.',
+  },
+};
+
+function pricingQuote(record: string, cellIndex: number, pending: boolean) {
+  if (pending) return 'Choose your cookie preferences to continue.';
+  const copy = pricingPageCopy[record];
+  if (!copy) return 'Pricing information shown on the captured page.';
+  if (cellIndex === 0) return copy.company;
+  if (cellIndex === 1) return copy.url;
+  if (cellIndex === 3) return copy.freePlan;
+  if (cellIndex === 4) return copy.trial;
+  return copy.plan;
 }
 
 function evidenceForCell(scenario: WorkflowTemplateKey, fixture: ReviewFixture, row: string[], cellIndex: number): EvidenceDetail {
@@ -71,9 +112,11 @@ function evidenceForCell(scenario: WorkflowTemplateKey, fixture: ReviewFixture, 
     field,
     record,
     value,
-    quote: pending
-      ? 'The source paused at the cookie preference checkpoint before this value could be supported.'
-      : `${record} lists ${field.toLowerCase()} as ${value}.`,
+    quote: scenario === 'research'
+      ? pricingQuote(record, cellIndex, pending)
+      : pending
+        ? 'The source paused before this value could be supported.'
+        : `${record} — ${field.toLowerCase()}: ${value}.`,
     sourceUrl,
     captureLabel: scenario === 'research' ? `${record} pricing page` : `${record} source page`,
     kind: scenario === 'research' ? 'pricing' : 'product',

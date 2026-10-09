@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import {
   Activity, BookOpen, Braces, CheckSquare2, Database, FileSearch, Home,
@@ -85,36 +85,74 @@ function Breadcrumbs({ pathname }: { pathname: string }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const stableSidebarScroll = useRef(0);
+  const pendingSidebarRestore = useRef(false);
+  const sidebarScrollTimer = useRef<number | null>(null);
+
+  function handleSidebarScroll(event: UIEvent<HTMLElement>) {
+    const scrollTop = event.currentTarget.scrollTop;
+    if (sidebarScrollTimer.current) window.clearTimeout(sidebarScrollTimer.current);
+    sidebarScrollTimer.current = window.setTimeout(() => {
+      stableSidebarScroll.current = scrollTop;
+      sidebarScrollTimer.current = null;
+    }, 120);
+  }
+
+  function handleSidebarNavigation() {
+    if (sidebarScrollTimer.current) {
+      window.clearTimeout(sidebarScrollTimer.current);
+      sidebarScrollTimer.current = null;
+    }
+    pendingSidebarRestore.current = true;
+    setNavOpen(false);
+  }
+
+  useLayoutEffect(() => {
+    if (!pendingSidebarRestore.current || !sidebarRef.current) return;
+    const sidebar = sidebarRef.current;
+    const scrollTop = stableSidebarScroll.current;
+    sidebar.scrollTop = scrollTop;
+    const frame = requestAnimationFrame(() => {
+      sidebar.scrollTop = scrollTop;
+      pendingSidebarRestore.current = false;
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [pathname]);
+
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key === 'Escape') setNavOpen(false);
     }
     window.addEventListener('keydown', closeOnEscape);
-    return () => window.removeEventListener('keydown', closeOnEscape);
+    return () => {
+      window.removeEventListener('keydown', closeOnEscape);
+      if (sidebarScrollTimer.current) window.clearTimeout(sidebarScrollTimer.current);
+    };
   }, []);
   return (
     <div className="app-shell">
       {navOpen ? <Button variant="ghost" className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} /> : null}
-      <aside className={navOpen ? 'sidebar mobile-open' : 'sidebar'}>
-        <Link href="/" className="brand" aria-label="Import.io Studio home">
+      <aside ref={sidebarRef} onScroll={handleSidebarScroll} className={navOpen ? 'sidebar mobile-open' : 'sidebar'}>
+        <Link href="/" className="brand" aria-label="Import.io Studio home" onClick={handleSidebarNavigation}>
           <BrandMark className="brand-mark" title="" />
           <span className="brand-name">import.io</span>
         </Link>
         <Button variant="ghost" className="workspace-card" asChild>
-          <Link href="/settings">
+          <Link href="/settings" onClick={handleSidebarNavigation}>
           <span className="workspace-icon">I</span>
           <span><strong>Import.io Studio</strong><small>Demo workspace</small></span>
           </Link>
         </Button>
         <nav aria-label="Primary navigation">
-          <Link href="/" onClick={() => setNavOpen(false)} className={pathname === '/' ? 'nav-item active' : 'nav-item'}><Home /><span>Home</span></Link>
+          <Link href="/" onClick={handleSidebarNavigation} className={pathname === '/' ? 'nav-item active' : 'nav-item'}><Home /><span>Home</span></Link>
           {groups.map((group) => (
             <section className="nav-group" key={group.label}>
               <p>{group.label}</p>
               {group.items.map((item) => {
                 const active = pathname === item.href || (item.href === '/pipelines' && pathname.startsWith('/pipelines/'));
                 const Icon = item.icon;
-                return <Link href={item.href} onClick={() => setNavOpen(false)} className={active ? 'nav-item active' : 'nav-item'} key={item.href}><Icon /><span>{item.label}</span>{item.label === 'Review' ? <ReviewRailCount /> : item.count ? <em>{item.count}</em> : null}</Link>;
+                return <Link href={item.href} onClick={handleSidebarNavigation} className={active ? 'nav-item active' : 'nav-item'} key={item.href}><Icon /><span>{item.label}</span>{item.label === 'Review' ? <ReviewRailCount /> : item.count ? <em>{item.count}</em> : null}</Link>;
               })}
             </section>
           ))}

@@ -7,7 +7,7 @@ body { min-width: 320px; }
 button, a, select, textarea { font: inherit; }
 a { text-decoration: none; }
 .app-shell { min-height: 100vh; display: grid; grid-template-columns: var(--sidebar-width) minmax(0, 1fr); }
-.sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; display: flex; flex-direction: column; border-right: 1px solid var(--io-color-border); background: var(--io-color-surface); padding: 0 14px 14px; }
+.sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; overflow-anchor: none; display: flex; flex-direction: column; border-right: 1px solid var(--io-color-border); background: var(--io-color-surface); padding: 0 14px 14px; }
 .brand { height: 72px; min-height: 72px; flex: 0 0 72px; display: flex; align-items: center; gap: 8px; color: var(--io-color-foreground); }
 .brand-mark { width: 22px; flex: 0 0 auto; }
 .brand-name { font-size: 26px; font-weight: 750; line-height: 1; letter-spacing: -.075em; }
@@ -620,6 +620,7 @@ main { padding: 30px 32px 64px; }
 .builder-foot { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 16px; margin-top: 10px; }
 .builder-foot > button { white-space: nowrap; }
 .workflow-stage { display: grid; gap: 18px; }
+.plan-stage { gap: 12px; }
 .stage-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 24px; }
 .stage-head h1 { margin: 9px 0 7px; font-size: 30px; line-height: 1.2; letter-spacing: -.025em; }
 .stage-head p { margin: 0; color: var(--io-color-muted); }
@@ -629,13 +630,14 @@ main { padding: 30px 32px 64px; }
 .plan-steps li:last-child { border: 0; }
 .plan-steps li > span { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--io-color-selected); color: var(--io-color-link); font: 11px var(--io-font-mono); }
 .plan-steps p { margin: 5px 0 0; color: var(--io-color-muted); font-size: 13px; line-height: 1.55; }
-.plan-contract { align-self: start; }
-.plan-contract-details { display: grid; gap: 16px; padding: 18px 20px 20px; border-top: 1px solid var(--io-color-border); }
+.plan-contract { align-self: stretch; display: flex; flex-direction: column; }
+.plan-contract-details { display: grid; gap: 12px; padding: 14px 20px; border-top: 1px solid var(--io-color-border); }
 .plan-contract-details > div { display: grid; gap: 8px; }
 .plan-contract-details > div > span { color: var(--io-color-subtle); font: 600 10px var(--io-font-mono); letter-spacing: .08em; text-transform: uppercase; }
 .plan-contract-details ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
 .plan-contract-details li { padding: 5px 7px; border-radius: 5px; background: var(--io-color-raised); color: var(--io-color-muted); font: 10.5px var(--io-font-mono); }
 .plan-contract-details p { margin: 0; padding: 11px 12px; border-left: 3px solid var(--io-color-primary); border-radius: 0 6px 6px 0; background: var(--io-color-selected); color: var(--io-color-muted); font-size: 12px; line-height: 1.55; }
+.plan-contract > .stage-actions { margin-top: auto; padding: 12px 20px 14px; border-top: 1px solid var(--io-color-border); }
 .stage-actions { display: flex; justify-content: flex-end; gap: 9px; padding-top: 4px; }
 
 .mini-product-page { display: block; min-height: 170px; padding: 0; background: var(--io-color-background); }

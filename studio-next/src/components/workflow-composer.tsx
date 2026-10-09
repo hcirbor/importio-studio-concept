@@ -265,7 +265,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
       return source;
     }
   }), [sources]);
-  const estimate = `${sourceCount} ${sourceCount === 1 ? 'query' : 'queries'} · ${(sourceCount * 0.6).toFixed(1)} browser minutes · estimated cost $${(sourceCount * 0.06).toFixed(2)}`;
+  const estimate = `${sourceCount} ${sourceCount === 1 ? 'query' : 'queries'} · ${(sourceCount * 0.6).toFixed(1)} browser minutes · estimated cost $${(sourceCount * 0.007).toFixed(2)}`;
   const urlSourceLabel = `${sourceCount} ${sourceCount === 1 ? 'source' : 'sources'}`;
   const guidedSourceLabel = inputMethod === 'urls'
     ? urlSourceLabel
@@ -339,7 +339,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
     return (
       <>
         {stepper}
-        <section className="workflow-stage">
+        <section className="workflow-stage plan-stage">
           <header className="stage-head">
             <div>
               <Eyebrow>Review plan</Eyebrow>
@@ -398,12 +398,11 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
                 <div><span>Field names</span><ul>{fieldNames.map((field) => <li key={field}>{field.replaceAll('_', ' ')}</li>)}</ul></div>
                 <p>{estimate}</p>
               </div>
+              <div className="stage-actions">
+                <Button variant="secondary" onClick={() => setStage(0)}>Back to describe</Button>
+                <Button variant="primary" onClick={() => setStage(2)}>Approve and run →</Button>
+              </div>
             </aside>
-          </div>
-
-          <div className="stage-actions">
-            <Button variant="secondary" onClick={() => setStage(0)}>Back to describe</Button>
-            <Button variant="primary" onClick={() => setStage(2)}>Approve and run →</Button>
           </div>
         </section>
       </>

@@ -12,6 +12,7 @@ type Worker = {
   domain: string;
   state: WorkerState;
   price?: string;
+  planDetails?: string;
   availability?: string;
 };
 
@@ -49,9 +50,9 @@ const scenarios: Record<string, Scenario> = {
     kind: 'research',
     completed: false,
     workers: [
-      { name: 'CloudHarbor', domain: 'cloudharbor.example', state: 'Complete', price: '$18 / month' },
-      { name: 'Letterloop', domain: 'letterloop.example', state: 'Complete', price: '$12 / month' },
-      { name: 'BrightSend', domain: 'brightsend.example', state: 'Needs input', price: 'Cookie choice' },
+      { name: 'CloudHarbor', domain: 'cloudharbor.example', state: 'Complete', price: '$18 / month', planDetails: '3 seats · core automation' },
+      { name: 'Letterloop', domain: 'letterloop.example', state: 'Complete', price: '$12 / month', planDetails: '500 contacts · email support' },
+      { name: 'BrightSend', domain: 'brightsend.example', state: 'Needs input', price: 'Cookie choice', planDetails: '2,000 emails · basic reports' },
     ],
   },
   run_7e91: {
@@ -230,7 +231,7 @@ function ProductFrame({
           <article><i /><strong>Free</strong><span>$0</span></article>
           <article className={step === 2 ? 'observed' : ''}>
             <label>{step === 2 ? 'Reading plan card' : 'Pricing plan'}</label>
-            <i /><strong>Starter</strong><span>{worker.price}</span>
+            <i /><strong>Starter</strong><span>{worker.price}{worker.planDetails ? ` · ${worker.planDetails}` : ''}</span>
           </article>
           <article><i /><strong>Business</strong><span>Contact sales</span></article>
         </div>
@@ -300,21 +301,31 @@ function ProductFrame({
 
 function Timeline({ worker, step, onStep }: { worker: Worker; step: number; onStep: (value: number) => void }) {
   const items = workerSteps(worker);
-  const currentStep = worker.state === 'Needs input' ? 1 : step;
+  const pendingTitles = ['Open approved source', 'Inspect navigation', 'Read the requested card'];
+  const completedCount = worker.state === 'Complete'
+    ? items.length
+    : worker.state === 'Needs input'
+      ? 1
+      : worker.state === 'Running'
+        ? Math.min(step, items.length)
+        : 0;
   return (
     <ol className="session-timeline">
-      {items.map((item, index) => (
-        <li className={index === currentStep ? 'current' : index < currentStep ? 'done' : ''} key={item.title}>
-          <Button variant="ghost" onClick={() => onStep(index)}>
-            <span>{index < currentStep ? '✓' : index === currentStep ? '•' : index + 1}</span>
-            <div>
-              <strong>{item.title}</strong>
-              <small>{item.detail}</small>
-              <em>{item.duration} <Camera size={12} /> capture</em>
-            </div>
-          </Button>
-        </li>
-      ))}
+      {items.map((item, index) => {
+        const completed = index < completedCount;
+        return (
+          <li className={completed ? 'done' : 'pending'} key={item.title}>
+            <Button variant="ghost" onClick={() => onStep(index)}>
+              <span>{completed ? '✓' : index + 1}</span>
+              <div>
+                <strong>{completed ? item.title : pendingTitles[index]}</strong>
+                <small>{completed ? item.detail : index === completedCount && worker.state === 'Needs input' ? 'Waiting for input.' : 'Waiting'}</small>
+                <em>{completed ? <>{item.duration} <Camera size={12} /> capture</> : '—'}</em>
+              </div>
+            </Button>
+          </li>
+        );
+      })}
     </ol>
   );
 }
