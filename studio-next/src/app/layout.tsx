@@ -5,7 +5,7 @@ import { AppShell } from '@/components/app-shell';
 import { ReviewStateProvider } from '@/components/review-state';
 
 export const metadata: Metadata = {
-  title: { default: 'Import.io Studio', template: '%s · Import.io Studio' },
+  title: { default: 'Home · Import.io Studio', template: '%s · Import.io Studio' },
   description: 'Design-system-backed Import.io Studio application.',
 };
 

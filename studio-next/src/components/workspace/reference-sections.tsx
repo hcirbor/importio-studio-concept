@@ -63,7 +63,7 @@ export function DevelopersSection() {
       <Feedback>{message}</Feedback>
       <section className="developer-grid">
         <article className="panel">
-          <PanelHead title="Task API" meta="POST /v1/tasks" />
+          <PanelHead title="Concept preview" meta="Task API · POST /v1/tasks" />
           <div className="panel-body">
             <p>Submit a task, keep its ID, and retrieve the result when it is ready.</p>
             <pre className="code-block">{curlExample}</pre>
@@ -71,13 +71,13 @@ export function DevelopersSection() {
           </div>
         </article>
         <article className="panel">
-          <PanelHead title="MCP quickstart" meta="Free developer entry" />
+          <PanelHead title="MCP quickstart" meta="10,000 free successful calls" />
           <div className="panel-body">
-            <p>Search public pages from an MCP client, then move proven workflows into your workspace.</p>
-            <pre className="code-block">npx -y @importio/mcp-server{`\n`}# no account required for Search preview</pre>
+            <p>Connect your MCP client to the remote Import.io server using Streamable HTTP.</p>
+            <pre className="code-block">https://mcp.import.io/mcp{`\n`}Transport: Streamable HTTP{`\n`}Auth: OAuth sign-in{`\n`}or Authorization: Bearer mcp_live_…</pre>
             <Button
               variant="primary"
-              onClick={() => setMessage('MCP setup: run the command above, then add the server to your MCP client.')}
+              onClick={() => setMessage('MCP setup: add the Streamable HTTP server, then sign in with OAuth or use an mcp_live_ bearer token.')}
             >
               View MCP setup
             </Button>
@@ -187,7 +187,7 @@ export function UsageSection() {
         description="Understand activity, limits and estimated cost before workflows become production dependencies."
       />
       <section className="metric-grid">
-        <article><small>Runs · 30 days</small><b>1,284</b></article>
+        <article><small>Runs · 30 days</small><b>1,137</b></article>
         <article><small>Browser minutes</small><b>418</b></article>
         <article><small>Records returned</small><b>92.6k</b></article>
         <article><small>Estimated cost</small><b>$84.20</b></article>
@@ -203,14 +203,14 @@ export function UsageSection() {
 
 export function SettingsSection() {
   const [keys, setKeys] = useState<ApiKey[]>([
-    { id: 'production', name: 'Production', display: 'sk_live_••••9f2a · created 14 Sep' },
+    { id: 'production', name: 'Production', display: 'mcp_live_••••9f2a · created 14 Sep' },
   ]);
   const [newKey, setNewKey] = useState('');
   const [retention, setRetention] = useState('30 days');
   const [message, setMessage] = useState('');
 
   function createKey() {
-    const value = `sk_live_demo_${Date.now().toString(36)}`;
+    const value = `mcp_live_demo_${Date.now().toString(36)}`;
     setKeys((current) => [
       ...current,
       { id: value, name: 'New key', display: `${value.slice(0, 16)}•••• · created now` },

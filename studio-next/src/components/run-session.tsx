@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Expand, Pause, Play, X } from 'lucide-react';
 import { Badge, Button } from '@/components/design-system';
 
@@ -49,9 +49,9 @@ const scenarios: Record<string, Scenario> = {
     kind: 'research',
     completed: false,
     workers: [
-      { name: 'HubSpot', domain: 'hubspot.com', state: 'Running', price: '$20 / month' },
-      { name: 'Mailchimp', domain: 'mailchimp.com', state: 'Complete', price: '$13 / month' },
-      { name: 'Brevo', domain: 'brevo.com', state: 'Needs input', price: 'Cookie choice' },
+      { name: 'CloudHarbor', domain: 'cloudharbor.example', state: 'Complete', price: '$18 / month' },
+      { name: 'Letterloop', domain: 'letterloop.example', state: 'Complete', price: '$12 / month' },
+      { name: 'BrightSend', domain: 'brightsend.example', state: 'Needs input', price: 'Cookie choice' },
     ],
   },
   run_7e91: {
@@ -104,11 +104,22 @@ const scenarios: Record<string, Scenario> = {
   },
 };
 
-const steps = [
-  { title: 'Opened approved source', detail: 'Final URL and capture retained.', duration: '4.2s' },
-  { title: 'Inspected navigation', detail: 'Observed links and requested language.', duration: '9.3s' },
-  { title: 'Read the requested card', detail: 'Captured the supported fields and evidence.', duration: '14.4s' },
+const stepDefinitions = [
+  { title: 'Opened approved source', detail: 'Final URL and capture retained.' },
+  { title: 'Inspected navigation', detail: 'Observed links and requested language.' },
+  { title: 'Read the requested card', detail: 'Captured the supported fields and evidence.' },
 ];
+
+function workerSteps(worker: Worker) {
+  const offset = [...worker.domain].reduce((total, character) => total + character.charCodeAt(0), 0) % 8;
+  const timings = [3.6, 8.4, 13.1].map((base, index) => `${(base + offset * 0.37 + index * 0.16).toFixed(1)}s`);
+  return stepDefinitions.map((item, index) => ({ ...item, duration: timings[index] }));
+}
+
+function workerStatusLabel(worker: Worker) {
+  if (worker.availability === 'Unresolved') return '1 to review';
+  return worker.state;
+}
 
 function statusTone(state: WorkerState) {
   if (state === 'Failed') return 'danger';
@@ -117,7 +128,17 @@ function statusTone(state: WorkerState) {
   return 'success';
 }
 
-function ProductFrame({ worker, step, scenario }: { worker: Worker; step: number; scenario: Scenario }) {
+function ProductFrame({
+  worker,
+  step,
+  scenario,
+  onCookieDecision,
+}: {
+  worker: Worker;
+  step: number;
+  scenario: Scenario;
+  onCookieDecision?: (decision: string) => void;
+}) {
   const [decision, setDecision] = useState('');
 
   if (worker.state === 'Failed') {
@@ -166,9 +187,9 @@ function ProductFrame({ worker, step, scenario }: { worker: Worker; step: number
               <h3>Choose your cookie preferences</h3>
               <p>The worker stopped before choosing optional cookies.</p>
               <div>
-                <Button variant="secondary" onClick={() => setDecision('Necessary cookies accepted')}>Accept necessary only</Button>
+                <Button variant="primary" onClick={() => onCookieDecision?.('Necessary cookies accepted')}>Accept necessary only</Button>
                 <Button variant="secondary" onClick={() => setDecision('Domain skipped')}>Skip domain</Button>
-                <Button variant="primary" onClick={() => setDecision('Control handed to you')}>Take control</Button>
+                <Button variant="secondary" onClick={() => setDecision('Control handed to you')}>Take control</Button>
               </div>
             </>
           )}
@@ -178,6 +199,30 @@ function ProductFrame({ worker, step, scenario }: { worker: Worker; step: number
   }
 
   if (scenario.kind === 'research') {
+    if (step === 0) {
+      return (
+        <div className="browser-frame">
+          <div className="mock-site-head"><strong>{worker.name}</strong><span>Platform&nbsp;&nbsp; Customers&nbsp;&nbsp; Resources</span></div>
+          <div className="pricing-cards capture-landing-cards">
+            <article><i /><strong>Product</strong><span>What teams can automate</span></article>
+            <article><i /><strong>Customers</strong><span>Stories and outcomes</span></article>
+            <article><i /><strong>Pricing</strong><span>Plans for every team</span></article>
+          </div>
+        </div>
+      );
+    }
+    if (step === 1) {
+      return (
+        <div className="browser-frame">
+          <div className="mock-site-head"><strong>{worker.name}</strong><span>Pricing overview</span></div>
+          <div className="pricing-cards capture-navigation-cards">
+            <article><i /><strong>Free</strong><span>Explore core features</span></article>
+            <article className="observed"><label>Opened pricing</label><i /><strong>Starter</strong><span>For growing teams</span></article>
+            <article><i /><strong>Business</strong><span>Advanced controls</span></article>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="browser-frame">
         <div className="mock-site-head"><strong>{worker.name}</strong><span>Products&nbsp;&nbsp; Solutions&nbsp;&nbsp; Pricing</span></div>
@@ -209,6 +254,32 @@ function ProductFrame({ worker, step, scenario }: { worker: Worker; step: number
     );
   }
 
+  if (step === 0) {
+    return (
+      <div className="browser-frame">
+        <div className="mock-site-head"><strong>{worker.name}</strong><span>Outdoor equipment</span></div>
+        <div className="product-cards capture-landing-cards">
+          <article><i /><strong>Tents</strong><span>3-season shelters</span></article>
+          <article><i /><strong>Packs</strong><span>Day and expedition</span></article>
+          <article><i /><strong>Equipment</strong><span>Camp essentials</span></article>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 1) {
+    return (
+      <div className="browser-frame">
+        <div className="mock-site-head"><strong>{worker.name}</strong><span>Search · Trailhead</span></div>
+        <div className="product-cards capture-navigation-cards">
+          <article><i /><strong>Summit Solo Tent</strong><span>1 person</span></article>
+          <article className="observed"><label>Matched request</label><i /><strong>Trailhead 2P Tent</strong><span>2 person · 3 season</span></article>
+          <article><i /><strong>Basecamp 4 Tent</strong><span>4 person</span></article>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="browser-frame">
       <div className="mock-site-head">
@@ -227,13 +298,15 @@ function ProductFrame({ worker, step, scenario }: { worker: Worker; step: number
   );
 }
 
-function Timeline({ step, onStep }: { step: number; onStep: (value: number) => void }) {
+function Timeline({ worker, step, onStep }: { worker: Worker; step: number; onStep: (value: number) => void }) {
+  const items = workerSteps(worker);
+  const currentStep = worker.state === 'Needs input' ? 1 : step;
   return (
     <ol className="session-timeline">
-      {steps.map((item, index) => (
-        <li className={index === step ? 'current' : index < step ? 'done' : ''} key={item.title}>
+      {items.map((item, index) => (
+        <li className={index === currentStep ? 'current' : index < currentStep ? 'done' : ''} key={item.title}>
           <Button variant="ghost" onClick={() => onStep(index)}>
-            <span>{index < step ? '✓' : index === step ? '•' : index + 1}</span>
+            <span>{index < currentStep ? '✓' : index === currentStep ? '•' : index + 1}</span>
             <div>
               <strong>{item.title}</strong>
               <small>{item.detail}</small>
@@ -253,6 +326,7 @@ function BrowserPanel({
   playing,
   onPlaying,
   onStep,
+  onCookieDecision,
 }: {
   worker: Worker;
   step: number;
@@ -260,6 +334,7 @@ function BrowserPanel({
   playing: boolean;
   onPlaying: (value: boolean) => void;
   onStep: (value: number) => void;
+  onCookieDecision?: (decision: string) => void;
 }) {
   function resetReplay() {
     onPlaying(false);
@@ -282,9 +357,9 @@ function BrowserPanel({
             <Button variant="ghost" size="sm" className="button-reset" onClick={resetReplay}>Replay</Button>
           </>
         )}
-        <code>https://{worker.domain}</code>
+        <code>https://{worker.domain}{scenario.kind === 'research' ? '/pricing' : ''}</code>
       </div>
-      <ProductFrame key={worker.domain} worker={worker} step={step} scenario={scenario} />
+      <ProductFrame key={worker.domain} worker={worker} step={step} scenario={scenario} onCookieDecision={onCookieDecision} />
       <div className="replay-controls">
         <Button
           variant="secondary"
@@ -295,16 +370,16 @@ function BrowserPanel({
         >
           {playing ? <Pause size={15} /> : <Play size={15} />}
         </Button>
-        <span>00:{String((step + 1) * 4).padStart(2, '0')}</span>
+        <span>{workerSteps(worker)[step].duration}</span>
         <input
           type="range"
           min="0"
-          max={steps.length - 1}
+          max={stepDefinitions.length - 1}
           value={step}
           onChange={(event) => onStep(Number(event.target.value))}
           aria-label="Replay step"
         />
-        <span>00:14</span>
+        <span>{workerSteps(worker).at(-1)?.duration}</span>
       </div>
     </section>
   );
@@ -318,8 +393,9 @@ function SessionContents({
   setStep,
   playing,
   setPlaying,
+  onCookieDecision,
   expanded = false,
-}: SessionContentsProps) {
+}: SessionContentsProps & { onCookieDecision?: (decision: string) => void }) {
   const worker = scenario.workers[workerIndex];
 
   function selectWorker(index: number) {
@@ -339,7 +415,7 @@ function SessionContents({
             onClick={() => selectWorker(index)}
             key={item.domain}
           >
-            {item.name} · {item.state.toLowerCase()}
+            {item.name} · {workerStatusLabel(item).toLowerCase()}
           </Button>
         ))}
       </div>
@@ -347,14 +423,14 @@ function SessionContents({
         <aside className="panel timeline-panel">
           <div className="section-head compact-section-head">
             <h2>Worker timeline</h2>
-            <Badge tone={statusTone(worker.state)}>{worker.state}</Badge>
+            <Badge tone={worker.availability === 'Unresolved' ? 'warning' : statusTone(worker.state)}>{workerStatusLabel(worker)}</Badge>
           </div>
-          <Timeline step={step} onStep={setStep} />
+          <Timeline worker={worker} step={step} onStep={setStep} />
           {worker.state === 'Needs input' ? (
             <div className="inline-intervention">
               <strong>Decision required</strong>
               <p>Choose the safest next step for this source.</p>
-              <Button variant="secondary" onClick={() => setStep(2)}>Open decision in browser</Button>
+              <Button variant="secondary" onClick={() => setStep(1)}>Open decision in browser</Button>
             </div>
           ) : null}
         </aside>
@@ -365,20 +441,79 @@ function SessionContents({
           playing={playing}
           onPlaying={setPlaying}
           onStep={setStep}
+          onCookieDecision={onCookieDecision}
         />
       </div>
     </>
   );
 }
 
-export function RunSession({ runId }: { runId: string }) {
-  const scenario = scenarios[runId] ?? scenarios.run_7f3a;
+export function RunSession({
+  runId,
+  researchResolved = false,
+  onResearchResolved,
+  onResearchStateChange,
+}: {
+  runId: string;
+  researchResolved?: boolean;
+  onResearchResolved?: () => void;
+  onResearchStateChange?: (state: 'Running' | 'Complete') => void;
+}) {
+  const baseScenario = scenarios[runId] ?? scenarios.run_7f3a;
   const [workerIndex, setWorkerIndex] = useState(0);
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [researchState, setResearchState] = useState<WorkerState>(researchResolved ? 'Complete' : 'Needs input');
   const expandButton = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
+  const decisionTimer = useRef<number | null>(null);
+  const scenario = useMemo<Scenario>(() => {
+    if (baseScenario.kind !== 'research') return baseScenario;
+    return {
+      ...baseScenario,
+      completed: researchState === 'Complete',
+      workers: baseScenario.workers.map((worker, index) => index === 2
+        ? {
+            ...worker,
+            state: researchState,
+            price: researchState === 'Complete' ? '$9 / month' : researchState === 'Running' ? 'Reading plan…' : worker.price,
+          }
+        : worker),
+    };
+  }, [baseScenario, researchState]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      const requestedWorker = params.get('worker');
+      const requestedStep = Number(params.get('step'));
+      if (requestedWorker) {
+        const index = baseScenario.workers.findIndex((worker) => worker.domain.startsWith(requestedWorker));
+        if (index >= 0) setWorkerIndex(index);
+      }
+      if (Number.isFinite(requestedStep)) setStep(Math.min(2, Math.max(0, requestedStep)));
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [baseScenario]);
+
+  useEffect(() => () => {
+    if (decisionTimer.current) window.clearTimeout(decisionTimer.current);
+  }, []);
+
+  function recordCookieDecision() {
+    setResearchState('Running');
+    onResearchStateChange?.('Running');
+    setStep(2);
+    setPlaying(false);
+    if (decisionTimer.current) window.clearTimeout(decisionTimer.current);
+    decisionTimer.current = window.setTimeout(() => {
+      setResearchState('Complete');
+      onResearchStateChange?.('Complete');
+      onResearchResolved?.();
+      decisionTimer.current = null;
+    }, 900);
+  }
 
   const closeExpanded = useCallback(() => {
     setExpanded(false);
@@ -390,7 +525,7 @@ export function RunSession({ runId }: { runId: string }) {
 
     const timer = window.setInterval(() => {
       setStep((current) => {
-        if (current >= steps.length - 1) {
+        if (current >= stepDefinitions.length - 1) {
           setPlaying(false);
           return current;
         }
@@ -418,7 +553,7 @@ export function RunSession({ runId }: { runId: string }) {
         return;
       }
       if (event.key === 'ArrowLeft') setStep((value) => Math.max(0, value - 1));
-      if (event.key === 'ArrowRight') setStep((value) => Math.min(steps.length - 1, value + 1));
+      if (event.key === 'ArrowRight') setStep((value) => Math.min(stepDefinitions.length - 1, value + 1));
       if (event.key === ' ') {
         event.preventDefault();
         setPlaying((value) => !value);
@@ -483,6 +618,7 @@ export function RunSession({ runId }: { runId: string }) {
               setStep={setStep}
               playing={playing}
               setPlaying={setPlaying}
+              onCookieDecision={recordCookieDecision}
               expanded
             />
           </section>
@@ -496,14 +632,15 @@ export function RunSession({ runId }: { runId: string }) {
         setStep={setStep}
         playing={playing}
         setPlaying={setPlaying}
+        onCookieDecision={recordCookieDecision}
       />
       <section className="panel capture-history">
         <div className="section-head compact-section-head">
           <h2>Capture history</h2>
-          <span className="mono-label">{steps.length} retained captures</span>
+          <span className="mono-label">{stepDefinitions.length} retained captures</span>
         </div>
         <div className="capture-strip">
-          {steps.map((capture, index) => (
+          {workerSteps(scenario.workers[workerIndex]).map((capture, index) => (
             <div
               role="button"
               tabIndex={0}
@@ -522,8 +659,9 @@ export function RunSession({ runId }: { runId: string }) {
                 worker={scenario.workers[workerIndex]}
                 step={index}
                 scenario={scenario}
+                onCookieDecision={recordCookieDecision}
               />
-              <span>00:{String((index + 1) * 4).padStart(2, '0')} · {capture.title}</span>
+              <span>{capture.duration} · {capture.title}</span>
             </div>
           ))}
         </div>

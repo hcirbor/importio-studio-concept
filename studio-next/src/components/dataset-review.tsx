@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Badge, Button, Tabs, TabsList, TabsTrigger } from '@/components/design-system';
 import { downloadJson } from '@/lib/download-json';
+import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
 
 const records = [
   {
@@ -11,6 +12,7 @@ const records = [
     price: '€249.00',
     availability: 'In stock',
     evidence: 'Supported · product page',
+    sourceUrl: 'https://northwind-outdoors.example/tents/trailhead-2p',
   },
   {
     retailer: 'Summit Supply',
@@ -18,6 +20,7 @@ const records = [
     price: '€239.00',
     availability: 'Low stock',
     evidence: 'Supported · product card',
+    sourceUrl: 'https://summit-supply.example/camping/trailhead-two-person',
   },
   {
     retailer: 'Trail Shop',
@@ -25,18 +28,41 @@ const records = [
     price: '€259.00',
     availability: 'Unknown',
     evidence: 'Price supported · review field',
+    sourceUrl: 'https://trail-shop.example/search?q=trailhead',
   },
 ];
 
-export function DatasetReview() {
+export function DatasetReview({ onSaved }: { onSaved?: () => void } = {}) {
   const [tab, setTab] = useState('table');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [feedback, setFeedback] = useState('');
+  const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const selectedRecord = records[selectedIndex];
 
   function exportRecords() {
     downloadJson('competitor-prices.json', records);
     setFeedback('Dataset exported as JSON.');
+  }
+
+  function openEvidence(index: number, field: string, value: string) {
+    const record = records[index];
+    setSelectedIndex(index);
+    setEvidence({
+      field,
+      record: `${record.retailer} · ${record.product}`,
+      value,
+      quote: value === 'Unknown'
+        ? `${record.product} is listed at ${record.price}; no supported availability statement appears on the captured page.`
+        : `${record.product} — ${field.toLowerCase()}: ${value}.`,
+      sourceUrl: record.sourceUrl,
+      captureLabel: `${record.retailer} product capture`,
+      kind: 'product',
+    });
+  }
+
+  function saveDataset() {
+    setFeedback('Dataset saved as Competitor prices · v4.');
+    onSaved?.();
   }
 
   return (
@@ -73,19 +99,18 @@ export function DatasetReview() {
                 {records.map((record, index) => (
                   <tr
                     className={selectedIndex === index ? 'selected' : ''}
-                    onClick={() => setSelectedIndex(index)}
                     key={record.retailer}
                   >
-                    <td>{record.retailer}</td>
-                    <td>{record.product}</td>
-                    <td>{record.price}</td>
-                    <td>{record.availability === 'Unknown' ? <Badge tone="warning">Unknown</Badge> : record.availability}</td>
+                    <td><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, 'Retailer', record.retailer)}>{record.retailer}</button></td>
+                    <td><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, 'Product', record.product)}>{record.product}</button></td>
+                    <td><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, 'Price', record.price)}>{record.price}</button></td>
+                    <td><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, 'Availability', record.availability)}>{record.availability === 'Unknown' ? <Badge tone="warning">Unknown</Badge> : record.availability}</button></td>
                     <td>
                       <Button
                         variant="ghost"
                         size="sm"
                         className="text-link"
-                        onClick={() => setSelectedIndex(index)}
+                        onClick={() => openEvidence(index, 'Evidence', record.evidence)}
                       >
                         {record.evidence}
                       </Button>
@@ -107,7 +132,7 @@ export function DatasetReview() {
             <dl>
               <div>
                 <dt>Source</dt>
-                <dd>{selectedRecord.retailer.toLowerCase().replaceAll(' ', '-')}.example</dd>
+                <dd>{selectedRecord.sourceUrl.replace('https://', '')}</dd>
               </div>
               <div>
                 <dt>Verdict</dt>
@@ -148,10 +173,11 @@ export function DatasetReview() {
       <footer className="review-footer">
         <span>Preview only · review before saving</span>
         <Button variant="secondary" onClick={exportRecords}>Export JSON</Button>
-        <Button variant="primary" onClick={() => setFeedback('Dataset saved as Competitor prices · v4.')}>
+        <Button variant="primary" onClick={saveDataset}>
           Save dataset
         </Button>
       </footer>
+      <EvidencePanel evidence={evidence} onClose={() => setEvidence(null)} />
     </section>
   );
 }

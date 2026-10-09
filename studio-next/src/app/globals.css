@@ -315,6 +315,9 @@ main { min-width: 0; padding: 38px 34px 64px; }
 .dataset-review > [role='tablist'] { margin-left: 30px; }
 .review-table tr { cursor: pointer; }
 .review-table tr.selected td { background: var(--io-color-selected); }
+.value-evidence-button { width: 100%; min-height: 28px; padding: 0; border: 0; border-radius: 4px; background: transparent; color: inherit; text-align: left; cursor: pointer; }
+.value-evidence-button:hover { color: var(--io-color-link); text-decoration: underline; text-underline-offset: 3px; }
+.value-evidence-button:focus-visible { outline: 2px solid var(--io-color-focus); outline-offset: 3px; }
 .field-evidence { display: grid; grid-template-columns: .9fr 1.6fr 1fr; align-items: stretch; gap: 0; margin: 22px 30px; border: 1px solid var(--io-color-border); border-radius: 9px; background: var(--io-color-background); overflow: hidden; }
 .field-evidence > div, .field-evidence blockquote, .field-evidence dl { margin: 0; padding: 18px; }
 .field-evidence > div span, .field-evidence > div strong { display: block; }
@@ -333,6 +336,20 @@ main { min-width: 0; padding: 38px 34px 64px; }
 .mini-product-page strong, .mini-product-page small { grid-column: 1 / -1; }
 .review-footer { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 16px 30px; border-top: 1px solid var(--io-color-border); }
 .review-footer > span { margin-right: auto; color: var(--io-color-subtle); }
+.evidence-panel-scrim { position: fixed; z-index: 90; inset: 0; display: flex; justify-content: flex-end; background: color-mix(in srgb, #100d20 30%, transparent); backdrop-filter: blur(2px); }
+.evidence-side-panel { width: min(440px, 100vw); height: 100%; overflow-y: auto; border-left: 1px solid var(--io-color-border); background: var(--io-color-surface); box-shadow: var(--io-shadow-panel); }
+.evidence-side-panel > header { position: sticky; top: 0; z-index: 1; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 22px; border-bottom: 1px solid var(--io-color-border); background: var(--io-color-surface); }
+.evidence-side-panel h2 { margin: 7px 0 0; font-size: 18px; line-height: 1.35; }
+.evidence-panel-body { display: grid; gap: 24px; padding: 22px; }
+.evidence-panel-body section { display: grid; gap: 10px; }
+.evidence-panel-body blockquote { margin: 0; padding: 14px 16px; border-left: 3px solid var(--io-color-primary); border-radius: 0 7px 7px 0; background: var(--io-color-background); color: var(--io-color-muted); line-height: 1.65; }
+.evidence-panel-body a { overflow-wrap: anywhere; }
+.evidence-capture-thumbnail { min-height: 210px; display: grid; align-content: center; gap: 12px; padding: 20px; border: 1px solid var(--io-color-border); border-radius: 9px; background: var(--io-color-background); }
+.evidence-capture-thumbnail > div { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.evidence-capture-thumbnail i { height: 82px; border: 1px solid var(--io-color-border); border-radius: 6px; background: linear-gradient(135deg, var(--io-color-border), var(--io-color-raised)); }
+.evidence-capture-thumbnail i:nth-child(2) { border-color: var(--io-color-primary); box-shadow: 0 0 0 2px var(--io-color-selected); }
+.evidence-capture-thumbnail strong, .evidence-capture-thumbnail small { display: block; }
+.evidence-capture-thumbnail small { color: var(--io-color-muted); }
 
 @media (max-width: 1100px) {
   .workflow-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -376,7 +393,11 @@ main { min-width: 0; padding: 38px 34px 64px; }
   .open-run { grid-column: auto; }
   .aperture-row { grid-column: 1; grid-template-columns: 1fr; }
   .stepper { overflow-x: auto; padding-bottom: 6px; }
-  .top-actions .avatar { display: none; }
+  .top-actions .avatar { display: grid; }
+  .review-toolbar { display: grid; align-items: stretch; }
+  .review-toolbar label { width: 100%; }
+  .review-toolbar > span { display: block; }
+  .review-toolbar > button { width: 100%; margin-left: 0; }
   .breadcrumbs { gap: 9px; }
   .pricing-cards, .product-cards { grid-template-columns: 1fr; }
   .browser-frame { padding: 14px; }
@@ -384,6 +405,7 @@ main { min-width: 0; padding: 38px 34px 64px; }
   .review-summary, .review-warning, .field-evidence, .dataset-json { margin-left: 16px; margin-right: 16px; }
   .review-footer { align-items: stretch; flex-direction: column; padding: 16px; }
   .review-footer > span { margin: 0 0 8px; }
+  .evidence-side-panel { width: 100vw; }
   .candidate-builder .form-grid { grid-template-columns: 1fr; }
   .candidate-builder .form-grid label:nth-child(2) { grid-column: auto; grid-row: auto; }
   .candidate-card { grid-template-columns: auto minmax(0, 1fr); align-items: start; }
@@ -608,6 +630,12 @@ main { padding: 30px 32px 64px; }
 .plan-steps li > span { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--io-color-selected); color: var(--io-color-link); font: 11px var(--io-font-mono); }
 .plan-steps p { margin: 5px 0 0; color: var(--io-color-muted); font-size: 13px; line-height: 1.55; }
 .plan-contract { align-self: start; }
+.plan-contract-details { display: grid; gap: 16px; padding: 18px 20px 20px; border-top: 1px solid var(--io-color-border); }
+.plan-contract-details > div { display: grid; gap: 8px; }
+.plan-contract-details > div > span { color: var(--io-color-subtle); font: 600 10px var(--io-font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.plan-contract-details ul { display: flex; flex-wrap: wrap; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.plan-contract-details li { padding: 5px 7px; border-radius: 5px; background: var(--io-color-raised); color: var(--io-color-muted); font: 10.5px var(--io-font-mono); }
+.plan-contract-details p { margin: 0; padding: 11px 12px; border-left: 3px solid var(--io-color-primary); border-radius: 0 6px 6px 0; background: var(--io-color-selected); color: var(--io-color-muted); font-size: 12px; line-height: 1.55; }
 .stage-actions { display: flex; justify-content: flex-end; gap: 9px; padding-top: 4px; }
 
 .mini-product-page { display: block; min-height: 170px; padding: 0; background: var(--io-color-background); }

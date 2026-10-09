@@ -3,6 +3,8 @@ import { Activity, Database, Globe2, Search } from 'lucide-react';
 import { Badge, Eyebrow } from '@/components/design-system';
 import { HomeAttention } from '@/components/home-attention';
 
+export const metadata = { title: 'Home · Import.io Studio' };
+
 const workflows = [
   { title: 'Research', description: 'Find and compare facts, with a source behind every answer.', hint: 'Pricing, policies or market questions', meta: 'Known sources', icon: Search, href: '/build?template=research' },
   { title: 'Extract', description: 'Turn known pages into the exact typed fields you need.', hint: 'A product, article or company page', meta: 'One source', icon: Globe2, href: '/build?template=extract' },

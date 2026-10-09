@@ -162,6 +162,8 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
   const [csvColumn, setCsvColumn] = useState('');
   const [csvHeaderMode, setCsvHeaderMode] = useState('First row contains column names');
   const [csvDragging, setCsvDragging] = useState(false);
+  const [researchResolved, setResearchResolved] = useState(false);
+  const [datasetSaved, setDatasetSaved] = useState(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const template = useMemo(() => workflowTemplates[selected], [selected]);
   useEffect(() => {
@@ -182,6 +184,8 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
     setFields(templateFields[key]);
     setInputMethod('urls');
     setActiveTool(null);
+    setResearchResolved(false);
+    setDatasetSaved(false);
     setSourcePulse(true);
     window.setTimeout(() => setSourcePulse(false), 520);
   }
@@ -253,6 +257,15 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
   }
   const sourceCount = useMemo(() => new Set(sources.split('\n').map((source) => source.trim()).filter(Boolean)).size, [sources]);
   const fieldCount = useMemo(() => fields.split(',').map((field) => field.trim()).filter(Boolean).length, [fields]);
+  const fieldNames = useMemo(() => fields.split(',').map((field) => field.trim()).filter(Boolean), [fields]);
+  const sourceDomains = useMemo(() => sources.split('\n').map((source) => source.trim()).filter(Boolean).map((source) => {
+    try {
+      return new URL(source.includes('://') ? source : `https://${source}`).hostname;
+    } catch {
+      return source;
+    }
+  }), [sources]);
+  const estimate = `${sourceCount} ${sourceCount === 1 ? 'query' : 'queries'} · ${(sourceCount * 0.6).toFixed(1)} browser minutes · estimated cost $${(sourceCount * 0.06).toFixed(2)}`;
   const urlSourceLabel = `${sourceCount} ${sourceCount === 1 ? 'source' : 'sources'}`;
   const guidedSourceLabel = inputMethod === 'urls'
     ? urlSourceLabel
@@ -380,6 +393,11 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
                 <div><dt>Missing data</dt><dd>{missingData}</dd></div>
                 <div><dt>Evidence</dt><dd>{evidence}</dd></div>
               </dl>
+              <div className="plan-contract-details">
+                <div><span>Source domains</span><ul>{sourceDomains.map((domain) => <li key={domain}>{domain}</li>)}</ul></div>
+                <div><span>Field names</span><ul>{fieldNames.map((field) => <li key={field}>{field.replaceAll('_', ' ')}</li>)}</ul></div>
+                <p>{estimate}</p>
+              </div>
             </aside>
           </div>
 
@@ -393,7 +411,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
   }
 
   if (stage === 2) {
-    const isRunning = selected === 'research';
+    const isRunning = selected === 'research' && !researchResolved;
 
     return (
       <>
@@ -418,11 +436,11 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
             </Badge>
           </header>
 
-          <RunSession runId={runId} />
+          <RunSession runId={runId} researchResolved={researchResolved} onResearchResolved={() => setResearchResolved(true)} />
 
           <div className="stage-actions">
             <Button variant="secondary" onClick={() => setStage(1)}>Review plan</Button>
-            <Button variant="primary" onClick={() => setStage(3)}>Review data →</Button>
+            <Button variant="primary" disabled={isRunning} onClick={() => setStage(3)}>Review data →</Button>
           </div>
         </section>
       </>
@@ -430,7 +448,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
   }
 
   if (stage === 3) {
-    const needsReview = selected === 'compare' || selected === 'research';
+    const needsReview = selected === 'compare' || (selected === 'research' && !researchResolved);
 
     return (
       <>
@@ -447,13 +465,11 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
             </Badge>
           </header>
 
-          <WorkflowScenarioReview scenario={selected} />
+          <WorkflowScenarioReview scenario={selected} researchResolved={researchResolved} onSaved={() => setDatasetSaved(true)} />
 
           <div className="stage-actions">
             <Button variant="secondary" onClick={() => setStage(2)}>Back to run</Button>
-            <Button variant="primary" asChild>
-              <Link href="/datasets/competitor-prices">Open saved dataset</Link>
-            </Button>
+            {datasetSaved ? <Button variant="primary" asChild><Link href="/datasets/competitor-prices">Open saved dataset</Link></Button> : null}
           </div>
         </section>
       </>

@@ -17,6 +17,23 @@ export const workspaceSectionSlugs = [
 
 export type WorkspaceSectionSlug = (typeof workspaceSectionSlugs)[number];
 
+export const workspaceSectionTitles: Record<WorkspaceSectionSlug, string> = {
+  pipelines: 'Pipelines',
+  runs: 'Runs',
+  datasets: 'Datasets',
+  monitors: 'Monitors',
+  memories: 'Memories',
+  groups: 'Groups',
+  enrich: 'Enrich',
+  search: 'Search',
+  candidates: 'Candidates',
+  qualify: 'Qualify',
+  developers: 'Developers',
+  webhooks: 'Webhooks',
+  usage: 'Usage',
+  settings: 'Settings',
+};
+
 export function isWorkspaceSectionSlug(value: string): value is WorkspaceSectionSlug {
   return workspaceSectionSlugs.includes(value as WorkspaceSectionSlug);
 }

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Button } from '@/components/design-system';
 import { downloadJson } from '@/lib/download-json';
 import { DatasetReview } from './dataset-review';
+import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
 import type { WorkflowTemplateKey } from './workflow-config';
 
 type ReviewFixture = {
@@ -12,14 +13,6 @@ type ReviewFixture = {
 };
 
 const reviewFixtures: Partial<Record<WorkflowTemplateKey, ReviewFixture>> = {
-  research: {
-    headings: ['Company', 'Pricing URL', 'Starting price', 'Free plan', 'Evidence'],
-    rows: [
-      ['HubSpot', 'hubspot.com/pricing', '$20 / month', 'Yes', 'Supported · plan card'],
-      ['Mailchimp', 'mailchimp.com/pricing', '$13 / month', 'Yes', 'Supported · pricing page'],
-      ['Brevo', 'brevo.com/pricing', 'Pending input', '—', 'Cookie decision required'],
-    ],
-  },
   collect: {
     headings: ['Product', 'Price', 'Availability', 'URL', 'Evidence'],
     rows: [
@@ -51,14 +44,60 @@ const reviewFixtures: Partial<Record<WorkflowTemplateKey, ReviewFixture>> = {
   },
 };
 
-export function WorkflowScenarioReview({ scenario }: { scenario: WorkflowTemplateKey }) {
+function researchFixture(resolved: boolean): ReviewFixture {
+  return {
+    headings: ['Company', 'Pricing URL', 'Starting price', 'Free plan', 'Free trial', 'Plan details', 'Evidence'],
+    rows: [
+      ['CloudHarbor', 'cloudharbor.example/pricing', '$18 / month', 'Yes', '14 days', 'Starter · 3 seats · core automation', 'Supported · plan card'],
+      ['Letterloop', 'letterloop.example/pricing', '$12 / month', 'Yes', '30 days', 'Essentials · 500 contacts · email support', 'Supported · pricing page'],
+      resolved
+        ? ['BrightSend', 'brightsend.example/pricing', '$9 / month', 'Yes', '14 days', 'Launch · 2,000 emails · basic reports', 'Supported · plan card']
+        : ['BrightSend', 'brightsend.example/pricing', 'Pending input', '—', '—', 'Cookie decision required', 'Cookie decision required'],
+    ],
+  };
+}
+
+function evidenceForCell(scenario: WorkflowTemplateKey, fixture: ReviewFixture, row: string[], cellIndex: number): EvidenceDetail {
+  const field = fixture.headings[cellIndex];
+  const value = row[cellIndex];
+  const record = row[0];
+  const sourceUrl = scenario === 'research'
+    ? `https://${row[1]}`
+    : scenario === 'discover'
+      ? 'https://worthington-directory.example/outdoor-equipment'
+      : 'https://northwind-outdoors.example/tents/trailhead-2p';
+  const pending = value === '—' || value === 'Pending input' || value === 'Cookie decision required';
+  return {
+    field,
+    record,
+    value,
+    quote: pending
+      ? 'The source paused at the cookie preference checkpoint before this value could be supported.'
+      : `${record} lists ${field.toLowerCase()} as ${value}.`,
+    sourceUrl,
+    captureLabel: scenario === 'research' ? `${record} pricing page` : `${record} source page`,
+    kind: scenario === 'research' ? 'pricing' : 'product',
+  };
+}
+
+export function WorkflowScenarioReview({
+  scenario,
+  researchResolved = false,
+  onSaved,
+}: {
+  scenario: WorkflowTemplateKey;
+  researchResolved?: boolean;
+  onSaved?: () => void;
+}) {
   const [feedback, setFeedback] = useState('');
+  const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
 
   if (scenario === 'compare') {
-    return <DatasetReview />;
+    return <DatasetReview onSaved={onSaved} />;
   }
 
-  const fixture = reviewFixtures[scenario] ?? reviewFixtures.collect!;
+  const fixture = scenario === 'research' ? researchFixture(researchResolved) : reviewFixtures[scenario] ?? reviewFixtures.collect!;
+  const supportedCount = scenario === 'research' && !researchResolved ? 2 : fixture.rows.length;
 
   function exportRows() {
     downloadJson(`${scenario}-preview.json`, fixture.rows);
@@ -70,8 +109,7 @@ export function WorkflowScenarioReview({ scenario }: { scenario: WorkflowTemplat
       <div className="review-summary">
         <span>PREVIEW COMPLETE</span>
         <strong>
-          {fixture.rows.length} supported {fixture.rows.length === 1 ? 'record' : 'records'} ready
-          to review.
+          {supportedCount} of {fixture.rows.length} supported {fixture.rows.length === 1 ? 'record' : 'records'} ready to review.
         </strong>
       </div>
 
@@ -94,7 +132,15 @@ export function WorkflowScenarioReview({ scenario }: { scenario: WorkflowTemplat
             {fixture.rows.map((row) => (
               <tr key={row.join('|')}>
                 {row.map((cell, cellIndex) => (
-                  <td key={`${fixture.headings[cellIndex]}-${cell}`}>{cell}</td>
+                  <td key={`${fixture.headings[cellIndex]}-${cell}`}>
+                    <button
+                      className="value-evidence-button"
+                      type="button"
+                      onClick={() => setEvidence(evidenceForCell(scenario, fixture, row, cellIndex))}
+                    >
+                      {cell}
+                    </button>
+                  </td>
                 ))}
               </tr>
             ))}
@@ -109,11 +155,15 @@ export function WorkflowScenarioReview({ scenario }: { scenario: WorkflowTemplat
         </Button>
         <Button
           variant="primary"
-          onClick={() => setFeedback('Dataset saved to the Studio workspace.')}
+          onClick={() => {
+            setFeedback('Dataset saved to the Studio workspace.');
+            onSaved?.();
+          }}
         >
           Save dataset
         </Button>
       </footer>
+      <EvidencePanel evidence={evidence} onClose={() => setEvidence(null)} />
     </section>
   );
 }
