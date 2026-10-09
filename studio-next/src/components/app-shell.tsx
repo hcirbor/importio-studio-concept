@@ -49,6 +49,13 @@ function pageTitle(pathname: string): [string, string] {
   return ['Studio', name.replace(/^./, (letter) => letter.toUpperCase())];
 }
 
+function parentBreadcrumbHref(pathname: string) {
+  if (pathname.startsWith('/runs/')) return '/runs';
+  if (pathname.startsWith('/datasets/')) return '/datasets';
+  if (pathname.startsWith('/pipelines/')) return '/pipelines';
+  return null;
+}
+
 function Breadcrumbs({ pathname }: { pathname: string }) {
   const searchParams = useSearchParams();
   const [liveBuildTitle, setLiveBuildTitle] = useState<string | null>(null);
@@ -64,7 +71,15 @@ function Breadcrumbs({ pathname }: { pathname: string }) {
   const current = pathname === '/build'
     ? liveBuildTitle ?? workflowTemplates[resolveWorkflowTemplate(searchParams.get('template'))].title
     : defaultCurrent;
-  return <div className="breadcrumbs"><span>{parent}</span><i>/</i><strong>{current}</strong></div>;
+  const parentHref = parentBreadcrumbHref(pathname);
+
+  return (
+    <nav className="breadcrumbs" aria-label="Breadcrumb">
+      {parentHref ? <Link href={parentHref}>{parent}</Link> : <span>{parent}</span>}
+      <i aria-hidden="true">/</i>
+      <strong aria-current="page">{current}</strong>
+    </nav>
+  );
 }
 
 export function AppShell({ children }: { children: React.ReactNode }) {

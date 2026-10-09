@@ -29,7 +29,10 @@ a { text-decoration: none; }
 .workspace { min-width: 0; }
 .topbar { height: 72px; position: sticky; top: 0; z-index: 30; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 0 32px; border-bottom: 1px solid var(--io-color-border); background: color-mix(in srgb, var(--io-color-background) 93%, transparent); backdrop-filter: blur(14px); }
 .breadcrumbs { display: flex; align-items: center; gap: 16px; font-size: 13px; }
-.breadcrumbs span, .breadcrumbs i { color: var(--io-color-subtle); font-style: normal; }
+.breadcrumbs span, .breadcrumbs a, .breadcrumbs i { color: var(--io-color-subtle); font-style: normal; }
+.breadcrumbs a { border-radius: 4px; text-decoration: none; }
+.breadcrumbs a:hover { color: var(--io-color-link); text-decoration: underline; text-underline-offset: 3px; }
+.breadcrumbs a:focus-visible { outline: 2px solid var(--io-color-focus); outline-offset: 4px; }
 .top-actions { display: flex; align-items: center; gap: 12px; }
 .demo-chip, .ready-chip { min-height: 34px; display: inline-flex; align-items: center; gap: 8px; padding: 0 12px; border-radius: 7px; white-space: nowrap; }
 .demo-chip { background: var(--io-color-selected); color: var(--io-color-link); font: 11px var(--io-font-mono); }
