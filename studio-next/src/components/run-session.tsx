@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Expand, Pause, Play, X } from 'lucide-react';
 import { Badge, Button } from '@/components/design-system';
+import { domainLabel, mockDomainRecord } from '@/lib/mock-web-data';
 
 type WorkerState = 'Running' | 'Complete' | 'Needs input' | 'Failed';
 type ScenarioKind = 'compare' | 'research' | 'collect' | 'discover' | 'extract' | 'monitor';
@@ -461,16 +462,39 @@ function SessionContents({
 
 export function RunSession({
   runId,
+  scenarioKey,
   researchResolved = false,
   onResearchResolved,
   onResearchStateChange,
+  customDomains = [],
+  customFields = [],
 }: {
   runId: string;
+  scenarioKey?: string;
   researchResolved?: boolean;
   onResearchResolved?: () => void;
   onResearchStateChange?: (state: 'Running' | 'Complete') => void;
+  customDomains?: string[];
+  customFields?: string[];
 }) {
-  const baseScenario = scenarios[runId] ?? scenarios.run_7f3a;
+  const baseScenario = useMemo<Scenario>(() => {
+    if (!customDomains.length) return scenarios[scenarioKey ?? runId] ?? scenarios.run_7f3a;
+    return {
+      title: 'Prompt-driven web research',
+      kind: 'research',
+      completed: true,
+      workers: customDomains.map((domain) => {
+        const record = mockDomainRecord(domain, customFields);
+        return {
+          name: domainLabel(domain),
+          domain,
+          state: 'Complete',
+          price: record.values.starting_price ?? record.values.price ?? Object.values(record.values)[0],
+          planDetails: record.values.free_trial ? `${record.values.free_trial} free trial` : Object.values(record.values)[1],
+        };
+      }),
+    };
+  }, [customDomains, customFields, runId, scenarioKey]);
   const [workerIndex, setWorkerIndex] = useState(0);
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
@@ -480,6 +504,7 @@ export function RunSession({
   const closeButton = useRef<HTMLButtonElement>(null);
   const decisionTimer = useRef<number | null>(null);
   const scenario = useMemo<Scenario>(() => {
+    if (customDomains.length) return baseScenario;
     if (baseScenario.kind !== 'research') return baseScenario;
     return {
       ...baseScenario,
@@ -492,7 +517,7 @@ export function RunSession({
           }
         : worker),
     };
-  }, [baseScenario, researchState]);
+  }, [baseScenario, customDomains.length, researchState]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {

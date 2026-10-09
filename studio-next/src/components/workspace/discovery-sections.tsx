@@ -5,22 +5,26 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { Button, Eyebrow, Input } from '@/components/design-system';
 import { Feedback, PageHead, SelectField, Status, TablePanel, type TableRow } from './shared';
+import { useAuth } from '@/lib/auth';
 
 const initialSearchQuery = 'Trailhead 2P Tent price Europe';
 
 const searchResults = [
   {
     domain: 'northwind-outdoors.example',
+    url: 'https://northwind-outdoors.example/tents/trailhead-2p',
     title: 'Trailhead 2P Tent — Northwind Outdoors',
     description: 'Product page with current EUR price, stock status and delivery guidance.',
   },
   {
     domain: 'summit-supply.example',
+    url: 'https://summit-supply.example/camping/trailhead-two-person',
     title: 'Trailhead Two-Person Tent — Summit Supply',
     description: 'Retail listing with price, low-stock notice and product specifications.',
   },
   {
     domain: 'trail-shop.example',
+    url: 'https://trail-shop.example/search?q=trailhead',
     title: 'Trailhead 2 Person — Trail Shop',
     description: 'Product detail page with price and availability requiring review.',
   },
@@ -65,21 +69,17 @@ const qualificationRows: TableRow[] = [
 const readyCandidateIds = new Set(['northwind-trade', 'summit-supply-europe']);
 
 export function SearchSection({ showHeader = true }: { showHeader?: boolean }) {
+  const auth = useAuth();
   const router = useRouter();
   const [query, setQuery] = useState(initialSearchQuery);
   const [limit, setLimit] = useState('3');
   const [searchedQuery, setSearchedQuery] = useState(initialSearchQuery);
-  const [addedSources, setAddedSources] = useState<string[]>([]);
 
   const feedback = searchedQuery !== initialSearchQuery
     ? `Showing ranked demo sources for “${searchedQuery}”.`
-    : addedSources.length
-      ? `${addedSources.length} source${addedSources.length === 1 ? '' : 's'} added to the next workflow.`
+    : auth.sources.length
+      ? `${auth.sources.length} source${auth.sources.length === 1 ? '' : 's'} added to the next workflow.`
       : undefined;
-
-  function addSource(domain: string) {
-    setAddedSources((current) => current.includes(domain) ? current : [...current, domain]);
-  }
 
   return (
     <>
@@ -108,8 +108,8 @@ export function SearchSection({ showHeader = true }: { showHeader?: boolean }) {
               <p>{result.description}</p>
             </div>
             <div>
-              <Button variant="secondary" onClick={() => addSource(result.domain)}>
-                {addedSources.includes(result.domain) ? 'Added' : 'Add to sources'}
+              <Button variant="secondary" onClick={() => auth.addSource(result.url)}>
+                {auth.sources.includes(result.url) ? 'Added' : 'Add to sources'}
               </Button>
               <Button variant="primary" onClick={() => router.push('/build?template=extract')}>
                 Extract from this page
@@ -216,7 +216,7 @@ export function CandidatesSection({ showHeader = true }: { showHeader?: boolean 
           </Button>
           <Button
             variant="primary"
-            onClick={() => setMessage(`Discovery complete. Showing the top ${Math.min(Number(limit) || 6, candidates.length)} bounded demo candidates.`)}
+            onClick={() => setMessage(`Discovery complete. Showing the top ${Math.min(Number(limit) || 6, candidates.length)} candidates.`)}
           >
             Discover
           </Button>

@@ -2,8 +2,10 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/design-system';
-import { downloadJson } from '@/lib/download-json';
+import type { DatasetRecord } from '@/lib/auth';
+import { mockDomainRecords } from '@/lib/mock-web-data';
 import { DatasetReview } from './dataset-review';
+import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
 import type { WorkflowTemplateKey } from './workflow-config';
 
@@ -116,7 +118,11 @@ function evidenceForCell(scenario: WorkflowTemplateKey, fixture: ReviewFixture, 
       ? pricingQuote(record, cellIndex, pending)
       : pending
         ? 'The source paused before this value could be supported.'
-        : `${record} — ${field.toLowerCase()}: ${value}.`,
+        : scenario === 'collect' || scenario === 'extract'
+          ? `${row[0]} — ${row[1]} · ${row[2]}.`
+          : scenario === 'monitor'
+            ? `Trailhead 2P Tent — €249 · In stock.`
+            : `${record} — ${value}.`,
     sourceUrl,
     captureLabel: scenario === 'research' ? `${record} pricing page` : `${record} source page`,
     kind: scenario === 'research' ? 'pricing' : 'product',
@@ -127,24 +133,56 @@ export function WorkflowScenarioReview({
   scenario,
   researchResolved = false,
   onSaved,
+  onCreateMonitor,
+  workspaceName = 'Import.io Studio',
+  customDomains = [],
+  customFields = [],
 }: {
   scenario: WorkflowTemplateKey;
   researchResolved?: boolean;
-  onSaved?: () => void;
+  onSaved?: (records?: DatasetRecord[], fields?: string[]) => void;
+  onCreateMonitor?: () => void;
+  workspaceName?: string;
+  customDomains?: string[];
+  customFields?: string[];
 }) {
   const [feedback, setFeedback] = useState('');
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
 
   if (scenario === 'compare') {
-    return <DatasetReview onSaved={onSaved} />;
+    return <DatasetReview onSaved={onSaved} workspaceName={workspaceName} />;
   }
 
-  const fixture = scenario === 'research' ? researchFixture(researchResolved) : reviewFixtures[scenario] ?? reviewFixtures.collect!;
-  const supportedCount = scenario === 'research' && !researchResolved ? 2 : fixture.rows.length;
+  const customRecords = customDomains.length ? mockDomainRecords(customDomains, customFields) : [];
+  const fixture = customRecords.length ? {
+    headings: ['Source', ...customFields],
+    rows: customRecords.map((record, index) => [customDomains[index], ...customFields.map((field)=>record.values[field] ?? '—')]),
+  } : scenario === 'research' ? researchFixture(researchResolved) : reviewFixtures[scenario] ?? reviewFixtures.collect!;
+  const supportedCount = scenario === 'research' && !researchResolved && !customRecords.length ? 2 : fixture.rows.length;
+  const savedFields = customRecords.length ? customFields : fixture.headings.filter((heading)=>heading !== 'Evidence');
+  const datasetRecords: DatasetRecord[] = customRecords.length ? customRecords : fixture.rows.map((row, rowIndex) => ({
+    id: `${scenario}-${rowIndex + 1}`,
+    values: Object.fromEntries(savedFields.map((field) => {
+      const index = fixture.headings.indexOf(field);
+      return [field, row[index] ?? '—'];
+    })),
+    evidence: Object.fromEntries(savedFields.map((field) => {
+      const index = fixture.headings.indexOf(field);
+      const detail = evidenceForCell(scenario, fixture, row, index);
+      return [field, { sourceUrl: detail.sourceUrl, quote: detail.quote }];
+    })),
+  }));
 
-  function exportRows() {
-    downloadJson(`${scenario}-preview.json`, fixture.rows);
-    setFeedback('Preview exported as JSON.');
+  function openEvidence(rowIndex: number, cellIndex: number) {
+    if (!customRecords.length) {
+      setEvidence(evidenceForCell(scenario, fixture, fixture.rows[rowIndex], cellIndex));
+      return;
+    }
+    const field = fixture.headings[cellIndex];
+    const record = customRecords[rowIndex];
+    const evidenceField = field === 'Source' ? customFields[0] : field;
+    const item = record.evidence[evidenceField];
+    setEvidence({ field, record: customDomains[rowIndex], value: fixture.rows[rowIndex][cellIndex], quote: item?.quote ?? 'Source page retained.', sourceUrl: item?.sourceUrl ?? `https://${customDomains[rowIndex]}`, captureLabel: `${customDomains[rowIndex]} pricing page`, kind: 'pricing' });
   }
 
   return (
@@ -172,14 +210,14 @@ export function WorkflowScenarioReview({
             </tr>
           </thead>
           <tbody>
-            {fixture.rows.map((row) => (
+            {fixture.rows.map((row, rowIndex) => (
               <tr key={row.join('|')}>
                 {row.map((cell, cellIndex) => (
                   <td key={`${fixture.headings[cellIndex]}-${cell}`}>
                     <button
                       className="value-evidence-button"
                       type="button"
-                      onClick={() => setEvidence(evidenceForCell(scenario, fixture, row, cellIndex))}
+                      onClick={() => openEvidence(rowIndex, cellIndex)}
                     >
                       {cell}
                     </button>
@@ -193,17 +231,19 @@ export function WorkflowScenarioReview({
 
       <footer className="review-footer">
         <span>Evidence retained with every supported value</span>
-        <Button variant="secondary" onClick={exportRows}>
-          Export JSON
-        </Button>
+        <DatasetExportMenu dataset={{ title: scenario === 'research' ? 'SaaS pricing research' : scenario, records: datasetRecords }} />
         <Button
           variant="primary"
           onClick={() => {
-            setFeedback('Dataset saved to the Studio workspace.');
-            onSaved?.();
+            if (scenario === 'monitor') {
+              onCreateMonitor?.();
+              return;
+            }
+            setFeedback(`Dataset saved to ${workspaceName}.`);
+            onSaved?.(datasetRecords, savedFields);
           }}
         >
-          Save dataset
+          {scenario === 'monitor' ? 'Create monitor' : 'Save dataset'}
         </Button>
       </footer>
       <EvidencePanel evidence={evidence} onClose={() => setEvidence(null)} />

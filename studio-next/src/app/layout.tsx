@@ -3,6 +3,8 @@ import '@importio/design-system/styles.css';
 import './globals.css';
 import { AppShell } from '@/components/app-shell';
 import { ReviewStateProvider } from '@/components/review-state';
+import { Toaster } from '@/components/ui/sonner';
+import { DemoAuthProvider } from '@/lib/auth';
 
 export const metadata: Metadata = {
   title: { default: 'Home · Import.io Studio', template: '%s · Import.io Studio' },
@@ -12,7 +14,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en" data-theme="light" suppressHydrationWarning>
-      <body><ReviewStateProvider><AppShell>{children}</AppShell></ReviewStateProvider></body>
+      <body><DemoAuthProvider><ReviewStateProvider><AppShell>{children}</AppShell><Toaster /></ReviewStateProvider></DemoAuthProvider></body>
     </html>
   );
 }

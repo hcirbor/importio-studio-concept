@@ -22,6 +22,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -40,6 +41,8 @@ import {
 import { resolveWorkflowTemplate, visibleStarterKeys, workflowTemplates, type WorkflowTemplateKey } from './workflow-config';
 import { RunSession } from './run-session';
 import { WorkflowScenarioReview } from './workflow-scenario-review';
+import { can, useAuth, viewerTooltip } from '@/lib/auth';
+import type { DatasetRecord } from '@/lib/auth';
 
 const inputMethods = [
   ['urls', 'Paste URLs or domains'],
@@ -52,6 +55,84 @@ const inputMethods = [
 
 type InputMethod = (typeof inputMethods)[number][0];
 type ComposerTool = 'Sources' | 'Browser actions' | 'Fields' | 'Limits' | 'Rules' | 'Improve prompt';
+
+const workflowDraftKey = 'importio-studio-workflow-draft';
+
+function uniqueRunId(existingIds: Set<string>) {
+  let id = '';
+  do {
+    const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID().replaceAll('-', '').slice(0, 6)
+      : Math.random().toString(36).slice(2, 8).padEnd(6, '0');
+    id = `run_${random}`;
+  } while (existingIds.has(id));
+  return id;
+}
+
+function recordCountForScenario(scenario: WorkflowTemplateKey) {
+  if (scenario === 'extract') return 1;
+  if (scenario === 'monitor') return 2;
+  return 3;
+}
+
+function templateSources(key: WorkflowTemplateKey, workspaceSources: string[]) {
+  return [...new Set([...workflowTemplates[key].sourceUrls, ...workspaceSources])].join('\n');
+}
+
+const workflowPromptExamples = visibleStarterKeys.map((key) => ({
+  key,
+  text: workflowTemplates[key].text,
+}));
+
+function parsePromptSpecification(request: string) {
+  const domains = Array.from(new Set(request.match(/\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}\b/gi)?.map((value) => value.toLowerCase()) ?? []));
+  const fields = new Set<string>();
+  const patterns: Array<[string, RegExp]> = [
+    ['starting_price', /\bstarting\s+price\b/i],
+    ['free_plan', /\bfree\s+plan\b/i],
+    ['free_trial', /\b(?:free\s+trial(?:\s+length)?|trial(?:\s+length)?)\b/i],
+    ['availability', /\b(?:stock|availability)\b/i],
+    ['product_name', /\b(?:product\s+name|product|name)\b/i],
+    ['url', /\burl\b/i],
+    ['rating', /\brating\b/i],
+    ['seller', /\bseller\b/i],
+    ['MAP', /\bMAP\b/],
+    ['plan', /\bplan\b/i],
+    ['price', /\bprice\b/i],
+  ];
+  patterns.forEach(([name, pattern]) => { if (pattern.test(request)) fields.add(name); });
+  if (fields.has('starting_price')) fields.delete('price');
+  if (fields.has('free_plan') || fields.has('free_trial')) fields.delete('plan');
+  const listed = request.match(/\b(?:return|extract|find)\s+([^.;]+)/i)?.[1];
+  if (listed) {
+    listed.split(/,|\band\b/i).map((item) => item.trim().replace(/\b(?:from|for|on)\b.*$/i, '').trim()).filter((item) => item && !domains.some((domain) => item.includes(domain))).forEach((item) => {
+      const canonical = patterns.find(([, pattern]) => pattern.test(item))?.[0];
+      if (canonical) fields.add(canonical);
+      else if (item.length < 36) fields.add(item.toLowerCase().replace(/^(?:the|a|an)\s+/i, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''));
+    });
+  }
+  return { domains, fields: Array.from(fields) };
+}
+
+type WorkflowDraft = {
+  dirty?: boolean;
+  selected: WorkflowTemplateKey;
+  mode: string;
+  inputMethod: InputMethod;
+  prompt: string;
+  sources: string;
+  fields: string;
+  access: string;
+  downloads: string;
+  region: string;
+  missingData: string;
+  evidence: string;
+  deduplication: string;
+  validation: string;
+  maxPages: string;
+  maxRecords: string;
+  timeout: string;
+};
 
 const templateFields: Record<WorkflowTemplateKey, string> = {
   compare: 'retailer, product, price',
@@ -120,15 +201,20 @@ export function WorkflowComposer() {
   const searchParams = useSearchParams();
   const initialTemplate = resolveWorkflowTemplate(searchParams.get('template'));
   const initialInput: InputMethod = searchParams.get('input') === 'prior' ? 'research' : 'urls';
-  return <WorkflowComposerContent key={`${initialTemplate}-${initialInput}`} initialTemplate={initialTemplate} initialInput={initialInput} />;
+  const initialPrompt = searchParams.has('template') ? workflowTemplates[initialTemplate].text : '';
+  return <WorkflowComposerContent key={`${initialTemplate}-${initialInput}`} initialTemplate={initialTemplate} initialInput={initialInput} initialPrompt={initialPrompt} />;
 }
 
-function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTemplate: WorkflowTemplateKey; initialInput: InputMethod }) {
+function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt }: { initialTemplate: WorkflowTemplateKey; initialInput: InputMethod; initialPrompt: string }) {
+  const auth = useAuth();
+  const mayRun = can(auth.session, 'run');
+  const initialWorkspaceSources = useRef(auth.sources);
+  const activeDraftKey = `${workflowDraftKey}:${auth.session?.workspaceId ?? 'signed-out'}`;
   const [stage, setStage] = useState(0);
   const [mode, setMode] = useState(initialInput === 'research' ? 'guided' : 'prompt');
   const [selected, setSelected] = useState<WorkflowTemplateKey>(initialTemplate);
-  const [prompt, setPrompt] = useState<string>(workflowTemplates[initialTemplate].text);
-  const [sources, setSources] = useState<string>(workflowTemplates[initialTemplate].sourceUrls.join('\n'));
+  const [prompt, setPrompt] = useState(initialPrompt);
+  const [sources, setSources] = useState<string>(() => templateSources(initialTemplate, auth.sources));
   const [inputMethod, setInputMethod] = useState<InputMethod>(initialInput);
   const [sourcePulse, setSourcePulse] = useState(false);
   const [templatesOpen, setTemplatesOpen] = useState(true);
@@ -164,23 +250,182 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
   const [csvDragging, setCsvDragging] = useState(false);
   const [researchResolved, setResearchResolved] = useState(false);
   const [datasetSaved, setDatasetSaved] = useState(false);
+  const [monitorDialogOpen, setMonitorDialogOpen] = useState(false);
+  const [monitorSchedule, setMonitorSchedule] = useState('Daily');
+  const [monitorFields, setMonitorFields] = useState<string[]>(['Price', 'Availability']);
+  const [monitorAlertWhen, setMonitorAlertWhen] = useState('Any change');
+  const [monitorThreshold, setMonitorThreshold] = useState('€230');
+  const [monitorNotifyVia, setMonitorNotifyVia] = useState<'Email'|'Slack'|'Webhook'>('Email');
+  const [monitorCreated, setMonitorCreated] = useState(false);
+  const [draftReady, setDraftReady] = useState(false);
+  const [draftDirty, setDraftDirty] = useState(false);
+  const [draftStatus, setDraftStatus] = useState('');
+  const [exampleIndex, setExampleIndex] = useState(0);
+  const [typedExample, setTypedExample] = useState('');
+  const [demoStopped, setDemoStopped] = useState(Boolean(initialPrompt));
+  const skipNextDraftSave = useRef(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
   const template = useMemo(() => workflowTemplates[selected], [selected]);
+  const promptSpecification = useMemo(() => parsePromptSpecification(prompt), [prompt]);
+  function markDraftDirty() {
+    setDemoStopped(true);
+    setDraftDirty(true);
+  }
+  function updateSetting<T>(setter: (value: T) => void, value: T) {
+    markDraftDirty();
+    setter(value);
+  }
+  function updatePrompt(value: string) {
+    markDraftDirty();
+    setPrompt(value);
+    const parsed = parsePromptSpecification(value);
+    if (parsed.domains.length) setSources(parsed.domains.map((domain) => `https://${domain}`).join('\n'));
+    if (parsed.fields.length) setFields(parsed.fields.join(', '));
+  }
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('studio:workflow-title', { detail: template.title }));
   }, [template.title]);
   useEffect(() => {
+    if (!auth.sources.length || promptSpecification.domains.length) return;
+    const timer = window.setTimeout(() => setSources((current) => [...new Set([...current.split('\n').map((source) => source.trim()).filter(Boolean), ...auth.sources])].join('\n')), 0);
+    return () => window.clearTimeout(timer);
+  }, [auth.sources, promptSpecification.domains.length]);
+  useEffect(() => {
     const timer = window.setTimeout(() => setTemplatesOpen(sessionStorage.getItem('studio-templates-open') !== 'false'), 0);
     return () => window.clearTimeout(timer);
   }, []);
+  useEffect(() => {
+    const example = workflowPromptExamples[exampleIndex];
+    if (demoStopped || prompt || mode !== 'prompt' || stage !== 0) return;
+
+    const setupTimer = window.setTimeout(() => {
+      setSelected(example.key);
+      setSources(templateSources(example.key, initialWorkspaceSources.current));
+      setFields(templateFields[example.key]);
+      setInputMethod('urls');
+      setSourcePulse(true);
+    }, 0);
+    const pulseTimer = window.setTimeout(() => setSourcePulse(false), 520);
+    const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reducedMotion) {
+      const timer = window.setTimeout(() => setTypedExample(example.text), 0);
+      return () => {
+        window.clearTimeout(setupTimer);
+        window.clearTimeout(timer);
+        window.clearTimeout(pulseTimer);
+      };
+    }
+
+    let character = 0;
+    let deleting = false;
+    let timer = 0;
+    const typeNextCharacter = () => {
+      character += deleting ? -1 : 1;
+      setTypedExample(example.text.slice(0, character));
+      if (!deleting && character === example.text.length) {
+        deleting = true;
+        timer = window.setTimeout(typeNextCharacter, 1400);
+      } else if (deleting && character === 0) {
+        setExampleIndex((current) => (current + 1) % workflowPromptExamples.length);
+      } else {
+        timer = window.setTimeout(typeNextCharacter, deleting ? 10 : 18 + (character % 3) * 4);
+      }
+    };
+    timer = window.setTimeout(() => {
+      setTypedExample('');
+      timer = window.setTimeout(typeNextCharacter, 220);
+    }, 0);
+    return () => {
+      window.clearTimeout(setupTimer);
+      window.clearTimeout(timer);
+      window.clearTimeout(pulseTimer);
+    };
+  }, [demoStopped, exampleIndex, mode, prompt, stage]);
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const stored = localStorage.getItem(activeDraftKey);
+      if (stored) {
+        try {
+          const draft = JSON.parse(stored) as WorkflowDraft;
+          const storedPrompt = draft.prompt ?? '';
+          const isGeneratedPrompt = workflowPromptExamples.some((example) => example.text === storedPrompt) || Object.values(workflowTemplates).some((item) => item.text === storedPrompt);
+          const hasUserDraft = draft.dirty ?? (Boolean(storedPrompt.trim()) && !isGeneratedPrompt);
+          if (hasUserDraft && !initialPrompt) {
+            if (draft.selected && workflowTemplates[draft.selected]) setSelected(draft.selected);
+            if (draft.mode === 'prompt' || draft.mode === 'guided') setMode(draft.mode);
+            if (inputMethods.some(([key]) => key === draft.inputMethod)) setInputMethod(draft.inputMethod);
+            setPrompt(storedPrompt);
+            setSources(draft.sources ?? templateSources(initialTemplate, initialWorkspaceSources.current));
+            setFields(draft.fields ?? templateFields[initialTemplate]);
+            setAccess(draft.access ?? 'Approved public sources');
+            setDownloads(draft.downloads ?? 'Block downloads');
+            setRegion(draft.region ?? 'Automatic');
+            setMissingData(draft.missingData ?? 'Use null; never invent');
+            setEvidence(draft.evidence ?? 'Source quote per value');
+            setDeduplication(draft.deduplication ?? 'Canonical URL + primary key');
+            setValidation(draft.validation ?? 'Require type match');
+            setMaxPages(draft.maxPages ?? '3');
+            setMaxRecords(draft.maxRecords ?? '10');
+            setTimeoutValue(draft.timeout ?? '5 minutes');
+            setDemoStopped(true);
+            setDraftDirty(true);
+            setDraftStatus('Draft saved · just now');
+          }
+        } catch {
+          localStorage.removeItem(activeDraftKey);
+        }
+      }
+      setDraftReady(true);
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [activeDraftKey, initialTemplate, initialPrompt]);
+  useEffect(() => {
+    if (!draftReady) return;
+    if (skipNextDraftSave.current) {
+      skipNextDraftSave.current = false;
+      return;
+    }
+    if (!draftDirty || (!demoStopped && !prompt.trim() && mode === 'prompt')) return;
+    const timer = window.setTimeout(() => {
+      const draft: WorkflowDraft = { dirty: true, selected, mode, inputMethod, prompt, sources, fields, access, downloads, region, missingData, evidence, deduplication, validation, maxPages, maxRecords, timeout };
+      localStorage.setItem(activeDraftKey, JSON.stringify(draft));
+      setDraftStatus('Draft saved · just now');
+    }, 300);
+    return () => window.clearTimeout(timer);
+  }, [access, activeDraftKey, deduplication, demoStopped, downloads, draftDirty, draftReady, evidence, fields, inputMethod, maxPages, maxRecords, missingData, mode, prompt, region, selected, sources, timeout, validation]);
   function setTemplateVisibility(open: boolean) {
     setTemplatesOpen(open);
     sessionStorage.setItem('studio-templates-open', String(open));
   }
+  function discardDraft() {
+    localStorage.removeItem(activeDraftKey);
+    skipNextDraftSave.current = true;
+    setSelected(initialTemplate);
+    setMode(initialInput === 'research' ? 'guided' : 'prompt');
+    setInputMethod(initialInput);
+    setPrompt(initialPrompt);
+    setDemoStopped(Boolean(initialPrompt));
+    setDraftDirty(false);
+    setExampleIndex(0);
+    setSources(templateSources(initialTemplate, auth.sources));
+    setFields(templateFields[initialTemplate]);
+    setAccess('Approved public sources');
+    setDownloads('Block downloads');
+    setRegion('Automatic');
+    setMissingData('Use null; never invent');
+    setEvidence('Source quote per value');
+    setDeduplication('Canonical URL + primary key');
+    setValidation('Require type match');
+    setMaxPages('3');
+    setMaxRecords('10');
+    setTimeoutValue('5 minutes');
+    setDraftStatus('');
+  }
   function applyTemplate(key: WorkflowTemplateKey) {
+    markDraftDirty();
     setSelected(key);
     setPrompt(workflowTemplates[key].text);
-    setSources(workflowTemplates[key].sourceUrls.join('\n'));
+    setSources(templateSources(key, auth.sources));
     setFields(templateFields[key]);
     setInputMethod('urls');
     setActiveTool(null);
@@ -190,6 +435,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
     window.setTimeout(() => setSourcePulse(false), 520);
   }
   function chooseInputMethod(method: InputMethod) {
+    markDraftDirty();
     setInputMethod(method);
     setGuidedFeedback('');
     setSourcePulse(false);
@@ -197,6 +443,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
     window.setTimeout(() => setSourcePulse(false), 520);
   }
   function applyCsvColumn(header: string, headers = csvHeaders, rows = csvRows) {
+    markDraftDirty();
     setCsvColumn(header);
     const columnIndex = Math.max(0, headers.indexOf(header));
     setSources(rows.map((row) => row[columnIndex]?.trim()).filter(Boolean).join('\n'));
@@ -233,6 +480,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
     configureCsv(rows, 'First row contains column names');
   }
   function useDatasetInput() {
+    markDraftDirty();
     const sampleSources = datasetSelection.startsWith('Competitor')
       ? workflowTemplates.compare.sourceUrls
       : datasetSelection.startsWith('Outdoor')
@@ -242,21 +490,25 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
     setGuidedFeedback(`${datasetColumn} selected from ${datasetSelection}. Original rows will remain unchanged.`);
   }
   function addRuntimeTestValues() {
+    markDraftDirty();
     setSources(workflowTemplates.compare.sourceUrls.join('\n'));
     setGuidedFeedback(`3 local test values added for inputs.${runtimeKey}. The saved workflow will still require ${runtimeType.toLowerCase()} at runtime.`);
   }
   function useDiscoveryInput() {
+    markDraftDirty();
     setSources(`https://search.import.io/?q=${encodeURIComponent(discoveryQuery)}`);
     setPrompt(`Discover up to ${discoveryLimit} ${discoveryEntity.toLowerCase()} candidates for: ${discoveryQuery}. Return source URLs and supporting evidence.`);
     setGuidedFeedback(`Live-web discovery added with a ${discoveryLimit}-candidate limit. Qualification remains a separate step.`);
   }
   function usePriorResearch() {
+    markDraftDirty();
     setSources('https://example.com/suppliers\nhttps://northwind.example\nhttps://summit.example');
     setPrompt('Revisit candidates from the selected prior research and re-verify every requested fact against live sources.');
     setGuidedFeedback(`${researchSet} added as labelled context. ${researchPolicy}.`);
   }
   const sourceCount = useMemo(() => new Set(sources.split('\n').map((source) => source.trim()).filter(Boolean)).size, [sources]);
   const fieldCount = useMemo(() => fields.split(',').map((field) => field.trim()).filter(Boolean).length, [fields]);
+  const understoodFieldCount = fieldCount;
   const fieldNames = useMemo(() => fields.split(',').map((field) => field.trim()).filter(Boolean), [fields]);
   const sourceDomains = useMemo(() => sources.split('\n').map((source) => source.trim()).filter(Boolean).map((source) => {
     try {
@@ -265,7 +517,8 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
       return source;
     }
   }), [sources]);
-  const estimate = `${sourceCount} ${sourceCount === 1 ? 'query' : 'queries'} · ${(sourceCount * 0.6).toFixed(1)} browser minutes · estimated cost $${(sourceCount * 0.007).toFixed(2)}`;
+  const estimateQueries = Math.max(1, sourceCount) * Math.max(1, Number(maxPages) || 1);
+  const estimate = `${estimateQueries} ${estimateQueries === 1 ? 'query' : 'queries'} · ${(estimateQueries * 0.6).toFixed(1)} browser minutes · estimated cost $${(estimateQueries * 0.007).toFixed(2)}`;
   const urlSourceLabel = `${sourceCount} ${sourceCount === 1 ? 'source' : 'sources'}`;
   const guidedSourceLabel = inputMethod === 'urls'
     ? urlSourceLabel
@@ -288,21 +541,22 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
   }
 
   function acceptRewrite() {
+    markDraftDirty();
     setPrompt(improvedPrompt);
     setActiveTool(null);
   }
 
   const guidedInputDetail = inputMethod === 'urls'
-    ? <label className="guided-field"><strong>Source URLs</strong><textarea value={sources} onChange={(event) => setSources(event.target.value)} aria-label="Source URLs" /><small>Paste up to 50 public HTTPS URLs or domains, one per line.</small></label>
+    ? <label className="guided-field"><strong>Source URLs</strong><textarea value={sources} onChange={(event) => updateSetting(setSources, event.target.value)} aria-label="Source URLs" /><small>Paste up to 50 public HTTPS URLs or domains, one per line.</small></label>
     : inputMethod === 'csv'
       ? <section className="csv-input-card"><input ref={csvInputRef} className="csv-hidden-input" type="file" accept=".csv,text/csv" aria-label="Upload CSV" onChange={(event) => { const file = event.target.files?.[0]; if (file) void loadCsvFile(file); }} /><div className={csvDragging ? 'csv-drop-zone dragging' : 'csv-drop-zone'} onDragOver={(event) => { event.preventDefault(); setCsvDragging(true); }} onDragLeave={() => setCsvDragging(false)} onDrop={(event) => { event.preventDefault(); setCsvDragging(false); const file = event.dataTransfer.files?.[0]; if (file) void loadCsvFile(file); }}><div className="csv-drop-copy"><strong>{csvFileLabel || 'Drop a CSV here or choose a file'}</strong><p>Nothing is uploaded. Studio reads the header and sample rows locally in your browser.</p></div><Button variant="primary" type="button" onClick={() => csvInputRef.current?.click()}>{csvFileLabel ? 'Replace CSV' : 'Choose CSV'}</Button></div><Button variant="ghost" type="button" className="csv-sample" onClick={loadSampleCsv}>Try a sample CSV instead</Button>{csvHeaders.length ? <div className="csv-mapping"><div className="csv-mapping-controls"><ToolSelect label="Use this column as the URL or domain" value={csvColumn} onValueChange={(value) => applyCsvColumn(value)} options={csvHeaders} /><ToolSelect label="Header row" value={csvHeaderMode} onValueChange={(value) => configureCsv(csvRawRows, value)} options={['First row contains column names','No header row']} /></div><div className="csv-preview"><table><thead><tr>{csvHeaders.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{csvRows.slice(0, 3).map((row, rowIndex) => <tr key={rowIndex}>{csvHeaders.map((header, columnIndex) => <td key={`${header}-${columnIndex}`}>{row[columnIndex] || '—'}</td>)}</tr>)}</tbody></table></div></div> : null}</section>
       : inputMethod === 'dataset'
-        ? <section className="guided-source-card"><div className="guided-source-intro"><Eyebrow>Existing dataset</Eyebrow><strong>Use rows from a Studio dataset</strong><p>Map the column that contains each URL or domain. The selected dataset remains unchanged.</p></div><div className="guided-option-controls"><div className="guided-option-grid"><ToolSelect label="Dataset" value={datasetSelection} onValueChange={(value) => { setDatasetSelection(value); setGuidedFeedback(''); }} options={['Competitor prices · v4','Outdoor catalogue · v12','MAP watch · v7']} /><ToolSelect label="Input column" value={datasetColumn} onValueChange={(value) => { setDatasetColumn(value); setGuidedFeedback(''); }} options={['website_url','domain','profile_url']} /></div><Button variant="secondary" type="button" onClick={useDatasetInput}>Use selected column</Button>{guidedFeedback ? <p className="guided-option-status" role="status">{guidedFeedback}</p> : null}</div></section>
+        ? <section className="guided-source-card"><div className="guided-source-intro"><Eyebrow>Existing dataset</Eyebrow><strong>Use rows from a Studio dataset</strong><p>Map the column that contains each URL or domain. The selected dataset remains unchanged.</p></div><div className="guided-option-controls"><div className="guided-option-grid"><ToolSelect label="Dataset" value={datasetSelection} onValueChange={(value) => { markDraftDirty(); setDatasetSelection(value); setGuidedFeedback(''); }} options={['Competitor prices · v4','Outdoor catalogue · v12','MAP watch · v7']} /><ToolSelect label="Input column" value={datasetColumn} onValueChange={(value) => { markDraftDirty(); setDatasetColumn(value); setGuidedFeedback(''); }} options={['website_url','domain','profile_url']} /></div><Button variant="secondary" type="button" onClick={useDatasetInput}>Use selected column</Button>{guidedFeedback ? <p className="guided-option-status" role="status">{guidedFeedback}</p> : null}</div></section>
         : inputMethod === 'runtime'
-          ? <section className="guided-source-card"><div className="guided-source-intro"><Eyebrow>Runtime input</Eyebrow><strong>Accept values when the workflow is called</strong><p>Studio validates the required parameter before a run starts.</p></div><div className="guided-option-controls"><div className="guided-option-grid"><label className="tool-field"><span>Runtime parameter</span><Input value={runtimeKey} onChange={(event) => { setRuntimeKey(event.target.value); setGuidedFeedback(''); }} aria-label="Runtime parameter" /></label><ToolSelect label="Value type" value={runtimeType} onValueChange={(value) => { setRuntimeType(value); setGuidedFeedback(''); }} options={['Array of URLs','Single URL','Dataset ID']} /></div><small>The saved workflow will require <code>inputs.{runtimeKey || 'product_url'}</code>.</small><Button variant="secondary" type="button" onClick={addRuntimeTestValues}>Add test values</Button>{guidedFeedback ? <p className="guided-option-status" role="status">{guidedFeedback}</p> : null}</div></section>
+          ? <section className="guided-source-card"><div className="guided-source-intro"><Eyebrow>Runtime input</Eyebrow><strong>Accept values when the workflow is called</strong><p>Studio validates the required parameter before a run starts.</p></div><div className="guided-option-controls"><div className="guided-option-grid"><label className="tool-field"><span>Runtime parameter</span><Input value={runtimeKey} onChange={(event) => { markDraftDirty(); setRuntimeKey(event.target.value); setGuidedFeedback(''); }} aria-label="Runtime parameter" /></label><ToolSelect label="Value type" value={runtimeType} onValueChange={(value) => { markDraftDirty(); setRuntimeType(value); setGuidedFeedback(''); }} options={['Array of URLs','Single URL','Dataset ID']} /></div><small>The saved workflow will require <code>inputs.{runtimeKey || 'product_url'}</code>.</small><Button variant="secondary" type="button" onClick={addRuntimeTestValues}>Add test values</Button>{guidedFeedback ? <p className="guided-option-status" role="status">{guidedFeedback}</p> : null}</div></section>
           : inputMethod === 'discover'
-            ? <section className="guided-source-card"><div className="guided-source-intro"><Eyebrow>Live discovery</Eyebrow><strong>Let Studio find candidate sources</strong><p>Discovery finds candidates only. Qualification remains a separate, evidence-backed step.</p></div><div className="guided-option-controls"><div className="guided-option-grid guided-option-grid-three"><label className="tool-field"><span>Search query</span><Input value={discoveryQuery} onChange={(event) => { setDiscoveryQuery(event.target.value); setGuidedFeedback(''); }} aria-label="Discovery query" /></label><ToolSelect label="Entity type" value={discoveryEntity} onValueChange={(value) => { setDiscoveryEntity(value); setGuidedFeedback(''); }} options={['Company','Product','Any web result']} /><ToolSelect label="Result limit" value={discoveryLimit} onValueChange={(value) => { setDiscoveryLimit(value); setGuidedFeedback(''); }} options={['10','20','50']} /></div><Button variant="secondary" type="button" onClick={useDiscoveryInput}>Use live-web discovery</Button>{guidedFeedback ? <p className="guided-option-status" role="status">{guidedFeedback}</p> : null}</div></section>
-            : <section className="guided-source-card"><div className="guided-source-intro"><Eyebrow>Prior research</Eyebrow><strong>Continue from reviewed research</strong><p>Reuse retained leads as labelled context, then verify every requested fact against live sources.</p></div><div className="guided-option-controls"><div className="guided-option-grid guided-option-grid-three"><ToolSelect label="Prior research" value={researchSet} onValueChange={(value) => { setResearchSet(value); setGuidedFeedback(''); }} options={['SaaS pricing research · 74 records','Retailer coverage study · 128 records','Supplier discovery · 42 records']} /><ToolSelect label="Reuse policy" value={researchPolicy} onValueChange={(value) => { setResearchPolicy(value); setGuidedFeedback(''); }} options={['Use as leads; re-verify every fact','Use only to seed discovery']} /><div className="guided-retention"><span>Retention</span><strong>24 days remaining</strong></div></div><Button variant="secondary" type="button" onClick={usePriorResearch}>Use selected research</Button>{guidedFeedback ? <p className="guided-option-status" role="status">{guidedFeedback}</p> : null}</div></section>;
+            ? <section className="guided-source-card"><div className="guided-source-intro"><Eyebrow>Live discovery</Eyebrow><strong>Let Studio find candidate sources</strong><p>Discovery finds candidates only. Qualification remains a separate, evidence-backed step.</p></div><div className="guided-option-controls"><div className="guided-option-grid guided-option-grid-three"><label className="tool-field"><span>Search query</span><Input value={discoveryQuery} onChange={(event) => { markDraftDirty(); setDiscoveryQuery(event.target.value); setGuidedFeedback(''); }} aria-label="Discovery query" /></label><ToolSelect label="Entity type" value={discoveryEntity} onValueChange={(value) => { markDraftDirty(); setDiscoveryEntity(value); setGuidedFeedback(''); }} options={['Company','Product','Any web result']} /><ToolSelect label="Result limit" value={discoveryLimit} onValueChange={(value) => { markDraftDirty(); setDiscoveryLimit(value); setGuidedFeedback(''); }} options={['10','20','50']} /></div><Button variant="secondary" type="button" onClick={useDiscoveryInput}>Use live-web discovery</Button>{guidedFeedback ? <p className="guided-option-status" role="status">{guidedFeedback}</p> : null}</div></section>
+            : <section className="guided-source-card"><div className="guided-source-intro"><Eyebrow>Prior research</Eyebrow><strong>Continue from reviewed research</strong><p>Reuse retained leads as labelled context, then verify every requested fact against live sources.</p></div><div className="guided-option-controls"><div className="guided-option-grid guided-option-grid-three"><ToolSelect label="Prior research" value={researchSet} onValueChange={(value) => { markDraftDirty(); setResearchSet(value); setGuidedFeedback(''); }} options={['SaaS pricing research · 74 records','Retailer coverage study · 128 records','Supplier discovery · 42 records']} /><ToolSelect label="Reuse policy" value={researchPolicy} onValueChange={(value) => { markDraftDirty(); setResearchPolicy(value); setGuidedFeedback(''); }} options={['Use as leads; re-verify every fact','Use only to seed discovery']} /><div className="guided-retention"><span>Retention</span><strong>24 days remaining</strong></div></div><Button variant="secondary" type="button" onClick={usePriorResearch}>Use selected research</Button>{guidedFeedback ? <p className="guided-option-status" role="status">{guidedFeedback}</p> : null}</div></section>;
 
   const stepper = (
     <div className="stepper" aria-label="Workflow progress">
@@ -323,17 +577,107 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
     </div>
   );
 
-  const runId = selected === 'research'
+  const [runId, setRunId] = useState('');
+  const scenarioRunId = selected === 'research'
     ? 'run_batch_91af'
-    : selected === 'collect'
-      ? 'run_collect'
-      : selected === 'discover'
-        ? 'run_discover'
-        : selected === 'extract'
-          ? 'run_extract'
-          : selected === 'monitor'
-            ? 'run_monitor'
-            : 'run_7f3a';
+    : selected === 'compare'
+      ? 'run_7f3a'
+      : `run_${selected}`;
+  const reviewedRecordCount = promptSpecification.domains.length || recordCountForScenario(selected);
+
+  function startRun() {
+    const nextRunId = uniqueRunId(new Set(auth.runs.map((run) => run.id)));
+    const completed = selected !== 'research' || promptSpecification.domains.length > 0;
+    const needsReview = selected === 'compare' && promptSpecification.domains.length === 0;
+    auth.addRun({
+      id: nextRunId,
+      when: completed ? 'Just now' : 'Running now',
+      pipeline: selected === 'research' ? 'SaaS pricing research' : template.title,
+      coverage: completed ? `${sourceCount} / ${sourceCount} sources` : `2 / ${sourceCount} sources`,
+      records: completed ? String(reviewedRecordCount) : '2',
+      queries: estimateQueries,
+      state: completed ? 'Completed' : 'Running',
+      outcome: completed ? (needsReview ? 'Partial' : 'Succeeded') : 'Running',
+      tone: completed ? (needsReview ? 'warning' : 'success') : 'info',
+      badge: true,
+      scenario: selected,
+    });
+    setRunId(nextRunId);
+    setStage(2);
+  }
+
+  function resolveResearchRun() {
+    setResearchResolved(true);
+    auth.updateRun(runId, {
+      when: 'Just now',
+      coverage: `${sourceCount} / ${sourceCount} sources`,
+      records: String(reviewedRecordCount),
+      state: 'Completed',
+      outcome: 'Succeeded',
+      tone: 'success',
+    });
+  }
+
+  function saveDataset(records?: DatasetRecord[], savedFields?: string[]) {
+    const datasetTitle = selected === 'research' ? 'SaaS pricing research' : template.title;
+    const needsReview = promptSpecification.domains.length === 0 && (selected === 'compare' || (selected === 'research' && !researchResolved));
+    const datasetIds: Record<WorkflowTemplateKey,string> = { compare:'competitor-prices', research:'saas-pricing-research', extract:'extract', collect:'build-a-dataset', discover:'supplier-discovery', monitor:'trailhead-baseline' };
+    auth.addDataset({
+      id: datasetIds[selected],
+      version: 'DATASET · V1',
+      title: datasetTitle,
+      detail: `${reviewedRecordCount} ${reviewedRecordCount === 1 ? 'record' : 'records'} · ${fieldCount} fields${needsReview ? ' · 1 unresolved' : ' · fully validated'}`,
+      status: needsReview ? 'Needs review' : 'Validated',
+      tone: needsReview ? 'warning' : 'success',
+      href: `/datasets/${datasetIds[selected]}`,
+      recordCount: reviewedRecordCount,
+      fields: savedFields ?? fieldNames,
+      lastUpdated: 'Just now',
+      sourceWorkflow: template.title,
+      sourceRunId: runId,
+      records,
+    });
+    setDatasetSaved(true);
+  }
+
+  function createMonitor() {
+    const baselineTitle = 'Trailhead baseline';
+    const monitorAlertRule = monitorAlertWhen === 'Price falls below' ? `Price falls below ${monitorThreshold}` : monitorAlertWhen;
+    auth.addDataset({
+      id: 'trailhead-baseline',
+      version: 'DATASET · V1',
+      title: baselineTitle,
+      detail: '2 records · 2 fields · fully validated',
+      status: 'Validated',
+      tone: 'success',
+      href: '/datasets/trailhead-baseline',
+      recordCount: 2,
+      fields: ['Price','Availability'],
+      lastUpdated: 'Just now',
+      sourceWorkflow: template.title,
+      sourceRunId: runId,
+      records: [
+        {id:'price',values:{Field:'Price',Baseline:'€249'},evidence:{Field:{sourceUrl:'https://northwind-outdoors.example/tents/trailhead-2p',quote:'Trailhead 2P Tent — €249 · In stock.'},Baseline:{sourceUrl:'https://northwind-outdoors.example/tents/trailhead-2p',quote:'Trailhead 2P Tent — €249 · In stock.'}}},
+        {id:'availability',values:{Field:'Availability',Baseline:'In stock'},evidence:{Field:{sourceUrl:'https://northwind-outdoors.example/tents/trailhead-2p',quote:'Trailhead 2P Tent — €249 · In stock.'},Baseline:{sourceUrl:'https://northwind-outdoors.example/tents/trailhead-2p',quote:'Trailhead 2P Tent — €249 · In stock.'}}},
+      ],
+    });
+    auth.addMonitor({
+      id: `monitor-${runId}`,
+      name: 'Trailhead price and availability',
+      detail: `${monitorAlertRule} · ${monitorNotifyVia}`,
+      baselineDataset: baselineTitle,
+      schedule: monitorSchedule,
+      lastChange: 'Not checked yet',
+      status: 'Scheduled',
+      tone: 'info',
+      fields: monitorFields,
+      alertRule: monitorAlertRule,
+      notifyVia: monitorNotifyVia,
+    });
+    setDatasetSaved(true);
+    setMonitorCreated(true);
+    setMonitorDialogOpen(false);
+  }
 
   if (stage === 1) {
     return (
@@ -400,7 +744,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
               </div>
               <div className="stage-actions">
                 <Button variant="secondary" onClick={() => setStage(0)}>Back to describe</Button>
-                <Button variant="primary" onClick={() => setStage(2)}>Approve and run →</Button>
+                <Button variant="primary" disabled={!mayRun} title={!mayRun ? viewerTooltip : undefined} onClick={startRun}>Approve and run →</Button>
               </div>
             </aside>
           </div>
@@ -410,7 +754,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
   }
 
   if (stage === 2) {
-    const isRunning = selected === 'research' && !researchResolved;
+    const isRunning = selected === 'research' && !researchResolved && promptSpecification.domains.length === 0;
 
     return (
       <>
@@ -435,7 +779,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
             </Badge>
           </header>
 
-          <RunSession runId={runId} researchResolved={researchResolved} onResearchResolved={() => setResearchResolved(true)} />
+          <RunSession runId={runId} scenarioKey={scenarioRunId} researchResolved={researchResolved} onResearchResolved={resolveResearchRun} customDomains={promptSpecification.domains} customFields={fieldNames} />
 
           <div className="stage-actions">
             <Button variant="secondary" onClick={() => setStage(1)}>Review plan</Button>
@@ -447,7 +791,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
   }
 
   if (stage === 3) {
-    const needsReview = selected === 'compare' || (selected === 'research' && !researchResolved);
+    const needsReview = (selected === 'compare' && promptSpecification.domains.length === 0) || (selected === 'research' && !researchResolved && promptSpecification.domains.length === 0);
 
     return (
       <>
@@ -464,11 +808,61 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
             </Badge>
           </header>
 
-          <WorkflowScenarioReview scenario={selected} researchResolved={researchResolved} onSaved={() => setDatasetSaved(true)} />
+          <WorkflowScenarioReview
+            scenario={selected}
+            researchResolved={researchResolved}
+            onSaved={saveDataset}
+            onCreateMonitor={() => setMonitorDialogOpen(true)}
+            workspaceName={auth.currentWorkspace?.name}
+            customDomains={promptSpecification.domains}
+            customFields={fieldNames}
+          />
+
+          <Dialog open={monitorDialogOpen} onOpenChange={setMonitorDialogOpen}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create a monitor</DialogTitle>
+                <DialogDescription>Schedule checks against the two-record Trailhead baseline dataset.</DialogDescription>
+              </DialogHeader>
+              <div className="dialog-form">
+                <label>PIPELINE<Select value={template.title} disabled><SelectTrigger aria-label="Pipeline"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={template.title}>{template.title}</SelectItem></SelectContent></Select></label>
+                <label>
+                  SCHEDULE
+                  <Select value={monitorSchedule} onValueChange={setMonitorSchedule}>
+                    <SelectTrigger aria-label="Schedule"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Hourly">Hourly</SelectItem>
+                      <SelectItem value="Daily">Daily</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </label>
+                <fieldset className="monitor-field-picker">
+                  <legend>FIELDS TO WATCH</legend>
+                  {['Price', 'Availability'].map((field) => (
+                    <label key={field}>
+                      <input
+                        type="checkbox"
+                        checked={monitorFields.includes(field)}
+                        onChange={(event) => setMonitorFields((current) => event.target.checked ? [...current, field] : current.filter((item) => item !== field))}
+                      />
+                      {field}
+                    </label>
+                  ))}
+                </fieldset>
+                <label>ALERT WHEN<Select value={monitorAlertWhen} onValueChange={setMonitorAlertWhen}><SelectTrigger aria-label="Alert when"><SelectValue /></SelectTrigger><SelectContent>{['Any change','Price falls below','Goes out of stock'].map((value)=><SelectItem value={value} key={value}>{value}</SelectItem>)}</SelectContent></Select></label>
+                {monitorAlertWhen === 'Price falls below' ? <label>VALUE<Input value={monitorThreshold} onChange={(event)=>setMonitorThreshold(event.target.value)} /></label> : null}
+                <label>NOTIFY VIA<Select value={monitorNotifyVia} onValueChange={(value)=>setMonitorNotifyVia(value as 'Email'|'Slack'|'Webhook')}><SelectTrigger aria-label="Notify via"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Email">Email · {auth.currentUser?.email}</SelectItem><SelectItem value="Slack">Slack</SelectItem><SelectItem value="Webhook">Webhook</SelectItem></SelectContent></Select></label>
+              </div>
+              <DialogFooter>
+                <Button variant="secondary" onClick={() => setMonitorDialogOpen(false)}>Cancel</Button>
+                <Button variant="primary" disabled={!monitorFields.length || (monitorAlertWhen === 'Price falls below' && !monitorThreshold.trim())} onClick={createMonitor}>Create monitor</Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <div className="stage-actions">
             <Button variant="secondary" onClick={() => setStage(2)}>Back to run</Button>
-            {datasetSaved ? <Button variant="primary" asChild><Link href="/datasets/competitor-prices">Open saved dataset</Link></Button> : null}
+            {monitorCreated ? <Button variant="primary" asChild><Link href="/monitors">Open monitors</Link></Button> : datasetSaved ? <Button variant="primary" asChild><Link href={`/datasets/${({compare:'competitor-prices',research:'saas-pricing-research',extract:'extract',collect:'build-a-dataset',discover:'supplier-discovery',monitor:'trailhead-baseline'} as Record<WorkflowTemplateKey,string>)[selected]}`}>Open saved dataset</Link></Button> : null}
           </div>
         </section>
       </>
@@ -485,11 +879,11 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
       </header>
       <div className={templatesOpen ? 'builder-layout' : 'builder-layout templates-collapsed'}>
         <div className="builder-main">
-          <Tabs value={mode} onValueChange={(value) => { setMode(value); setActiveTool(null); }}>
+          <Tabs value={mode} onValueChange={(value) => { markDraftDirty(); setMode(value); setActiveTool(null); }}>
             <TabsList><TabsTrigger value="prompt">Full prompt</TabsTrigger><TabsTrigger value="guided">Guided setup</TabsTrigger></TabsList>
           </Tabs>
           <div className={mode === 'prompt' ? 'composer prompt-mode' : 'composer guided-mode'}>
-            {mode === 'prompt' ? <textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} aria-label="Workflow request" placeholder="e.g. Compare the price and availability of the Trailhead 2P Tent on these retailer pages. Return one row per seller with the source quote." /> : <div className="guided-composer"><section className="input-method-panel"><strong>How will you provide inputs?</strong><div className="input-methods" role="tablist" aria-label="Input method">{inputMethods.map(([key,label]) => <Button variant="secondary" size="sm" role="tab" aria-selected={inputMethod === key} className={inputMethod === key ? 'input-method-button active' : 'input-method-button'} onClick={() => chooseInputMethod(key)} key={key}>{label}</Button>)}</div><p>{inputMethod === 'urls' ? `${sourceCount} valid inputs · 0 duplicates · 0 invalid` : inputMethod === 'csv' ? csvRows.length ? `${csvRows.length} CSV rows ready · ${new Set(sources.split('\n').filter(Boolean)).size} unique inputs · column ${csvColumn}` : 'Choose a CSV to detect its columns and preview the rows' : guidedSourceLabel}</p></section><div className="guided-input-detail">{guidedInputDetail}</div><label className="guided-field"><strong>What do you want to know?</strong><textarea value={prompt} onChange={(event) => setPrompt(event.target.value)} aria-label="Guided workflow request" /></label></div>}
+            {mode === 'prompt' ? <div className="prompt-field"><textarea value={prompt} onChange={(event) => updatePrompt(event.target.value)} aria-label="Workflow request" />{prompt ? null : <div className="prompt-ghost" aria-hidden="true">{typedExample}<i /></div>}</div> : <div className="guided-composer"><section className="input-method-panel"><strong>How will you provide inputs?</strong><div className="input-methods" role="tablist" aria-label="Input method">{inputMethods.map(([key,label]) => <Button variant="secondary" size="sm" role="tab" aria-selected={inputMethod === key} className={inputMethod === key ? 'input-method-button active' : 'input-method-button'} onClick={() => chooseInputMethod(key)} key={key}>{label}</Button>)}</div><p>{inputMethod === 'urls' ? `${sourceCount} valid inputs · 0 duplicates · 0 invalid` : inputMethod === 'csv' ? csvRows.length ? `${csvRows.length} CSV rows ready · ${new Set(sources.split('\n').filter(Boolean)).size} unique inputs · column ${csvColumn}` : 'Choose a CSV to detect its columns and preview the rows' : guidedSourceLabel}</p></section><div className="guided-input-detail">{guidedInputDetail}</div><label className="guided-field"><strong>What do you want to know?</strong><textarea value={prompt} onChange={(event) => updatePrompt(event.target.value)} aria-label="Guided workflow request" /></label><div className="guided-plan-action"><Button variant="primary" onClick={() => setStage(1)}>Plan workflow →</Button></div></div>}
             {mode === 'prompt' ? <div className="composer-tools"><div className="composer-tool-list">
               {([
                 ['Sources', Globe2],
@@ -502,16 +896,17 @@ function WorkflowComposerContent({ initialTemplate, initialInput }: { initialTem
             </div><div className="composer-submit">{prompt.trim() ? <span className="keyboard-hint">⌘↵ to plan</span> : null}<Button variant="primary" className="send" aria-label="Plan workflow" title={prompt.trim() || sourceCount ? 'Plan workflow' : 'Add a source or say what to find'} disabled={!prompt.trim() && sourceCount === 0} onClick={() => setStage(1)}><ArrowUp size={17} /></Button></div></div> : null}
             {mode === 'prompt' && activeTool ? <section className="composer-tool-panel" id="workflow-tool-panel" aria-labelledby="workflow-tool-title">
               <header><div><h2 id="workflow-tool-title">{activeTool}</h2><p>{activeTool === 'Sources' ? 'Add public HTTPS URLs or domains, one per line.' : activeTool === 'Browser actions' ? 'Choose how Studio may navigate the public web.' : activeTool === 'Fields' ? 'Make the expected output explicit.' : activeTool === 'Limits' ? 'Bound browser work before the plan is approved.' : activeTool === 'Rules' ? 'Set evidence and missing-data behavior.' : 'Review the proposed rewrite before changing your draft.'}</p></div><Button variant="ghost" size="icon" aria-label={`Close ${activeTool}`} onClick={() => setActiveTool(null)}><X size={16} /></Button></header>
-              {activeTool === 'Sources' ? <div className="source-editor"><div className="source-preview-chips" aria-label={`${sourceCount} configured sources`}>{sources.split('\n').map((source) => source.trim()).filter(Boolean).map((source, index) => <span key={`${source}-${index}`}>{source.replace(/^https?:\/\//, '')}</span>)}</div><label className="tool-field tool-field-wide"><span>Sources</span><Textarea value={sources} onChange={(event) => setSources(event.target.value)} aria-label="Sources" /></label></div> : null}
-              {activeTool === 'Browser actions' ? <div className="tool-grid"><ToolSelect label="Access" value={access} onValueChange={setAccess} options={['Approved public sources','Public web discovery','Approved domains only']} /><ToolSelect label="Downloads" value={downloads} onValueChange={setDownloads} options={['Block downloads','Allow documents','Allow all downloads']} /><ToolSelect label="Region" value={region} onValueChange={setRegion} options={['Automatic','Europe','United States']} /></div> : null}
-              {activeTool === 'Fields' ? <div className="tool-grid"><label className="tool-field tool-field-span-2"><span>Output fields</span><Input value={fields} onChange={(event) => setFields(event.target.value)} aria-label="Output fields" /></label><ToolSelect label="Missing values" value={missingData} onValueChange={setMissingData} options={['Use null; never invent','Omit missing fields','Send to review']} /><ToolSelect label="Validation" value={validation} onValueChange={setValidation} options={['Require type match','Coerce safe values','Review mismatches']} /></div> : null}
-              {activeTool === 'Limits' ? <div className="tool-grid"><label className="tool-field"><span>Maximum pages</span><Input type="number" min="1" value={maxPages} onChange={(event) => setMaxPages(event.target.value)} /></label><label className="tool-field"><span>Maximum records</span><Input type="number" min="1" value={maxRecords} onChange={(event) => setMaxRecords(event.target.value)} /></label><ToolSelect label="Timeout" value={timeout} onValueChange={setTimeoutValue} options={['2 minutes','5 minutes','15 minutes']} /></div> : null}
-              {activeTool === 'Rules' ? <div className="tool-grid"><ToolSelect label="Missing data" value={missingData} onValueChange={setMissingData} options={['Use null; never invent','Omit missing fields','Send to review']} /><ToolSelect label="Evidence" value={evidence} onValueChange={setEvidence} options={['Source quote per value','Page evidence per record','No evidence required']} /><ToolSelect label="Deduplication" value={deduplication} onValueChange={setDeduplication} options={['Canonical URL + primary key','Canonical URL only','Keep every result']} /></div> : null}
+              {activeTool === 'Sources' ? <div className="source-editor"><div className="source-preview-chips" aria-label={`${sourceCount} configured sources`}>{sources.split('\n').map((source) => source.trim()).filter(Boolean).map((source, index) => <span key={`${source}-${index}`}>{source.replace(/^https?:\/\//, '')}<button type="button" aria-label={`Remove ${source}`} onClick={() => { markDraftDirty(); setSources((current) => current.split('\n').map((item) => item.trim()).filter((item) => item && item !== source).join('\n')); if (auth.sources.includes(source)) auth.removeSource(source); }}><X size={12} /></button></span>)}</div><label className="tool-field tool-field-wide"><span>Sources</span><Textarea value={sources} onChange={(event) => updateSetting(setSources, event.target.value)} aria-label="Sources" /></label></div> : null}
+              {activeTool === 'Browser actions' ? <div className="tool-grid"><ToolSelect label="Access" value={access} onValueChange={(value) => updateSetting(setAccess, value)} options={['Approved public sources','Public web discovery','Approved domains only']} /><ToolSelect label="Downloads" value={downloads} onValueChange={(value) => updateSetting(setDownloads, value)} options={['Block downloads','Allow documents','Allow all downloads']} /><ToolSelect label="Region" value={region} onValueChange={(value) => updateSetting(setRegion, value)} options={['Automatic','Europe','United States']} /></div> : null}
+              {activeTool === 'Fields' ? <div className="tool-grid"><label className="tool-field tool-field-span-2"><span>Output fields</span><Input value={fields} onChange={(event) => updateSetting(setFields, event.target.value)} aria-label="Output fields" /></label><ToolSelect label="Missing values" value={missingData} onValueChange={(value) => updateSetting(setMissingData, value)} options={['Use null; never invent','Omit missing fields','Send to review']} /><ToolSelect label="Validation" value={validation} onValueChange={(value) => updateSetting(setValidation, value)} options={['Require type match','Coerce safe values','Review mismatches']} /></div> : null}
+              {activeTool === 'Limits' ? <div className="tool-grid"><label className="tool-field"><span>Maximum pages</span><Input type="number" min="1" value={maxPages} onChange={(event) => updateSetting(setMaxPages, event.target.value)} /></label><label className="tool-field"><span>Maximum records</span><Input type="number" min="1" value={maxRecords} onChange={(event) => updateSetting(setMaxRecords, event.target.value)} /></label><ToolSelect label="Timeout" value={timeout} onValueChange={(value) => updateSetting(setTimeoutValue, value)} options={['2 minutes','5 minutes','15 minutes']} /></div> : null}
+              {activeTool === 'Rules' ? <div className="tool-grid"><ToolSelect label="Missing data" value={missingData} onValueChange={(value) => updateSetting(setMissingData, value)} options={['Use null; never invent','Omit missing fields','Send to review']} /><ToolSelect label="Evidence" value={evidence} onValueChange={(value) => updateSetting(setEvidence, value)} options={['Source quote per value','Page evidence per record','No evidence required']} /><ToolSelect label="Deduplication" value={deduplication} onValueChange={(value) => updateSetting(setDeduplication, value)} options={['Canonical URL + primary key','Canonical URL only','Keep every result']} /></div> : null}
               {activeTool === 'Improve prompt' ? <div className="prompt-rewrite"><div className="prompt-rewrite-diff"><del>{prompt.trim() || 'No complete prompt yet.'}</del><ins>{improvedPrompt}</ins></div><div className="prompt-rewrite-actions"><Button variant="secondary" onClick={() => setActiveTool(null)}>Undo</Button><Button variant="primary" onClick={acceptRewrite}>Accept rewrite</Button></div></div> : null}
             </section> : null}
           </div>
-          <div className="understood"><strong>STUDIO UNDERSTOOD</strong><Badge tone="info">{template.type}</Badge><span className={sourcePulse ? 'source-chip pulse' : 'source-chip'}><Badge tone="success">{sourceLabel}</Badge></span><Badge tone="success">{fieldCount} fields</Badge><Badge tone="success">{evidence}</Badge><Badge tone="success">{missingData}</Badge><Badge tone="warning">{maxPages ? `Capped at ${maxPages} pages` : 'No page limit set'}</Badge></div>
-          <div className="builder-foot"><span>Nothing runs until you approve the plan.</span><span>Local mockup only · no extraction is submitted</span>{mode === 'guided' ? <Button variant="primary" onClick={() => setStage(1)}>Plan workflow →</Button> : null}</div>
+          {draftDirty ? <div className="draft-status" role="status"><span>{draftStatus || 'Draft saved · just now'}</span><Button variant="ghost" size="sm" onClick={discardDraft}>Discard draft</Button></div> : null}
+          <div className="understood"><strong>STUDIO UNDERSTOOD</strong><Badge tone="info">{template.type}</Badge><span className={sourcePulse ? 'source-chip pulse' : 'source-chip'}><Badge tone="success">{sourceLabel}</Badge></span><Badge tone="success">{understoodFieldCount} fields</Badge><Badge tone="success">{evidence}</Badge><Badge tone="success">{missingData}</Badge><Badge tone="warning">{maxPages ? `Capped at ${maxPages} pages` : 'No page limit set'}</Badge></div>
+          <div className="builder-foot"><span>Nothing runs until you approve the plan.</span><span>Local mockup only · no extraction is submitted</span></div>
         </div>
         {templatesOpen ? <aside className="templates"><div className="templates-head"><p>Start from</p><Button variant="ghost" size="icon" onClick={() => setTemplateVisibility(false)} aria-label="Hide templates" title="Hide templates"><ChevronRight size={15}/></Button></div>
           {visibleStarterKeys.map((key) => {

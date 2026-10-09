@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { Badge, Button, Tabs, TabsList, TabsTrigger } from '@/components/design-system';
-import { downloadJson } from '@/lib/download-json';
+import type { DatasetRecord } from '@/lib/auth';
+import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
 
 const records = [
@@ -32,17 +33,18 @@ const records = [
   },
 ];
 
-export function DatasetReview({ onSaved }: { onSaved?: () => void } = {}) {
+const exportRecords: DatasetRecord[] = records.map((record) => ({
+  id: record.retailer.toLowerCase().replace(/\W+/g, '-'),
+  values: { Retailer: record.retailer, Product: record.product, Price: record.price, Availability: record.availability },
+  evidence: Object.fromEntries(['Retailer','Product','Price','Availability'].map((field) => [field, { sourceUrl: record.sourceUrl, quote: `${record.product} — ${record.price}${record.availability !== 'Unknown' ? ` · ${record.availability}` : ''}.` }])),
+}));
+
+export function DatasetReview({ onSaved, workspaceName = 'Import.io Studio' }: { onSaved?: (records?: DatasetRecord[], fields?: string[]) => void; workspaceName?: string } = {}) {
   const [tab, setTab] = useState('table');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const selectedRecord = records[selectedIndex];
-
-  function exportRecords() {
-    downloadJson('competitor-prices.json', records);
-    setFeedback('Dataset exported as JSON.');
-  }
 
   function openEvidence(index: number, field: string, value: string) {
     const record = records[index];
@@ -53,7 +55,7 @@ export function DatasetReview({ onSaved }: { onSaved?: () => void } = {}) {
       value,
       quote: value === 'Unknown'
         ? `${record.product} is listed at ${record.price}; no supported availability statement appears on the captured page.`
-        : `${record.product} — ${field.toLowerCase()}: ${value}.`,
+        : `${record.product} — ${record.price} · ${record.availability}.`,
       sourceUrl: record.sourceUrl,
       captureLabel: `${record.retailer} product capture`,
       kind: 'product',
@@ -61,8 +63,8 @@ export function DatasetReview({ onSaved }: { onSaved?: () => void } = {}) {
   }
 
   function saveDataset() {
-    setFeedback('Dataset saved as Competitor prices · v4.');
-    onSaved?.();
+    setFeedback(`Dataset saved to ${workspaceName}.`);
+    onSaved?.(exportRecords, ['Retailer','Product','Price','Availability']);
   }
 
   return (
@@ -75,11 +77,11 @@ export function DatasetReview({ onSaved }: { onSaved?: () => void } = {}) {
         Availability for Trail Shop is unresolved—not rejected. The record remains in the dataset.
       </div>
       {feedback ? <p className="review-feedback" role="status">{feedback}</p> : null}
-      <Tabs value={tab} onValueChange={setTab}>
+      <Tabs className="dataset-view-tabs" value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="table">Table</TabsTrigger>
           <TabsTrigger value="json">JSON</TabsTrigger>
-          <TabsTrigger value="screens">Evidence screens</TabsTrigger>
+          <TabsTrigger value="screens">Record evidence</TabsTrigger>
         </TabsList>
       </Tabs>
       {tab === 'table' ? (
@@ -144,35 +146,47 @@ export function DatasetReview({ onSaved }: { onSaved?: () => void } = {}) {
       ) : tab === 'json' ? (
         <pre className="code-block dataset-json">{JSON.stringify(records, null, 2)}</pre>
       ) : (
-        <div className="evidence-screen-grid">
+        <div className="record-evidence-grid">
           {records.map((record, index) => (
-            <Button
-              variant="ghost"
-              onClick={() => {
-                setSelectedIndex(index);
-                setTab('table');
-              }}
-              key={record.retailer}
-            >
-              <span>{record.retailer}</span>
-              <div className="mini-product-page">
-                <div className="mini-browser-head"><b>{record.retailer}</b><small>Product</small></div>
-                <div className="mini-card-row">
-                  <i />
-                  <i className="observed"><label>Reading product card</label></i>
-                  <i />
+            <article className="record-evidence-card" key={record.retailer}>
+              <header>
+                <div>
+                  <span>RECORD {String(index + 1).padStart(2, '0')}</span>
+                  <strong>{record.retailer}</strong>
                 </div>
-                <strong>{record.product}</strong>
-                <small>{record.price} · {record.availability}</small>
-              </div>
-              <em>{record.evidence}</em>
-            </Button>
+                <Badge tone={record.availability === 'Unknown' ? 'warning' : 'success'}>
+                  {record.availability === 'Unknown' ? 'Needs review' : 'Fully supported'}
+                </Badge>
+              </header>
+              <dl>
+                <div><dt>Product</dt><dd>{record.product}</dd></div>
+                <div><dt>Price</dt><dd>{record.price}</dd></div>
+                <div><dt>Availability</dt><dd>{record.availability}</dd></div>
+              </dl>
+              <blockquote>
+                “{record.product} — {record.price}
+                {record.availability !== 'Unknown' ? ` — ${record.availability}` : ''}.”
+              </blockquote>
+              <footer>
+                <div>
+                  <span>Source</span>
+                  <code>{record.sourceUrl.replace('https://', '')}</code>
+                </div>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => openEvidence(index, 'Evidence', record.evidence)}
+                >
+                  Open evidence
+                </Button>
+              </footer>
+            </article>
           ))}
         </div>
       )}
       <footer className="review-footer">
         <span>Preview only · review before saving</span>
-        <Button variant="secondary" onClick={exportRecords}>Export JSON</Button>
+        <DatasetExportMenu dataset={{ title: 'Competitor prices', records: exportRecords }} />
         <Button variant="primary" onClick={saveDataset}>
           Save dataset
         </Button>

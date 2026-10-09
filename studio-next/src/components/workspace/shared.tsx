@@ -98,16 +98,18 @@ export function SelectField({
   onValueChange,
   options,
   className,
+  disabled = false,
 }: {
   label: string;
   value: string;
   onValueChange: (value: string) => void;
   options: SelectOption[];
   className?: string;
+  disabled?: boolean;
 }) {
   return (
-    <Select value={value} onValueChange={onValueChange}>
-      <SelectTrigger aria-label={label} className={className}>
+    <Select value={value} onValueChange={onValueChange} disabled={disabled}>
+      <SelectTrigger aria-label={label} className={className} disabled={disabled}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

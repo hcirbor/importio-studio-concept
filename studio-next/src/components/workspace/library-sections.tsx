@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Button,
   Dialog,
@@ -102,6 +102,12 @@ export function EnrichmentsSection({ showHeader = true, openCreateOnMount = fals
   const [name, setName] = useState('New supplier enrichment');
   const [fileName, setFileName] = useState('');
   const [message, setMessage] = useState('');
+
+  useEffect(() => {
+    if (!openCreateOnMount) return;
+    const timer = window.setTimeout(() => setDialogOpen(true), 0);
+    return () => window.clearTimeout(timer);
+  }, [openCreateOnMount]);
 
   function createEnrichment() {
     setDialogOpen(false);

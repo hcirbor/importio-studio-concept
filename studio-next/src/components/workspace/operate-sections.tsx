@@ -14,7 +14,7 @@ import {
   Eyebrow,
   Input,
 } from '@/components/design-system';
-import { downloadJson } from '@/lib/download-json';
+import { DatasetExportMenu } from '../dataset-export-menu';
 import {
   Feedback,
   PageHead,
@@ -27,6 +27,8 @@ import {
 } from './shared';
 import { EnrichmentsSection } from './library-sections';
 import { SectionTabs, useSectionTab } from './section-tabs';
+import { useReviewState } from '../review-state';
+import { can, useAuth, viewerTooltip } from '@/lib/auth';
 
 const pipelines = [
   {
@@ -59,115 +61,17 @@ const pipelines = [
   },
 ];
 
-const runs = [
-  {
-    id: 'run_batch_91af',
-    when: 'Running now',
-    pipeline: 'SaaS pricing research',
-    coverage: '12 / 20 domains',
-    records: '12',
-    usage: 'Not yet measured',
-    state: 'Running',
-    outcome: 'Running',
-    tone: 'info' as Tone,
-  },
-  {
-    id: 'run_7f3a',
-    when: '2 minutes ago',
-    pipeline: 'Competitor prices',
-    coverage: '3 / 3 sources',
-    records: '3',
-    usage: 'Not yet measured',
-    state: 'Completed',
-    outcome: 'Partial',
-    tone: 'warning' as Tone,
-  },
-  {
-    id: 'run_7e91',
-    when: '1 hour ago',
-    pipeline: 'Outdoor catalogue',
-    coverage: '1,284 / 1,284 pages',
-    records: '1,284',
-    usage: 'Not yet measured',
-    state: 'Completed',
-    outcome: 'Succeeded',
-    tone: 'success' as Tone,
-  },
-  {
-    id: 'run_failed_9d11',
-    when: 'Yesterday',
-    pipeline: 'Retail availability',
-    coverage: '2 / 3 sources',
-    records: '2',
-    usage: '$0.18',
-    state: 'Failed',
-    outcome: 'Blocked',
-    tone: 'danger' as Tone,
-  },
-];
-
-const datasets = [
-  {
-    version: 'DATASET · V4',
-    title: 'Competitor prices',
-    detail: '3 records · 5 fields · 1 unresolved',
-    status: 'Needs review',
-    tone: 'warning' as Tone,
-  },
-  {
-    version: 'DATASET · V7',
-    title: 'Outdoor catalogue',
-    detail: '1,284 records · 8 fields · fully validated',
-    status: 'Validated',
-    tone: 'success' as Tone,
-  },
-  {
-    version: 'DATASET · V2',
-    title: 'Qualified suppliers',
-    detail: '74 records · 9 fields · 6 unresolved',
-    status: 'Partial',
-    tone: 'warning' as Tone,
-  },
-];
-
-const baseMonitorRows: TableRow[] = [
-  {
-    id: 'map-watch',
-    cells: [
-      <span key="name"><strong>MAP watch</strong><small>Price and seller availability</small></span>,
-      'Marketplace sellers',
-      'Daily',
-      'Yesterday · 12 changes',
-      <Status key="status">Healthy</Status>,
-    ],
-  },
-  {
-    id: 'trailhead-availability',
-    cells: [
-      <span key="name"><strong>Trailhead availability</strong><small>Price and stock status</small></span>,
-      'Competitor prices',
-      'Every 6 hours',
-      '3 days ago · low stock',
-      <Status key="status">Healthy</Status>,
-    ],
-  },
-  {
-    id: 'supplier-terms',
-    cells: [
-      <span key="name"><strong>Supplier terms</strong><small>Minimum order and lead time</small></span>,
-      'Qualified suppliers',
-      'Paused',
-      '12 days ago',
-      <Status key="status" tone="warning">Paused</Status>,
-    ],
-  },
-];
-
 export function PipelinesSection() {
+  const auth = useAuth();
+  const mayRun = can(auth.session, 'run');
+  const { pipelineVersion, pipelineStatus } = useReviewState();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [inspected, setInspected] = useState<string>();
-  const visiblePipelines = pipelines.filter((pipeline) => {
+  const currentPipelines = pipelines.map((pipeline) => pipeline.name === 'Competitor prices'
+    ? { ...pipeline, version: `v${pipelineVersion}`, status: pipelineStatus, tone: pipelineStatus === 'Healthy' ? 'success' as Tone : 'warning' as Tone }
+    : pipeline);
+  const visiblePipelines = currentPipelines.filter((pipeline) => {
     const matchesQuery = pipeline.name.toLowerCase().includes(query.toLowerCase());
     const matchesStatus = status === 'all' || pipeline.status === status;
     return matchesQuery && matchesStatus;
@@ -199,7 +103,7 @@ export function PipelinesSection() {
         group="Operate"
         title="Pipelines"
         description="Reusable pipelines with versioned schemas and execution rules."
-        action={<Button variant="primary" asChild><Link href="/build?template=research">New pipeline</Link></Button>}
+        action={mayRun ? <Button variant="primary" asChild><Link href="/build?template=research">New pipeline</Link></Button> : <Button variant="primary" disabled title={viewerTooltip}>New pipeline</Button>}
       />
       <Toolbar search="Search pipelines" value={query} onChange={setQuery}>
         <SelectField
@@ -228,6 +132,7 @@ export function PipelinesSection() {
 }
 
 export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
+  const auth = useAuth();
   const router = useRouter();
   const [workflow, setWorkflow] = useState('all');
   const [state, setState] = useState('all');
@@ -235,14 +140,14 @@ export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
   const [runId, setRunId] = useState('run_7f3a');
   const [error, setError] = useState('');
 
-  const visibleRuns = runs.filter((run) => (
+  const visibleRuns = auth.runs.filter((run) => (
     (workflow === 'all' || run.pipeline === workflow)
     && (state === 'all' || run.state === state)
     && (outcome === 'all' || run.outcome === outcome)
   ));
 
   function openRun() {
-    const run = runs.find((item) => item.id === runId.trim());
+    const run = auth.runs.find((item) => item.id === runId.trim());
     if (!run) {
       setError('Run ID not found in this interactive demo.');
       return;
@@ -258,22 +163,27 @@ export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
       run.pipeline,
       run.coverage,
       run.records,
-      run.usage,
+      `$${(run.queries * 0.007).toFixed(2)}`,
       <Status key="status" tone={run.tone}>
         {run.state}{run.outcome !== run.state ? ` · ${run.outcome}` : ''}
       </Status>,
-      <Button key="open" variant="ghost" size="sm" asChild><Link href={`/runs/${run.id}`}>Open</Link></Button>,
+      <Button key="open" variant="ghost" size="sm" asChild><Link href={['run_batch_91af','run_7f3a','run_7e91','run_failed_9d11'].includes(run.id) ? `/runs/${run.id}` : `/runs/run_7f3a?run=${encodeURIComponent(run.id)}`}>Open</Link></Button>,
     ],
   }));
+  const runningCount = auth.runs.filter((run) => run.state === 'Running').length;
+  const partialCount = auth.runs.filter((run) => run.outcome === 'Partial').length;
+  const completedToday = auth.runs.filter((run) => run.state === 'Completed' && run.when !== 'Yesterday').length;
+  const usageToday = auth.runs.filter((run) => run.when !== 'Yesterday').reduce((sum, run) => sum + run.queries * 0.007, 0);
+  const workflowOptions = [...new Set(auth.runs.map((run) => run.pipeline))];
 
   return (
     <>
       {showHeader ? <PageHead group="Operate" title="All runs" description="Every execution, with scope, status, usage and actionable exceptions." /> : null}
       <section className="metric-grid">
-        <article><small>Running</small><b>1</b></article>
-        <article><small>Partial</small><b>1</b></article>
-        <article><small>Completed today</small><b>42</b></article>
-        <article><small>Usage today</small><b>Not yet measured</b></article>
+        <article><small>Running</small><b>{runningCount}</b></article>
+        <article><small>Partial</small><b>{partialCount}</b></article>
+        <article><small>Completed today</small><b>{completedToday}</b></article>
+        <article><small>Usage today</small><b>${usageToday.toFixed(2)}</b></article>
       </section>
       <section className="panel run-filters">
         <label>
@@ -284,9 +194,7 @@ export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
             onValueChange={setWorkflow}
             options={[
               { value: 'all', label: 'All workflows' },
-              { value: 'SaaS pricing research', label: 'SaaS pricing research' },
-              { value: 'Competitor prices', label: 'Competitor prices' },
-              { value: 'Outdoor catalogue', label: 'Outdoor catalogue' },
+              ...workflowOptions.map((value) => ({ value, label: value })),
             ]}
           />
         </label>
@@ -339,6 +247,7 @@ export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
 }
 
 export function DatasetsSection() {
+  const auth = useAuth();
   const searchParams = useSearchParams();
   const typeTabs = [
     { value: 'all', label: 'All' },
@@ -348,24 +257,20 @@ export function DatasetsSection() {
   const type = useSectionTab('type', typeTabs, 'all');
   const [query, setQuery] = useState('');
   const [validation, setValidation] = useState('all');
-  const [message, setMessage] = useState('');
-  const heading = type === 'enrichment' ? 'Enrichments' : type === 'dataset' ? 'Datasets' : 'All';
+  const [selectedDatasetId, setSelectedDatasetId] = useState('');
   const description = type === 'enrichment'
     ? 'CSV enrichment with a verdict and evidence per cell.'
     : 'Versioned structured outputs ready for review, export and delivery.';
-  const visibleDatasets = datasets.filter((dataset) => (
+  const visibleDatasets = auth.datasets.filter((dataset) => (
     dataset.title.toLowerCase().includes(query.toLowerCase())
     && (validation === 'all' || dataset.status === validation)
   ));
 
-  function exportDatasets() {
-    downloadJson('importio-datasets.json', visibleDatasets.map(({ title, detail, status }) => ({ title, detail, status })));
-    setMessage(`${visibleDatasets.length} dataset${visibleDatasets.length === 1 ? '' : 's'} exported as JSON.`);
-  }
+  const selectedDataset = visibleDatasets.find((dataset) => dataset.id === selectedDatasetId) ?? visibleDatasets[0];
 
   return (
     <>
-      <PageHead group="Operate" title={heading} description={description} />
+      <PageHead group="Operate" title="Datasets" description={description} />
       <SectionTabs value={type} tabs={typeTabs} param="type" fallback="all" />
       {type !== 'enrichment' ? <><Toolbar search="Search datasets" value={query} onChange={setQuery}>
         <SelectField
@@ -380,30 +285,17 @@ export function DatasetsSection() {
           ]}
           className="filter-select"
         />
-        <Button variant="secondary" onClick={exportDatasets}>Export</Button>
+        {selectedDataset ? <><SelectField label="Dataset to export" value={selectedDataset.id} onValueChange={setSelectedDatasetId} options={visibleDatasets.map((dataset)=>({value:dataset.id,label:dataset.title}))} className="filter-select" /><DatasetExportMenu dataset={selectedDataset} /></> : null}
       </Toolbar>
-      <Feedback>{message}</Feedback>
       <section className="dataset-cards">
         {visibleDatasets.map((dataset) => (
-          <article className="panel dataset-card" key={dataset.title}>
+          <article className="panel dataset-card" key={dataset.id}>
             <Eyebrow>{dataset.version}</Eyebrow>
             <h2>{dataset.title}</h2>
             <p>{dataset.detail}</p>
             <footer>
               <Status tone={dataset.tone}>{dataset.status}</Status>
-              {dataset.title === 'Competitor prices' ? (
-                <Button variant="ghost" size="sm" asChild>
-                  <Link href="/datasets/competitor-prices">Review data</Link>
-                </Button>
-              ) : (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setMessage(`${dataset.title} selected. Its complete detail screen is not part of this bounded demo.`)}
-                >
-                  Open
-                </Button>
-              )}
+              <Button variant="ghost" size="sm" asChild><Link href={`/datasets/${dataset.id}`}>Open</Link></Button>
             </footer>
           </article>
         ))}
@@ -416,33 +308,53 @@ export function DatasetsSection() {
 }
 
 export function MonitorsSection() {
+  const auth = useAuth();
+  const mayCreateMonitor = can(auth.session, 'create_monitor');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pipeline, setPipeline] = useState('Competitor prices');
-  const [schedule, setSchedule] = useState('Every 6 hours');
+  const [schedule, setSchedule] = useState('Daily');
+  const [watchedFields, setWatchedFields] = useState(['Price', 'Availability']);
+  const [alertWhen, setAlertWhen] = useState('Any change');
+  const [priceThreshold, setPriceThreshold] = useState('€230');
+  const [notifyVia, setNotifyVia] = useState<'Email' | 'Slack' | 'Webhook'>('Email');
   const [message, setMessage] = useState('');
-  const [created, setCreated] = useState(false);
+  const fieldsByPipeline: Record<string, string[]> = {
+    'Competitor prices': ['Price', 'Availability'],
+    'Outdoor catalogue': ['Product', 'Price', 'Availability', 'URL'],
+    'Qualified suppliers': ['Company', 'Location', 'Minimum order', 'Lead time'],
+  };
+
+  const alertRule = alertWhen === 'Price falls below' ? `Price falls below ${priceThreshold}` : alertWhen;
 
   function createMonitor() {
-    setCreated(true);
+    auth.addMonitor({
+      id: `monitor-${Date.now()}`,
+      name: `${pipeline} monitor`,
+      detail: `${alertRule} · ${notifyVia}`,
+      baselineDataset: pipeline,
+      schedule,
+      lastChange: 'Not checked yet',
+      status: 'Scheduled',
+      tone: 'info',
+      fields: watchedFields,
+      alertRule,
+      notifyVia,
+    });
     setDialogOpen(false);
     setMessage(`${pipeline} will be checked ${schedule.toLowerCase()}.`);
   }
 
-  const rows = created
-    ? [
-        ...baseMonitorRows,
-        {
-          id: 'new-monitor',
-          cells: [
-            <span key="name"><strong>{pipeline} monitor</strong><small>New baseline watch</small></span>,
-            pipeline,
-            schedule,
-            'Not checked yet',
-            <Status key="status" tone="info">Scheduled</Status>,
-          ],
-        },
-      ]
-    : baseMonitorRows;
+  const rows: TableRow[] = auth.monitors.map((monitor) => ({
+    id: monitor.id,
+    cells: [
+      <span key="name"><strong>{monitor.name}</strong><small>{monitor.detail}</small></span>,
+      monitor.baselineDataset,
+      monitor.schedule,
+      monitor.lastChange,
+      <Status key="status" tone={monitor.tone}>{monitor.status}</Status>,
+    ],
+  }));
+  const activeCount = auth.monitors.filter((monitor) => monitor.status !== 'Paused').length;
 
   return (
     <>
@@ -450,7 +362,7 @@ export function MonitorsSection() {
         group="Operate"
         title="Monitors"
         description="Keep successful pipelines current and review meaningful changes."
-        action={<Button variant="primary" onClick={() => setDialogOpen(true)}>Choose a pipeline to monitor</Button>}
+        action={<Button variant="primary" disabled={!mayCreateMonitor} title={!mayCreateMonitor ? viewerTooltip : undefined} onClick={() => setDialogOpen(true)}>Choose a pipeline to monitor</Button>}
       />
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
@@ -464,23 +376,19 @@ export function MonitorsSection() {
               <SelectField
                 label="Pipeline"
                 value={pipeline}
-                onValueChange={setPipeline}
+                onValueChange={(value)=>{setPipeline(value);setWatchedFields(fieldsByPipeline[value] ?? []);}}
                 options={pipelines.map((item) => ({ value: item.name, label: item.name }))}
               />
             </label>
-            <label>
-              SCHEDULE
-              <SelectField
-                label="Schedule"
-                value={schedule}
-                onValueChange={setSchedule}
-                options={['Every 6 hours', 'Daily', 'Weekly'].map((value) => ({ value, label: value }))}
-              />
-            </label>
+            <fieldset className="monitor-fields"><legend>FIELDS TO WATCH</legend>{(fieldsByPipeline[pipeline] ?? []).map((field)=><label key={field}><input type="checkbox" checked={watchedFields.includes(field)} onChange={(event)=>setWatchedFields((current)=>event.target.checked?[...current,field]:current.filter((item)=>item!==field))} /> {field}</label>)}</fieldset>
+            <label>ALERT WHEN<SelectField label="Alert when" value={alertWhen} onValueChange={setAlertWhen} options={['Any change','Price falls below','Goes out of stock'].map((value)=>({value,label:value}))} /></label>
+            {alertWhen === 'Price falls below' ? <label>VALUE<Input value={priceThreshold} onChange={(event)=>setPriceThreshold(event.target.value)} placeholder="€230" /></label> : null}
+            <label>NOTIFY VIA<SelectField label="Notify via" value={notifyVia} onValueChange={(value)=>setNotifyVia(value as 'Email'|'Slack'|'Webhook')} options={[{value:'Email',label:`Email · ${auth.currentUser?.email ?? 'current user'}`},{value:'Slack',label:'Slack'},{value:'Webhook',label:'Webhook'}]} /></label>
+            <label>SCHEDULE<SelectField label="Schedule" value={schedule} onValueChange={setSchedule} options={['Hourly', 'Daily'].map((value) => ({ value, label: value }))} /></label>
           </div>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button variant="primary" onClick={createMonitor}>Create monitor</Button>
+            <Button variant="primary" disabled={!mayCreateMonitor || watchedFields.length === 0} title={!mayCreateMonitor ? viewerTooltip : undefined} onClick={createMonitor}>Create monitor</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -490,11 +398,11 @@ export function MonitorsSection() {
           <strong>Monitoring starts after a workflow has a trusted baseline.</strong>
           <p>Choose a saved pipeline, select the fields that matter, then set its schedule and alert rules.</p>
         </div>
-        <Status>{created ? '3 active' : '2 active'}</Status>
+        <Status>{activeCount} active</Status>
       </section>
       <TablePanel
         title="Active monitors"
-        meta="Next check · 14:00 UTC"
+        meta={`${auth.monitors.length} monitor${auth.monitors.length === 1 ? '' : 's'} · Next check · 14:00 UTC`}
         headings={['Monitor', 'Pipeline', 'Schedule', 'Last change', 'Status']}
         rows={rows}
       />

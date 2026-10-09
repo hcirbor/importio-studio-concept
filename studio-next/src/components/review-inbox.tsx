@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import {
   Badge,
   Button,
@@ -13,6 +14,7 @@ import {
   SelectValue,
 } from '@/components/design-system';
 import { useReviewState } from './review-state';
+import { can, useAuth, viewerTooltip } from '@/lib/auth';
 
 const acceptedUnknownSummary = 'The Trailhead availability item was accepted as unknown.';
 
@@ -31,62 +33,103 @@ function PipelineFilter() {
 }
 
 export function ReviewInbox() {
-  const { hasReviewItem, acceptReviewItem, restoreReviewItem } = useReviewState();
+  const auth = useAuth();
+  const mayReview = can(auth.session, 'review');
+  const { hasReviewItem, reviewCount, pipelineVersion, acceptReviewItem, restoreReviewItem } = useReviewState();
   const [editing, setEditing] = useState(false);
+  const [selectedIndex, setSelectedIndex] = useState(0);
   const [reviewedValue, setReviewedValue] = useState('');
+  const [reviewNote, setReviewNote] = useState('');
   const [feedback, setFeedback] = useState('');
   const [decisionSummary, setDecisionSummary] = useState(acceptedUnknownSummary);
 
-  useEffect(() => {
-    function handleShortcut(event: KeyboardEvent) {
-      const isTextInput = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
-      if (event.key.toLowerCase() !== 'a' || !hasReviewItem || isTextInput) return;
+  const showUndoToast = useCallback((message: string, undo: () => void) => {
+    toast(message, {
+      duration: 5000,
+      action: { label: 'Undo', onClick: undo },
+    });
+  }, []);
 
-      event.preventDefault();
-      setDecisionSummary(acceptedUnknownSummary);
-      acceptReviewItem();
-    }
-
-    window.addEventListener('keydown', handleShortcut);
-    return () => window.removeEventListener('keydown', handleShortcut);
-  }, [acceptReviewItem, hasReviewItem]);
-
-  function beginEditing() {
+  const beginEditing = useCallback(() => {
+    if (!mayReview) return;
     setFeedback('');
     setEditing(true);
-  }
+    setReviewedValue('In stock');
+    setReviewNote('');
+  }, [mayReview]);
 
   function cancelEditing() {
     setEditing(false);
     setReviewedValue('');
+    setReviewNote('');
   }
 
-  function queueRetry() {
+  const queueRetry = useCallback(() => {
+    if (!mayReview) return;
     setEditing(false);
     setReviewedValue('');
+    setReviewNote('');
     setFeedback('Retry queued for trail-shop.example. The item will remain here until the retry finishes.');
-  }
+    showUndoToast('Retry queued', () => setFeedback(''));
+  }, [mayReview, showUndoToast]);
 
   function saveReviewedValue() {
+    if (!mayReview) return;
     const value = reviewedValue.trim();
-    if (!value) return;
+    const note = reviewNote.trim();
+    if (!value || !note) return;
 
     setEditing(false);
     setFeedback('');
     setDecisionSummary(`Trailhead availability was reviewed and saved as “${value}”.`);
+    auth.updateDatasetValue('competitor-prices', 'trail-shop', 'Availability', value, auth.currentUser?.name ?? 'Jordan Davis', note);
     acceptReviewItem();
+    showUndoToast('Value saved', () => {
+      auth.updateDatasetValue('competitor-prices', 'trail-shop', 'Availability', 'Unknown');
+      restoreReviewItem();
+    });
   }
 
-  function acceptUnknown() {
+  const acceptUnknown = useCallback(() => {
+    if (!mayReview) return;
     setEditing(false);
     setReviewedValue('');
     setFeedback('');
     setDecisionSummary(acceptedUnknownSummary);
     acceptReviewItem();
-  }
+    showUndoToast('Unknown value accepted', restoreReviewItem);
+  }, [acceptReviewItem, mayReview, restoreReviewItem, showUndoToast]);
+
+  useEffect(() => {
+    function handleShortcut(event: KeyboardEvent) {
+      const isTextInput = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
+      if (isTextInput) return;
+      const key = event.key.toLowerCase();
+      if ((key === 'j' || key === 'k') && hasReviewItem) {
+        event.preventDefault();
+        setSelectedIndex(0);
+        return;
+      }
+      if (!hasReviewItem) return;
+      if (key === 'a') {
+        event.preventDefault();
+        acceptUnknown();
+      } else if (key === 'e') {
+        event.preventDefault();
+        beginEditing();
+      } else if (key === 'r') {
+        event.preventDefault();
+        queueRetry();
+      }
+    }
+
+    window.addEventListener('keydown', handleShortcut);
+    return () => window.removeEventListener('keydown', handleShortcut);
+  }, [acceptUnknown, beginEditing, hasReviewItem, queueRetry]);
 
   function restoreDemoReview() {
     setReviewedValue('');
+    setReviewNote('');
     setFeedback('');
     restoreReviewItem();
   }
@@ -96,7 +139,7 @@ export function ReviewInbox() {
       <>
         <section className="panel review-toolbar">
           <label>PIPELINE<PipelineFilter /></label>
-          <span>0 items need review</span>
+          <span>{reviewCount} items need review</span>
         </section>
         <div className="panel empty-page">
           <div>
@@ -114,12 +157,13 @@ export function ReviewInbox() {
     <>
       <section className="panel review-toolbar">
         <label>PIPELINE<PipelineFilter /></label>
-        <span>1 item needs review</span>
-        <Button variant="secondary" onClick={acceptUnknown}>Bulk accept visible</Button>
+        <span>{reviewCount} item needs review</span>
+        <Button variant="secondary" disabled={!mayReview} title={!mayReview ? viewerTooltip : undefined} onClick={acceptUnknown}>Bulk accept visible</Button>
+        <small className="review-shortcuts">Keyboard shortcuts: J/K move · A accept · E enter value · R retry</small>
       </section>
       <div className="review-layout">
         <section className="panel">
-          <Button variant="ghost" className="review-item selected">
+          <Button variant="ghost" className={`review-item${selectedIndex === 0 ? ' selected' : ''}`}>
             <span className="review-index">1</span>
             <span>
               <strong>Trailhead availability is unknown</strong>
@@ -138,37 +182,46 @@ export function ReviewInbox() {
           <div className="review-detail">
             <p>The product page exposes a price but no supported availability statement. Keep the field unknown or enter a reviewed value.</p>
             <dl className="detail-list" style={{ marginTop: 18, border: '1px solid var(--io-color-border)', borderRadius: 8 }}>
-              <div><dt>Pipeline</dt><dd><Link href="/pipelines/competitor-prices" className="text-link">Competitor prices · v4 →</Link></dd></div>
+              <div><dt>Pipeline</dt><dd><Link href="/pipelines/competitor-prices" className="text-link">Competitor prices · v{pipelineVersion} →</Link></dd></div>
               <div><dt>Source</dt><dd><Link href="/runs/run_7f3a" className="text-link">trail-shop.example →</Link></dd></div>
               <div><dt>Evidence</dt><dd><Link href="/runs/run_7f3a?worker=trail-shop&step=2" className="text-link">Price supported · availability absent →</Link></dd></div>
             </dl>
             {editing ? (
               <div className="review-value-entry">
                 <label htmlFor="reviewed-value">Reviewed availability</label>
+                <Select value={reviewedValue} onValueChange={setReviewedValue}>
+                  <SelectTrigger id="reviewed-value" autoFocus aria-label="Reviewed availability"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="In stock">In stock</SelectItem>
+                    <SelectItem value="Low stock">Low stock</SelectItem>
+                    <SelectItem value="Out of stock">Out of stock</SelectItem>
+                  </SelectContent>
+                </Select>
+                <label htmlFor="review-source-reason">Source or reason</label>
                 <Input
-                  id="reviewed-value"
-                  autoFocus
-                  value={reviewedValue}
-                  onChange={(event) => setReviewedValue(event.target.value)}
+                  id="review-source-reason"
+                  value={reviewNote}
+                  onChange={(event) => setReviewNote(event.target.value)}
                   onKeyDown={(event) => event.key === 'Enter' && saveReviewedValue()}
-                  placeholder="e.g. In stock"
+                  placeholder="Required"
+                  required
                 />
-                <Button variant="primary" disabled={!reviewedValue.trim()} onClick={saveReviewedValue}>
-                  Save value
+                <Button variant="primary" disabled={!reviewedValue.trim() || !reviewNote.trim()} onClick={saveReviewedValue}>
+                  Save reviewed value
                 </Button>
               </div>
             ) : null}
             {feedback ? <p className="review-feedback retry-feedback" role="status">{feedback}</p> : null}
             <div className="review-actions">
               {editing ? (
-                <Button variant="secondary" onClick={cancelEditing}>Cancel edit</Button>
+                <Button variant="secondary" onClick={cancelEditing}>Cancel</Button>
               ) : (
                 <>
-                  <Button variant="secondary" onClick={beginEditing}>Enter value</Button>
-                  <Button variant="secondary" onClick={feedback ? () => setFeedback('') : queueRetry}>
+                  <Button variant="secondary" disabled={!mayReview} title={!mayReview ? viewerTooltip : undefined} onClick={beginEditing}>Enter value</Button>
+                  <Button variant="secondary" disabled={!mayReview} title={!mayReview ? viewerTooltip : undefined} onClick={feedback ? () => setFeedback('') : queueRetry}>
                     {feedback ? 'Cancel retry' : 'Retry'}
                   </Button>
-                  <Button variant="primary" onClick={acceptUnknown}>Accept unknown</Button>
+                  <Button variant="primary" disabled={!mayReview} title={!mayReview ? viewerTooltip : undefined} onClick={acceptUnknown}>Accept unknown</Button>
                 </>
               )}
             </div>
