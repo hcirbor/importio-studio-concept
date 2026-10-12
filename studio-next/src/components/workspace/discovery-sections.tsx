@@ -217,7 +217,7 @@ export function CandidatesSection({ showHeader = true }: { showHeader?: boolean 
   );
 }
 
-export function QualifySection({
+function QualifySection({
   showHeader = true,
   onBack,
   selectedCandidates,

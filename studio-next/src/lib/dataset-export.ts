@@ -40,19 +40,3 @@ export function createDatasetExport(dataset: Pick<WorkspaceDataset, 'title' | 'r
   const bytes = XLSX.write(workbook, { bookType: 'xlsx', type: 'array', compression: true });
   return { filename: `${stem}.xlsx`, blob: new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }) };
 }
-
-function downloadBlob(filename: string, blob: Blob) {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement('a');
-  anchor.href = url;
-  anchor.download = filename;
-  document.body.appendChild(anchor);
-  anchor.click();
-  anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-}
-
-export function exportDataset(dataset: Pick<WorkspaceDataset, 'title' | 'records'>, format: DatasetExportFormat) {
-  const file = createDatasetExport(dataset, format);
-  downloadBlob(file.filename, file.blob);
-}

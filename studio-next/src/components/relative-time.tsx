@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 
-export function formatRelativeTime(timestamp: number, now: number) {
+function formatRelativeTime(timestamp: number, now: number) {
   const elapsed = Math.max(0, now - timestamp);
   const minutes = Math.floor(elapsed / 60_000);
   if (minutes < 1) return 'Just now';
