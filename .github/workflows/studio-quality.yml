@@ -35,32 +35,30 @@ jobs:
             Import Studio/studio-next/package-lock.json
 
       - name: Build Import.io design system
-        working-directory: Import.io design system
-        run: npm ci && npm run build
+        run: |
+          cd "Import.io design system"
+          npm ci
+          npm run build
 
       - name: Install dependencies
-        working-directory: Import Studio/studio-next
-        run: npm ci
+        run: |
+          cd "Import Studio/studio-next"
+          npm ci
 
       - name: Lint
-        working-directory: Import Studio/studio-next
-        run: npm run lint
+        run: npm --prefix "Import Studio/studio-next" run lint
 
       - name: Quality baseline
-        working-directory: Import Studio/studio-next
-        run: npm run lint:quality
+        run: npm --prefix "Import Studio/studio-next" run lint:quality
 
       - name: Typecheck
-        working-directory: Import Studio/studio-next
-        run: npm run typecheck
+        run: npm --prefix "Import Studio/studio-next" run typecheck
 
       - name: Build
-        working-directory: Import Studio/studio-next
-        run: npm run build
+        run: npm --prefix "Import Studio/studio-next" run build
 
       - name: End-to-end tests
-        working-directory: Import Studio/studio-next
-        run: npm run test:e2e
+        run: npm --prefix "Import Studio/studio-next" run test:e2e
 
       - name: Upload Playwright report on failure
         if: failure()
