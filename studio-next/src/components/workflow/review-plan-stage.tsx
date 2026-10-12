@@ -43,7 +43,7 @@ export function ReviewPlanStage(props: ReviewPlanStageProps) {
   const inputDecisions = useCapability('input-decisions');
   const costEstimates = useCapability('cost-estimates');
   const showUsageInsteadOfCost = costEstimates.status === 'coming-soon';
-  const hasComingSoonPlanStep = browserActions.status === 'coming-soon' || (props.needsInputDecision && inputDecisions.status === 'coming-soon');
+  const planStepCapabilityId = browserActions.status === 'coming-soon' ? 'browser-actions' : props.needsInputDecision && inputDecisions.status === 'coming-soon' ? 'input-decisions' : undefined;
 
   return <>
     {props.stepper}
@@ -54,7 +54,7 @@ export function ReviewPlanStage(props: ReviewPlanStageProps) {
           <div className="section-head"><h2>Plan</h2><span>{props.sourceLabel}</span></div>
           <ol>
             <li><span>1</span><div><strong>Open approved sources</strong><p>Visit only the supplied URLs and retain each final URL.</p></div></li>
-            <li className={hasComingSoonPlanStep ? 'plan-step-flagged' : undefined}><span>2</span><div><strong className="plan-step-title">Inspect the relevant content {browserActions.status === 'coming-soon' ? <StatusTag capabilityId="browser-actions" /> : null}{props.needsInputDecision && inputDecisions.status === 'coming-soon' ? <StatusTag capabilityId="input-decisions" /> : null}</strong><p>Read product, pricing or directory content required by the request.</p></div></li>
+            <li className={planStepCapabilityId ? 'plan-step-flagged' : undefined}><span>2</span><div><strong className="plan-step-title">Inspect the relevant content {planStepCapabilityId ? <StatusTag capabilityId={planStepCapabilityId} /> : null}</strong><p>Read product, pricing or directory content required by the request.</p></div></li>
             <li><span>3</span><div><strong>Return supported records</strong><p>Produce {props.fieldCount} fields with a source quote for every supported value.</p></div></li>
           </ol>
           <label className="plan-workflow-name"><span>Workflow name</span><Input value={props.workflowName || props.suggestedWorkflowName} onChange={(event) => props.onWorkflowName(event.target.value)} aria-label="Workflow name" /><small>Suggested from your request · editable</small></label>

@@ -36,7 +36,9 @@ test('Collect preview offers a bounded sample and flags the review plan', async 
   await page.getByLabel('Maximum records').fill('25');
   await page.getByRole('button', { name: 'Plan workflow', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Run a sample (10 records)' })).toBeVisible();
-  await expect(page.locator('.plan-step-flagged')).toContainText('Coming soon');
+  const flaggedStep = page.locator('.plan-step-flagged');
+  await expect(flaggedStep).toContainText('Coming soon');
+  await expect(flaggedStep.getByRole('button', { name: 'Coming soon' })).toHaveCount(1);
   await expectAccessible(page, 'labelled review plan');
 });
 
@@ -54,6 +56,7 @@ test('monitor rules and channels stay visible and explain unsupported choices', 
 test('input decisions and take control explain why they cannot run', async ({ page }) => {
   await page.goto('/build?template=research');
   await page.getByRole('button', { name: 'Plan workflow', exact: true }).click();
+  await expect(page.locator('.plan-step-flagged').getByRole('button', { name: 'Coming soon' })).toHaveCount(1);
   await page.getByRole('button', { name: 'Approve and run →' }).click();
   await page.getByRole('button', { name: /BrightSend · needs input/i }).click();
   await page.getByRole('button', { name: 'Open decision in browser' }).click();
@@ -61,5 +64,10 @@ test('input decisions and take control explain why they cannot run', async ({ pa
   await expect(page.getByRole('tooltip').filter({ hasText: "Interactive decisions on a page aren't available yet." })).toBeVisible();
   await page.getByRole('button', { name: 'Take control' }).click();
   await expect(page.getByRole('tooltip').filter({ hasText: "Taking control of the browser isn't available yet." })).toBeVisible();
+  await page.getByRole('button', { name: 'Skip domain' }).click();
+  const reviewData = page.getByRole('button', { name: 'Review data →' });
+  await expect(reviewData).toBeEnabled();
+  await reviewData.click();
+  await expect(page.getByRole('heading', { name: 'Check the records and their evidence.' })).toBeVisible();
   await expectAccessible(page, 'labelled input decision');
 });

@@ -14,11 +14,11 @@ export function ProductFrame({ worker, step, scenario, onCookieDecision }: { wor
   const [inputDecisionNoteOpen, setInputDecisionNoteOpen] = useState(false);
 
   function chooseInputDecision(value: string) {
-    if (inputDecisionsCapability.status === 'coming-soon') {
+    if (value === 'Necessary cookies accepted' && inputDecisionsCapability.status === 'coming-soon') {
       setInputDecisionNoteOpen(true);
       return;
     }
-    if (value === 'Necessary cookies accepted') onCookieDecision?.(value);
+    if (onCookieDecision) onCookieDecision(value);
     else setDecision(value);
   }
 
