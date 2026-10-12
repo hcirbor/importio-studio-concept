@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { X } from 'lucide-react';
 import { Badge, Button, Eyebrow, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/design-system';
 import { useCapability, viewerTooltip } from '@/lib/data';
-import { StatusTag, statusTagsEnabled } from '@/components/status-tag';
+import { StatusTag } from '@/components/status-tag';
 import { FIELD_TYPES, isFieldType, type FieldType } from '@/lib/workflow/fields';
 
 export type PlanField = { id: string; name: string; type: FieldType };
@@ -42,8 +42,8 @@ export function ReviewPlanStage(props: ReviewPlanStageProps) {
   const browserActions = useCapability('browser-actions');
   const inputDecisions = useCapability('input-decisions');
   const costEstimates = useCapability('cost-estimates');
-  const showUsageInsteadOfCost = statusTagsEnabled && costEstimates.status === 'coming-soon';
-  const hasComingSoonPlanStep = statusTagsEnabled && (browserActions.status === 'coming-soon' || (props.needsInputDecision && inputDecisions.status === 'coming-soon'));
+  const showUsageInsteadOfCost = costEstimates.status === 'coming-soon';
+  const hasComingSoonPlanStep = browserActions.status === 'coming-soon' || (props.needsInputDecision && inputDecisions.status === 'coming-soon');
 
   return <>
     {props.stepper}

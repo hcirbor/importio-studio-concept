@@ -20,9 +20,13 @@ test('coming-soon controls expose their note to pointer and keyboard', async ({ 
   const tag = page.getByRole('button', { name: 'Coming soon' }).first();
   await expect(tag).toBeVisible();
   await tag.focus();
-  await expect(page.getByRole('tooltip').filter({ hasText: "Clicks, forms and logins aren't available yet." })).toBeVisible();
+  const note = page.getByRole('tooltip').filter({ hasText: "Clicks, forms and logins aren't available yet." });
+  await expect(note).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(note).toBeHidden();
+  await expect(tag).toBeFocused();
   await browserActions.click();
-  await expect(page.getByRole('tooltip').filter({ hasText: "Clicks, forms and logins aren't available yet." })).toBeVisible();
+  await expect(note).toBeVisible();
   await expectAccessible(page, 'labelled builder');
 });
 

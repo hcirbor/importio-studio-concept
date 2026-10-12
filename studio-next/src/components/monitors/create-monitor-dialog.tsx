@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react';
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from '@/components/design-system';
 import { can, isNotificationChannel, useCapability, useStudio, viewerTooltip, type NotificationChannel, type WorkspaceDataset } from '@/lib/data';
 import { formatFieldLabel } from '@/lib/workflow/fields';
-import { StatusTag, statusTagsEnabled } from '@/components/status-tag';
+import { StatusTag } from '@/components/status-tag';
 import { SelectField } from '../workspace/shared';
 
 type CreateMonitorDialogProps = {
@@ -52,7 +52,7 @@ export function CreateMonitorDialog({ open, onOpenChange, onMessage, initialPipe
   }
 
   function chooseAlert(value: string) {
-    if (statusTagsEnabled && rulesCapability.status === 'coming-soon' && value === 'Price falls below') {
+    if (rulesCapability.status === 'coming-soon' && value === 'Price falls below') {
       setRulesNoteOpen(true);
       return;
     }
@@ -61,7 +61,7 @@ export function CreateMonitorDialog({ open, onOpenChange, onMessage, initialPipe
 
   function chooseChannel(value: string) {
     if (!isNotificationChannel(value)) return;
-    if (statusTagsEnabled && channelsCapability.status === 'coming-soon' && (value === 'Email' || value === 'Slack')) {
+    if (channelsCapability.status === 'coming-soon' && (value === 'Email' || value === 'Slack')) {
       setChannelsNoteOpen(true);
       return;
     }

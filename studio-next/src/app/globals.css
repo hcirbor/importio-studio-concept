@@ -1018,7 +1018,7 @@ main { padding: 30px 32px 64px; }
 .status-tag { white-space: nowrap; }
 .status-tag-preview { border: 1px solid var(--io-color-primary); background: transparent !important; }
 .status-tag-note { position: absolute; left: 0; bottom: calc(100% + 8px); width: max-content; max-width: min(280px, 75vw); padding: 9px 11px; border: 1px solid var(--io-color-border); border-radius: var(--io-radius-md); background: var(--io-color-surface); box-shadow: var(--io-shadow-md); color: var(--io-color-text); font: 500 12px/1.45 var(--io-font-sans); letter-spacing: 0; text-transform: none; opacity: 0; visibility: hidden; pointer-events: none; transform: translateY(3px); transition: opacity .12s ease, transform .12s ease, visibility .12s ease; }
-.status-tag-wrap.open .status-tag-note, .status-tag-wrap:focus-within .status-tag-note, .status-tag-wrap:hover .status-tag-note { opacity: 1; visibility: visible; transform: translateY(0); }
+.status-tag-wrap.open .status-tag-note { opacity: 1; visibility: visible; transform: translateY(0); }
 .plan-step-flagged { border-radius: var(--io-radius-md); background: color-mix(in srgb, var(--io-color-warning-soft) 42%, transparent); }
 .sample-run-offer { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 14px; padding: 12px; border: 1px solid var(--io-color-border); border-radius: var(--io-radius-md); background: var(--io-color-raised); }
 .sample-run-offer p { flex: 1 1 100%; margin: 0; color: var(--io-color-muted); }

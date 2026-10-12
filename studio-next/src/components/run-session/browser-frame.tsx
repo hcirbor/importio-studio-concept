@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Badge, Button } from '@/components/design-system';
-import { StatusTag, statusTagsEnabled } from '@/components/status-tag';
+import { StatusTag } from '@/components/status-tag';
 import { useCapability, type RunPresentation as Scenario, type RunWorker as Worker } from '@/lib/data';
 import { ReplayControls } from './replay-controls';
 
@@ -14,7 +14,7 @@ export function ProductFrame({ worker, step, scenario, onCookieDecision }: { wor
   const [inputDecisionNoteOpen, setInputDecisionNoteOpen] = useState(false);
 
   function chooseInputDecision(value: string) {
-    if (statusTagsEnabled && inputDecisionsCapability.status === 'coming-soon') {
+    if (inputDecisionsCapability.status === 'coming-soon') {
       setInputDecisionNoteOpen(true);
       return;
     }
@@ -23,7 +23,7 @@ export function ProductFrame({ worker, step, scenario, onCookieDecision }: { wor
   }
 
   function takeControl() {
-    if (statusTagsEnabled && takeControlCapability.status === 'coming-soon') {
+    if (takeControlCapability.status === 'coming-soon') {
       setTakeControlNoteOpen(true);
       return;
     }
