@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Eyebrow } from '@/components/design-system';
-import { useAuth } from '@/lib/auth';
+import { useStudio } from '@/lib/data';
 import { formatFieldLabel } from '@/lib/field-label';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
@@ -10,7 +10,7 @@ import { useState } from 'react';
 import { RelativeTime } from './relative-time';
 
 export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const dataset = auth.datasets.find((item) => item.id === datasetId);
   if (!dataset) {

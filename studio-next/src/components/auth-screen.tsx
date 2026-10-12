@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { BrandMark, Button, Input } from '@/components/design-system';
 import { LoginStage } from '@/components/auth/login-stage';
-import { useAuth } from '@/lib/auth';
+import { useStudio } from '@/lib/data';
 
 function GoogleIcon() {
   return (
@@ -28,7 +28,7 @@ function MicrosoftIcon() {
 }
 
 export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get('next') || '/';

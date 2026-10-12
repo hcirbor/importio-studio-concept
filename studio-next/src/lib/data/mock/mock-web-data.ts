@@ -1,6 +1,6 @@
-import type { DatasetRecord } from '@/lib/auth';
+import type { DatasetRecord } from '@/lib/data/StudioDataSource';
 
-export function hashDomain(domain: string) {
+function hashDomain(domain: string) {
   return Array.from(domain).reduce((hash, character) => ((hash << 5) - hash + character.charCodeAt(0)) | 0, 0) >>> 0;
 }
 
@@ -35,8 +35,4 @@ export function mockDomainRecord(domain: string, fields: string[]): DatasetRecor
     evidence[field] = { sourceUrl, quote: value === null ? 'Not stated · unknown' : quote };
   });
   return { id: domain.replace(/[^a-z0-9]+/gi, '-'), values, evidence };
-}
-
-export function mockDomainRecords(domains: string[], fields: string[]) {
-  return domains.map((domain) => mockDomainRecord(domain, fields));
 }

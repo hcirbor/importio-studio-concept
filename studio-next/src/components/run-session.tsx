@@ -1,28 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Camera, Expand, Pause, Play, X } from 'lucide-react';
 import { Badge, Button } from '@/components/design-system';
-import { domainLabel, mockDomainRecord } from '@/lib/mock-web-data';
-
-type WorkerState = 'Running' | 'Complete' | 'Needs input' | 'Failed';
-type ScenarioKind = 'compare' | 'research' | 'collect' | 'discover' | 'extract' | 'monitor';
-
-type Worker = {
-  name: string;
-  domain: string;
-  state: WorkerState;
-  price?: string;
-  planDetails?: string;
-  availability?: string;
-};
-
-type Scenario = {
-  title: string;
-  kind: ScenarioKind;
-  completed: boolean;
-  workers: Worker[];
-};
+import { useStudio, type RunPresentation as Scenario, type RunWorker as Worker, type RunWorkerState as WorkerState } from '@/lib/data';
 
 type SessionContentsProps = {
   scenario: Scenario;
@@ -35,76 +16,7 @@ type SessionContentsProps = {
   expanded?: boolean;
 };
 
-const scenarios: Record<string, Scenario> = {
-  run_7f3a: {
-    title: 'Competitor prices',
-    kind: 'compare',
-    completed: true,
-    workers: [
-      { name: 'Northwind Outdoors', domain: 'northwind-outdoors.example', state: 'Complete', price: '€249', availability: 'In stock' },
-      { name: 'Summit Supply', domain: 'summit-supply.example', state: 'Complete', price: '€239', availability: 'Low stock' },
-      { name: 'Trail Shop', domain: 'trail-shop.example', state: 'Complete', price: '€259', availability: 'Unresolved' },
-    ],
-  },
-  run_batch_91af: {
-    title: 'SaaS pricing research',
-    kind: 'research',
-    completed: false,
-    workers: [
-      { name: 'CloudHarbor', domain: 'cloudharbor.example', state: 'Complete', price: '$18 / month', planDetails: '3 seats · core automation' },
-      { name: 'Letterloop', domain: 'letterloop.example', state: 'Complete', price: '$12 / month', planDetails: '500 contacts · email support' },
-      { name: 'BrightSend', domain: 'brightsend.example', state: 'Needs input', price: 'Cookie choice', planDetails: '2,000 emails · basic reports' },
-    ],
-  },
-  run_7e91: {
-    title: 'Outdoor catalogue',
-    kind: 'collect',
-    completed: true,
-    workers: [
-      { name: 'Northwind catalogue', domain: 'northwind-outdoors.example', state: 'Complete', price: '1,284 products', availability: 'Complete' },
-    ],
-  },
-  run_failed_9d11: {
-    title: 'Retail availability',
-    kind: 'extract',
-    completed: true,
-    workers: [
-      { name: 'Trail Shop', domain: 'trail-shop.example', state: 'Failed', price: '€259', availability: 'Blocked' },
-    ],
-  },
-  run_collect: {
-    title: 'Northwind tent catalogue',
-    kind: 'collect',
-    completed: true,
-    workers: [
-      { name: 'Northwind catalogue', domain: 'northwind-outdoors.example', state: 'Complete', price: '3 products', availability: '2 pages' },
-    ],
-  },
-  run_discover: {
-    title: 'Qualified supplier discovery',
-    kind: 'discover',
-    completed: true,
-    workers: [
-      { name: 'Worthington directory', domain: 'worthington-directory.example', state: 'Complete', price: '3 qualified', availability: '74 candidates' },
-    ],
-  },
-  run_extract: {
-    title: 'Trailhead product extraction',
-    kind: 'extract',
-    completed: true,
-    workers: [
-      { name: 'Northwind Outdoors', domain: 'northwind-outdoors.example', state: 'Complete', price: '€249', availability: 'In stock' },
-    ],
-  },
-  run_monitor: {
-    title: 'Trailhead baseline',
-    kind: 'monitor',
-    completed: true,
-    workers: [
-      { name: 'Northwind Outdoors', domain: 'northwind-outdoors.example', state: 'Complete', price: '€249', availability: 'Baseline saved' },
-    ],
-  },
-};
+const pendingScenario: Scenario = { title: '', kind: 'research', completed: false, workers: [{ name: '', domain: '', state: 'Running' }] };
 
 const stepDefinitions = [
   { title: 'Opened approved source', detail: 'Final URL and capture retained.' },
@@ -462,12 +374,8 @@ function SessionContents({
 
 export function RunSession({
   runId,
-  scenarioKey,
-  researchResolved = false,
   onResearchResolved,
   onResearchStateChange,
-  customDomains = [],
-  customFields = [],
 }: {
   runId: string;
   scenarioKey?: string;
@@ -477,48 +385,25 @@ export function RunSession({
   customDomains?: string[];
   customFields?: string[];
 }) {
-  const baseScenario = useMemo<Scenario>(() => {
-    if (!customDomains.length) return scenarios[scenarioKey ?? runId] ?? scenarios.run_7f3a;
-    return {
-      title: 'Prompt-driven web research',
-      kind: 'research',
-      completed: true,
-      workers: customDomains.map((domain) => {
-        const record = mockDomainRecord(domain, customFields);
-        const statedValues = Object.values(record.values).filter((value): value is string => value !== null);
-        return {
-          name: domainLabel(domain),
-          domain,
-          state: 'Complete',
-          price: record.values.starting_price ?? record.values.price ?? statedValues[0],
-          planDetails: record.values.free_trial ? `${record.values.free_trial} free trial` : statedValues[1],
-        };
-      }),
-    };
-  }, [customDomains, customFields, runId, scenarioKey]);
+  const execution = useStudio((snapshot) => snapshot.execution);
+  const researchCallbacks = useRef({ onResearchResolved, onResearchStateChange });
+  const [scenario, setScenario] = useState<Scenario>(pendingScenario);
   const [workerIndex, setWorkerIndex] = useState(0);
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [researchState, setResearchState] = useState<WorkerState>(researchResolved ? 'Complete' : 'Needs input');
   const expandButton = useRef<HTMLButtonElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
-  const decisionTimer = useRef<number | null>(null);
-  const scenario = useMemo<Scenario>(() => {
-    if (customDomains.length) return baseScenario;
-    if (baseScenario.kind !== 'research') return baseScenario;
-    return {
-      ...baseScenario,
-      completed: researchState === 'Complete',
-      workers: baseScenario.workers.map((worker, index) => index === 2
-        ? {
-            ...worker,
-            state: researchState,
-            price: researchState === 'Complete' ? '$9 / month' : researchState === 'Running' ? 'Reading plan…' : worker.price,
-          }
-        : worker),
-    };
-  }, [baseScenario, customDomains.length, researchState]);
+
+  useEffect(() => {
+    researchCallbacks.current = { onResearchResolved, onResearchStateChange };
+  }, [onResearchResolved, onResearchStateChange]);
+
+  useEffect(() => execution.subscribeRunEvents(runId, (event) => {
+    setScenario(event.presentation);
+    if (event.decisionState) researchCallbacks.current.onResearchStateChange?.(event.decisionState);
+    if (event.decisionState === 'Complete') researchCallbacks.current.onResearchResolved?.();
+  }), [execution, runId]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -526,30 +411,18 @@ export function RunSession({
       const requestedWorker = params.get('worker');
       const requestedStep = Number(params.get('step'));
       if (requestedWorker) {
-        const index = baseScenario.workers.findIndex((worker) => worker.domain.startsWith(requestedWorker));
+        const index = scenario.workers.findIndex((worker) => worker.domain.startsWith(requestedWorker));
         if (index >= 0) setWorkerIndex(index);
       }
       if (Number.isFinite(requestedStep)) setStep(Math.min(2, Math.max(0, requestedStep)));
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [baseScenario]);
-
-  useEffect(() => () => {
-    if (decisionTimer.current) window.clearTimeout(decisionTimer.current);
-  }, []);
+  }, [scenario.workers]);
 
   function recordCookieDecision() {
-    setResearchState('Running');
-    onResearchStateChange?.('Running');
     setStep(2);
     setPlaying(false);
-    if (decisionTimer.current) window.clearTimeout(decisionTimer.current);
-    decisionTimer.current = window.setTimeout(() => {
-      setResearchState('Complete');
-      onResearchStateChange?.('Complete');
-      onResearchResolved?.();
-      decisionTimer.current = null;
-    }, 900);
+    void execution.resolveRunDecision(runId);
   }
 
   const closeExpanded = useCallback(() => {

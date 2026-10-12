@@ -24,10 +24,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { type Role, useAuth } from '@/lib/auth';
+import { type Role, useStudio } from '@/lib/data';
 
 export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -116,7 +116,7 @@ export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }
 }
 
 export function UserMenu({ compact = false, rail = false }: { compact?: boolean; rail?: boolean }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const router = useRouter();
   const user = auth.currentUser;
   const initials = user?.name

@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Badge, Button, Tabs, TabsList, TabsTrigger } from '@/components/design-system';
-import type { DatasetRecord } from '@/lib/auth';
+import type { DatasetRecord } from '@/lib/data';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
 import { formatFieldLabel } from '@/lib/field-label';

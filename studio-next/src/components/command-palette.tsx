@@ -21,6 +21,7 @@ import {
   CommandSeparator,
   CommandShortcut,
 } from '@/components/ui/command';
+import { useStudio } from '@/lib/data';
 
 const pageDestinations = [
   ['Home', '/'],
@@ -41,16 +42,8 @@ const pageDestinations = [
   ['Settings', '/settings'],
 ] as const;
 
-const recentItems = [
-  ['Run · run_7f3a', '/runs/run_7f3a', Clock3],
-  ['Run · run_batch_91af', '/runs/run_batch_91af', Clock3],
-  ['Pipeline · Competitor prices', '/pipelines/competitor-prices', Layers3],
-  ['Pipeline · Outdoor catalogue', '/pipelines', Layers3],
-  ['Dataset · Competitor prices', '/datasets/competitor-prices', Database],
-  ['Dataset · Outdoor catalogue', '/datasets?type=dataset', Database],
-] as const;
-
 export function CommandPalette() {
+  const recentItems = useStudio((snapshot) => snapshot.fixtures.recentItems);
   const router = useRouter();
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -103,9 +96,10 @@ export function CommandPalette() {
               </CommandGroup>
               <CommandSeparator />
               <CommandGroup heading="Recent">
-                {recentItems.map(([label, href, Icon]) => (
-                  <CommandItem key={label} value={label} onSelect={() => goTo(href)}><Icon />{label}</CommandItem>
-                ))}
+                {recentItems.map((item) => {
+                  const Icon = item.kind === 'run' ? Clock3 : item.kind === 'pipeline' ? Layers3 : Database;
+                  return <CommandItem key={item.label} value={item.label} onSelect={() => goTo(item.href)}><Icon />{item.label}</CommandItem>;
+                })}
               </CommandGroup>
             </CommandList>
           </Command>

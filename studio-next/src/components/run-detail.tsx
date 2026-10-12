@@ -2,11 +2,11 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Badge, Eyebrow } from '@/components/design-system';
 import { RunSession } from './run-session';
 import { RunDetailAction } from './run-detail-action';
-import { useAuth } from '@/lib/auth';
+import { useStudio, type WorkspaceRun } from '@/lib/data';
 
 export type RunDetailData = {
   title: string;
@@ -20,10 +20,12 @@ export type RunDetailData = {
 };
 
 export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
-  const auth = useAuth();
+  const { auth, execution } = useStudio((snapshot) => snapshot);
   const searchParams = useSearchParams();
   const currentId = searchParams.get('run') ?? id;
-  const workspaceRun = auth.runs.find((item) => item.id === currentId);
+  const [engineRun, setEngineRun] = useState<WorkspaceRun>();
+  const workspaceRun = engineRun ?? auth.runs.find((item) => item.id === currentId);
+  useEffect(() => { void execution.getRun(currentId).then(setEngineRun); }, [currentId, execution, auth.runs]);
   const [researchState, setResearchState] = useState<'idle' | 'running' | 'complete'>('idle');
   const isResearch = currentId === 'run_batch_91af';
   const researchResolved = researchState === 'complete';
@@ -70,7 +72,7 @@ export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
       <Link href="/runs" className="back-link">← Runs</Link>
       <header className="page-head run-detail-heading">
         <div><Eyebrow>Runs / {currentId}</Eyebrow><h1>{displayRun.title}</h1><p>{displayRun.description}</p></div>
-        <div><Badge tone={displayRun.tone}>{displayRun.badge}</Badge><RunDetailAction status={displayRun.status} href={displayRun.actionHref} label={displayRun.actionLabel} /></div>
+        <div><Badge tone={displayRun.tone}>{displayRun.badge}</Badge><RunDetailAction status={displayRun.status} runId={currentId} href={displayRun.actionHref} label={displayRun.actionLabel} /></div>
       </header>
       <section className="metric-grid run-detail-metrics">
         <article><small>Sources</small><b>{displayRun.metrics[0]}</b></article>

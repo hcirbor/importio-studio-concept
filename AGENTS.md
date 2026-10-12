@@ -14,6 +14,7 @@ Read BUILD_PLAN.md first. Work only on what the prompt asks.
 - Change only what the prompt lists. No unrequested refactors, renames, copy changes or "improvements".
 - No contact-sales CTAs. No surprising UI changes.
 - Demo content uses fictional `.example` domains only. Never claim certifications (e.g. SOC 2).
+- Never use 'ROADMAP', 'WIP' or 'Beta' as labels.
 - Plumbing phases (tests, data boundary, gateway, live engines): no changes to rendered markup or CSS. Import and hook changes inside `.tsx` files are allowed. Visual tests must show 0 differences.
 - Components read state only through `src/lib/data` hooks. Never import mock modules directly.
 - CiteOtter (`kapetacom/citeotter`) stays read-only through the initial integration. Any required engine change goes on a separate branch and PR with an identified company owner. Never push to its master branch.
@@ -41,12 +42,15 @@ Read BUILD_PLAN.md first. Work only on what the prompt asks.
 
 (Only when the prompt says so. Other prompts make changes and report, nothing more.)
 
-One phase = one PR and one release tag. The tag sits on the tested application commit. Deployment results go in a separate documentation-only receipt commit.
+One phase = one branch from `main`, one PR, one merge commit and one release tag. The tag sits on the tested merge commit on `main`. Deployment results go in a separate documentation-only receipt commit on `main`.
 
-1. In `studio-next/`: `npm run lint`, `npm run typecheck`, `npm run build` and `npm run test:e2e` all pass (once tests exist).
-2. **Application commit** with a message naming the phase (e.g. "Phase 2 — reactive data boundary"). Tag it as BUILD_PLAN.md specifies. Push the commit and tag.
-3. Deploy only if the phase's Deploy column says so:
+1. Create the phase branch from the latest `main`.
+2. In `studio-next/`: `npm run lint`, `npm run typecheck`, `npm run build` and `npm run test:e2e` all pass (once tests exist).
+3. **Application commit** with a message naming the phase (e.g. "Phase 2 — reactive data boundary"). Push the branch and open a PR.
+4. Wait for CI to pass. Merge the PR with a merge commit (not squash or rebase), then tag that merge commit on `main` as BUILD_PLAN.md specifies and push the tag. If Rob asks to review the PR first, stop after opening it; merge, tag, deploy and receipt require his later approval.
+5. Deploy only if the phase's Deploy column says so:
+   - Never deploy a dirty build. `/build-info.json` must not contain `"dirty": true`.
    - **Demo** (`importio-studio-demo.rob123400.chatgpt.site`): static export, mock data, labels off. After publishing, fetch `/build-info.json` and confirm its `commit` equals the tagged commit SHA. Until build-info exists, fetch the live `/build` HTML, take the `app/build/page-*.js` name from it, and compare that file name and its SHA-256 with the local build. If they don't match, the deploy failed: say so and don't report it as done.
    - **Live preview:** deploy behind the access gate. Confirm anonymous requests are blocked, `/healthz` is OK through the proxy, and the bounded Extract smoke test passes.
-4. **Receipt commit** (documentation only, BUILD_PLAN.md): add a Log row with date, phase, tag, short application SHA, published yes/no, deploy evidence (build-info SHA, or file name + checksum) and notes. Commit as "Phase N receipt" and push. Don't move the tag. The working tree ends clean.
-5. Report: files changed, test results, tag, application SHA, receipt SHA, deploy confirmation, and anything not done.
+6. **Receipt commit on `main`** (documentation only, BUILD_PLAN.md): add a Log row with date, phase, tag, short merge SHA, published yes/no, deploy evidence (build-info SHA, or file name + checksum) and notes. Commit as "Phase N receipt" and push. Don't move the tag. The working tree ends clean.
+7. Report: files changed, test results, PR and CI, tag, merge SHA, receipt SHA, deploy confirmation, and anything not done.
