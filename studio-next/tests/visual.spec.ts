@@ -6,6 +6,16 @@ const viewports = [
   { name: 'mobile', width: 375, height: 812 },
 ] as const;
 
+const workspaceRoutes = [
+  { name: 'search', path: '/search', heading: 'Search' },
+  { name: 'runs', path: '/runs', heading: 'All runs' },
+  { name: 'datasets', path: '/datasets', heading: 'Datasets' },
+  { name: 'monitors', path: '/monitors', heading: 'Monitors' },
+  { name: 'usage', path: '/usage', heading: 'Usage' },
+  { name: 'developers', path: '/developers', heading: 'API & MCP' },
+  { name: 'settings', path: '/settings', heading: 'Settings' },
+] as const;
+
 async function ready(page: Page, path: string) {
   await page.goto(path);
   await waitForStudio(page);
@@ -70,5 +80,13 @@ for (const viewport of viewports) {
       await expect(page.getByRole('heading', { level: 1, name: 'Competitor prices' })).toBeVisible();
       await expect(page).toHaveScreenshot(`dataset-detail-${viewport.name}.png`);
     });
+
+    for (const route of workspaceRoutes) {
+      test(`${route.name} · ${viewport.name}`, async ({ page }) => {
+        await ready(page, route.path);
+        await expect(page.getByRole('heading', { level: 1, name: route.heading })).toBeVisible();
+        await expect(page).toHaveScreenshot(`${route.name}-${viewport.name}.png`);
+      });
+    }
   });
 }
