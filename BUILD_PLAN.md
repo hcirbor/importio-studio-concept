@@ -1,6 +1,6 @@
 # Studio × CiteOtter — Build plan
 
-Owner: Rob Richardson · Started: 12 Oct 2026 · Revision 3 · Status: Phase 0
+Owner: Rob Richardson · Started: 12 Oct 2026 · Revision 4 · Status: Phase 1
 
 Repository root: `Import Studio/` · Application root: `studio-next/` (run all npm commands there)
 
@@ -64,6 +64,7 @@ Naming: CiteOtter's `review` is an automated evidence check. Studio's human inbo
 | 2 | Reactive data boundary | P3 | subscribe/getSnapshot source; StudioDataProvider; mock moved behind it; `/build-info.json` (`commit` required, `tag` optional) | Yes, demo | `boundary` | Tests pass with 0 visual differences; live `/build-info.json` commit equals the tagged SHA |
 | 2R | **Code review + cleanup** | P3R | Written review (duplication, components over ~300 lines, `any`, dead code, per-template special cases, text-matching logic); then one cleanup with no visual changes; quality baseline reduced | Yes, demo | `cleanup-1` | Review report saved in `docs/reviews/`; baseline violations reduced; 0 visual differences |
 | 3 | Status labels | P4 | Capabilities map + StatusTag; off on demo | Yes, demo (labels off) | `status-tags` | 0 differences with labels off; labelled states tested |
+| 3B | **Feature parity with the HTML concept** | P4B | Restore features lost in the React port (see "Parity gaps"), on mock data, with status labels where the engine can't support them yet | Yes, demo | `parity-1` | Every gap is either restored or recorded as an intentional removal; journey tests added for each restored flow |
 | 4 | Protected live host + server | P5 | Server build; access gate; allowlisted `/api/engine/*` proxy; health and Extract smoke test | Yes, live preview | `live-gateway` | Gate blocks anonymous access; `/healthz` OK; bounded Extract smoke test passes (provider path works); no credential reaches the browser |
 | 5 | Extract, live | P6 | Live ExecutionEngine for "Extract from a page" | Live preview | `live-extract` | Supported public HTTPS pages run end to end: plan → run → evidence → dataset → export; blocked/unavailable pages show a clear state |
 | 5R | **Human engineering review** | — | An engineer reviews the CiteOtter translation, the `/api/engine/*` server, the access gate and credential handling. Findings fixed in a follow-up prompt | No | `live-extract-reviewed` | Named reviewer signs off; blocking findings fixed. No wider access to the live preview before this |
@@ -75,7 +76,26 @@ Naming: CiteOtter's `review` is an automated evidence check. Studio's human inbo
 
 Out of scope (engineering's decision): real sign-in, multi-tenant workspaces, billing, persistent control-plane storage.
 
-Expect 12 planned prompts plus roughly one fix-up prompt per phase, so 16–22 in total.
+Expect 13 planned prompts plus roughly one fix-up prompt per phase, so 17–23 in total.
+
+## Parity gaps (HTML concept → React app, audited 12 Oct 2026)
+
+Already carried over under new names: Memories → Runs › Saved · Groups → Runs › Batches · Candidates/Qualifications → Search › Companies · Webhooks → Developers › Webhooks.
+
+| Priority | Missing in React app | In the HTML concept |
+|---|---|---|
+| High | Pipeline repair flow | `#pipeline-repair`: what changed on the site, before/after evidence, "Approve repair (creates v8)", "Roll back to v7"; surfaced in Needs attention |
+| High | Monitor events | "Recent monitor events" on Monitors, plus `#monitor-event` detail: what changed, evidence, "Accept as new baseline", "Mute field for 7 days", "Open run" |
+| High | Run controls | "Cancel" on any running run, "Get API code" (run → API/MCP call), "Resolve inputs (n)" summary, domain queue for larger runs |
+| Medium | Capture artefacts | "View screenshot", "View HTML snapshot", "Watch recording" on captures (labelled ROADMAP in HTML) |
+| Medium | Roadmap labelling | HTML used ROADMAP tags (Configure monitor, screenshots). Dropped in the port; Phase 3 StatusTag replaces it |
+| Medium | Enrichment retries | "Retry N failed" rows on partial enrichments |
+| Medium | Settings | Notifications and Audit log sections |
+| Medium | Qualification follow-through | "Save qualified candidates" → dataset; "Extend search" |
+| Decide | Managed handoff | "Hand to Import.io experts" in Review and Datasets (code exists but isn't shown). Restore it, or record it as an intentional removal (no contact-sales CTAs) |
+| Low | Quick try | `#try` single-page Extract preview with "Save to workspace" |
+| Low | Usage | "Download JSON", usage by pipeline |
+| Low | Runs | "Load older" pagination |
 
 ## Code quality
 

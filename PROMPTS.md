@@ -1,4 +1,4 @@
-# Codex prompts — phases 0 to 3 (revision 3)
+# Codex prompts — phases 0 to 3B (revision 4)
 
 All npm commands run in `studio-next/`. AGENTS.md and BUILD_PLAN.md live at the repository root (`Import Studio/`).
 
@@ -117,6 +117,28 @@ Phase 3 — status labels. Authorised: commit, tag, push, deploy the demo.
 4. NEXT_PUBLIC_SHOW_STATUS_TAGS: default false. Add tests with it set to true, using a test capability map that marks every feature id.
 5. With labels off: 0 visual differences.
 Tag status-tags. Deploy the demo (labels off) and verify per AGENTS.md. Receipt commit afterwards.
+```
+
+## P4B — Phase 3B: Feature parity
+
+```
+Phase 3B — feature parity with the HTML concept. Authorised: commit, tag, push, deploy the demo.
+Reference: the HTML concept (importio-studio-unified-concept.html, now in design/prototypes/) and BUILD_PLAN.md "Parity gaps". Port the behaviour and content into the existing shadcn design system. Don't copy the HTML's styling. Mock data only. Use the data layer and capabilities; no direct mock imports.
+High:
+1. Pipeline repair: /pipelines/[id]/repair. Shows what changed on the site, before/after evidence per field, "Approve repair (creates vN+1)" and "Roll back to vN". Surface it in Home "Needs attention" and on the pipeline detail. Approve updates the pipeline version; roll back restores it; both use Undo toasts.
+2. Monitor events: a "Recent monitor events" section on /monitors, plus /monitors/events/[id] showing what changed (old → new), evidence, "Accept as new baseline", "Mute field for 7 days", "Open run". Events count toward Needs attention.
+3. Run controls: "Cancel" on any running run (with confirmation; the run ends Cancelled · Partial with results kept). "Get API code" opens a dialog with the equivalent cURL / TypeScript / MCP call for this run's workflow (copy buttons; fictional key placeholder). "Resolve inputs (n)" jumps to the first worker that needs input.
+Medium:
+4. Captures: "View screenshot", "View HTML snapshot" and "Watch recording" actions, as StatusTag coming-soon with notes (feature ids capture-screenshot, capture-html, capture-recording).
+5. Enrichment: "Retry N failed" on partial enrichments (simulated retry; rows update; Undo).
+6. Settings: a Notifications section (in-app / email per event type) and an Audit log (who did what, when; filter by member; mock entries generated from real demo actions such as key created, member invited, repair approved).
+7. Qualification: "Save qualified candidates" creates a dataset; "Extend search" adds more candidates.
+Low:
+8. Usage: "Download JSON" and a by-pipeline breakdown. Runs: "Load older".
+Do NOT restore "Hand to Import.io experts" unless BUILD_PLAN.md records Rob's decision to keep it.
+Add journey tests for 1–3, 5 and 7. New screens get visual baselines; existing screens keep 0 visual differences except where these features add elements.
+Update the Parity gaps table: mark each row restored (with commit) or deferred.
+Tag parity-1. Deploy the demo and verify per AGENTS.md. Receipt commit afterwards.
 ```
 
 ---
