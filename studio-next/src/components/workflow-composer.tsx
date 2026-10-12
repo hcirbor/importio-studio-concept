@@ -41,7 +41,7 @@ import {
 import { resolveWorkflowTemplate, visibleStarterKeys, workflowTemplates, type WorkflowTemplateKey } from './workflow-config';
 import { RunSession } from './run-session';
 import { WorkflowScenarioReview } from './workflow-scenario-review';
-import { can, useStudio, viewerTooltip, type DatasetRecord } from '@/lib/data';
+import { can, isNotificationChannel, useStudio, viewerTooltip, type DatasetRecord, type NotificationChannel } from '@/lib/data';
 import { uniqueDatasetIdentity } from '@/lib/dataset-slug';
 import { formatFieldLabel } from '@/lib/field-label';
 import {
@@ -66,10 +66,20 @@ const inputMethods = [
 
 type InputMethod = (typeof inputMethods)[number][0];
 type ComposerTool = 'Sources' | 'Browser actions' | 'Fields' | 'Limits' | 'Rules' | 'Improve prompt';
-type FieldType = 'text' | 'number' | 'currency' | 'boolean' | 'duration' | 'url' | 'date' | 'status';
+const fieldTypeOptions = ['text', 'number', 'currency', 'boolean', 'duration', 'url', 'date', 'status'] as const;
+type FieldType = (typeof fieldTypeOptions)[number];
 type PlanField = { id: string; name: string; type: FieldType };
 
-const fieldTypeOptions: FieldType[] = ['text', 'number', 'currency', 'boolean', 'duration', 'url', 'date', 'status'];
+function isFieldType(value: string): value is FieldType {
+  return fieldTypeOptions.some((type) => type === value);
+}
+
+function fieldTypeRecord(entries: Array<readonly [string, FieldType]>) {
+  return entries.reduce<Record<string, FieldType>>((record, [name, type]) => {
+    record[name] = type;
+    return record;
+  }, {});
+}
 
 const workflowDraftKey = 'importio-studio-workflow-draft';
 
@@ -188,6 +198,57 @@ type WorkflowDraft = {
   timeout: string;
 };
 
+function isStoredRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isWorkflowTemplateKey(value: unknown): value is WorkflowTemplateKey {
+  return typeof value === 'string' && Object.keys(workflowTemplates).some((key) => key === value);
+}
+
+function isInputMethod(value: unknown): value is InputMethod {
+  return typeof value === 'string' && inputMethods.some(([key]) => key === value);
+}
+
+function decodeFieldTypes(value: unknown) {
+  if (!isStoredRecord(value)) return undefined;
+  const entries = Object.entries(value);
+  if (!entries.every((entry): entry is [string, FieldType] => typeof entry[1] === 'string' && isFieldType(entry[1]))) return undefined;
+  return fieldTypeRecord(entries);
+}
+
+function storedString(record: Record<string, unknown>, key: string) {
+  const value = record[key];
+  return typeof value === 'string' ? value : '';
+}
+
+function decodeWorkflowDraft(value: unknown): WorkflowDraft | null {
+  if (!isStoredRecord(value) || !isWorkflowTemplateKey(value.selected) || !isInputMethod(value.inputMethod)) return null;
+  const stringKeys = ['mode', 'prompt', 'sources', 'fields', 'access', 'downloads', 'region', 'missingData', 'evidence', 'deduplication', 'validation', 'maxPages', 'maxRecords', 'timeout'] as const;
+  if (!stringKeys.every((key) => typeof value[key] === 'string')) return null;
+  return {
+    dirty: typeof value.dirty === 'boolean' ? value.dirty : undefined,
+    workflowName: typeof value.workflowName === 'string' ? value.workflowName : undefined,
+    fieldTypes: decodeFieldTypes(value.fieldTypes),
+    selected: value.selected,
+    mode: storedString(value, 'mode'),
+    inputMethod: value.inputMethod,
+    prompt: storedString(value, 'prompt'),
+    sources: storedString(value, 'sources'),
+    fields: storedString(value, 'fields'),
+    access: storedString(value, 'access'),
+    downloads: storedString(value, 'downloads'),
+    region: storedString(value, 'region'),
+    missingData: storedString(value, 'missingData'),
+    evidence: storedString(value, 'evidence'),
+    deduplication: storedString(value, 'deduplication'),
+    validation: storedString(value, 'validation'),
+    maxPages: storedString(value, 'maxPages'),
+    maxRecords: storedString(value, 'maxRecords'),
+    timeout: storedString(value, 'timeout'),
+  };
+}
+
 const templateFields: Record<WorkflowTemplateKey, string> = {
   compare: 'retailer, product, price',
   research: 'company, pricing_url, starting_price, free_plan, free_trial, plan_details',
@@ -209,7 +270,7 @@ function inferredFieldType(field: string) {
 }
 
 function inferredFieldTypes(fields: string[]) {
-  return Object.fromEntries(fields.map((field) => [field, inferredFieldType(field)])) as Record<string, FieldType>;
+  return fieldTypeRecord(fields.map((field) => [field, inferredFieldType(field)]));
 }
 
 function parseCsvRows(text: string) {
@@ -344,7 +405,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   const [monitorFields, setMonitorFields] = useState<string[]>(['Price', 'Availability']);
   const [monitorAlertWhen, setMonitorAlertWhen] = useState('Any change');
   const [monitorThreshold, setMonitorThreshold] = useState('€230');
-  const [monitorNotifyVia, setMonitorNotifyVia] = useState<'Email'|'Slack'|'Webhook'>('Email');
+  const [monitorNotifyVia, setMonitorNotifyVia] = useState<NotificationChannel>('Email');
   const [monitorCreated, setMonitorCreated] = useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
@@ -370,7 +431,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     markDraftDirty();
     setFields(value);
     const names = value.split(',').map((field) => normalizeFieldName(field)).filter(Boolean);
-    setFieldTypes((current) => Object.fromEntries(names.map((name) => [name, current[name] ?? inferredFieldType(name)])) as Record<string, FieldType>);
+    setFieldTypes((current) => fieldTypeRecord(names.map((name) => [name, current[name] ?? inferredFieldType(name)])));
   }
   function updatePrompt(value: string) {
     markDraftDirty();
@@ -432,7 +493,8 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
       const stored = localStorage.getItem(activeDraftKey);
       if (stored) {
         try {
-          const draft = JSON.parse(stored) as WorkflowDraft;
+          const draft = decodeWorkflowDraft(JSON.parse(stored));
+          if (!draft) throw new Error('Invalid workflow draft');
           const storedPrompt = draft.prompt ?? '';
           const isGeneratedPrompt = workflowPromptExamples.some((example) => example.text === storedPrompt) || Object.values(workflowTemplates).some((item) => item.text === storedPrompt);
           const hasUserDraft = draft.dirty ?? (Boolean(storedPrompt.trim()) && !isGeneratedPrompt);
@@ -673,7 +735,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     setPlanFields(nextRows);
     const normalizedNames = nextRows.map((field) => normalizeFieldName(field.name));
     setFields(normalizedNames.join(', '));
-    setFieldTypes(Object.fromEntries(nextRows.filter((field) => normalizeFieldName(field.name)).map((field) => [normalizeFieldName(field.name), field.type])) as Record<string, FieldType>);
+    setFieldTypes(fieldTypeRecord(nextRows.filter((field) => normalizeFieldName(field.name)).map((field) => [normalizeFieldName(field.name), field.type])));
     markDraftDirty();
   }
   function openPlanFieldEditor() {
@@ -685,7 +747,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     const normalizedRows = planFields.map((field) => ({ ...field, name: normalizeFieldName(field.name) }));
     setPlanFields(normalizedRows);
     setFields(normalizedRows.map((field) => field.name).join(', '));
-    setFieldTypes(Object.fromEntries(normalizedRows.map((field) => [field.name, field.type])) as Record<string, FieldType>);
+    setFieldTypes(fieldTypeRecord(normalizedRows.map((field) => [field.name, field.type])));
     setEditingPlanFields(false);
   }
   const sourceDomains = useMemo(() => sources.split('\n').map((source) => source.trim()).filter(Boolean).map((source) => {
@@ -943,7 +1005,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
                               aria-label={`Field ${index + 1} name`}
                               onChange={(event) => syncPlanFieldRows(planFields.map((item) => item.id === field.id ? { ...item, name: event.target.value } : item))}
                             />
-                            <Select value={field.type} onValueChange={(value) => syncPlanFieldRows(planFields.map((item) => item.id === field.id ? { ...item, type: value as FieldType } : item))}>
+                            <Select value={field.type} onValueChange={(value) => { if (isFieldType(value)) syncPlanFieldRows(planFields.map((item) => item.id === field.id ? { ...item, type: value } : item)); }}>
                               <SelectTrigger className="plan-field-type" aria-label={`Field ${index + 1} type`}><SelectValue /></SelectTrigger>
                               <SelectContent>{fieldTypeOptions.map((type) => <SelectItem value={type} key={type}>{type}</SelectItem>)}</SelectContent>
                             </Select>
@@ -1069,7 +1131,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
                 </fieldset>
                 <label>ALERT WHEN<Select value={monitorAlertWhen} onValueChange={setMonitorAlertWhen}><SelectTrigger aria-label="Alert when"><SelectValue /></SelectTrigger><SelectContent>{['Any change','Price falls below','Goes out of stock'].map((value)=><SelectItem value={value} key={value}>{value}</SelectItem>)}</SelectContent></Select></label>
                 {monitorAlertWhen === 'Price falls below' ? <label>VALUE<Input value={monitorThreshold} onChange={(event)=>setMonitorThreshold(event.target.value)} /></label> : null}
-                <label>NOTIFY VIA<Select value={monitorNotifyVia} onValueChange={(value)=>setMonitorNotifyVia(value as 'Email'|'Slack'|'Webhook')}><SelectTrigger aria-label="Notify via"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Email">Email · {auth.currentUser?.email}</SelectItem><SelectItem value="Slack">Slack</SelectItem><SelectItem value="Webhook">Webhook</SelectItem></SelectContent></Select></label>
+                <label>NOTIFY VIA<Select value={monitorNotifyVia} onValueChange={(value)=>{if(isNotificationChannel(value))setMonitorNotifyVia(value);}}><SelectTrigger aria-label="Notify via"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Email">Email · {auth.currentUser?.email}</SelectItem><SelectItem value="Slack">Slack</SelectItem><SelectItem value="Webhook">Webhook</SelectItem></SelectContent></Select></label>
               </div>
               <DialogFooter>
                 <Button variant="secondary" onClick={() => setMonitorDialogOpen(false)}>Cancel</Button>

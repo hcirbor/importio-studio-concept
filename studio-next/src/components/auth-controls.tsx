@@ -24,7 +24,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { type Role, useStudio } from '@/lib/data';
+import { isRole, ROLE_VALUES, useStudio } from '@/lib/data';
 
 export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   const auth = useStudio((snapshot) => ({
@@ -170,8 +170,8 @@ export function UserMenu({ compact = false, rail = false }: { compact?: boolean;
         <DropdownMenuItem onSelect={() => router.push('/settings')}>Profile</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="user-menu-section-label">View as <span>(demo only)</span></DropdownMenuLabel>
-        <DropdownMenuRadioGroup value={auth.currentRole ?? undefined} onValueChange={(value) => auth.setDemoRole(value as Role)}>
-          {(['Owner', 'Admin', 'Editor', 'Viewer'] as Role[]).map((role) => (
+        <DropdownMenuRadioGroup value={auth.currentRole ?? undefined} onValueChange={(value) => { if (isRole(value)) auth.setDemoRole(value); }}>
+          {ROLE_VALUES.map((role) => (
             <DropdownMenuRadioItem key={role} value={role}>{role}</DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

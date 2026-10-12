@@ -6,15 +6,17 @@ import type { WorkspaceDataset } from '@/lib/data';
 import { createDatasetExport, type DatasetExportFormat } from '@/lib/dataset-export';
 
 type DownloadLink = { href: string; filename: string };
+const exportFormats = ['csv', 'xlsx', 'json'] as const satisfies readonly DatasetExportFormat[];
 
 export function DatasetExportMenu({ dataset, label = 'Export' }: { dataset: Pick<WorkspaceDataset, 'title' | 'records'>; label?: string }) {
   const [open, setOpen] = useState(false);
   const [downloads, setDownloads] = useState<Partial<Record<DatasetExportFormat, DownloadLink>>>({});
   function openDialog() {
-    const next = Object.fromEntries((['csv','xlsx','json'] as DatasetExportFormat[]).map((format) => {
+    const next: Record<DatasetExportFormat, DownloadLink> = { csv: { href: '', filename: '' }, xlsx: { href: '', filename: '' }, json: { href: '', filename: '' } };
+    exportFormats.forEach((format) => {
       const file = createDatasetExport(dataset, format);
-      return [format, { href: URL.createObjectURL(file.blob), filename: file.filename }];
-    })) as Record<DatasetExportFormat, DownloadLink>;
+      next[format] = { href: URL.createObjectURL(file.blob), filename: file.filename };
+    });
     setDownloads(next);
     setOpen(true);
   }

@@ -27,7 +27,7 @@ import {
 } from './shared';
 import { EnrichmentsSection } from './library-sections';
 import { SectionTabs, useSectionTab } from './section-tabs';
-import { can, useStudio, viewerTooltip } from '@/lib/data';
+import { can, isNotificationChannel, useStudio, viewerTooltip, type NotificationChannel } from '@/lib/data';
 import { isTimestampToday, RelativeTime, useCurrentTime } from '../relative-time';
 
 export function PipelinesSection() {
@@ -296,7 +296,7 @@ export function MonitorsSection() {
   const [watchedFields, setWatchedFields] = useState(['Price', 'Availability']);
   const [alertWhen, setAlertWhen] = useState('Any change');
   const [priceThreshold, setPriceThreshold] = useState('€230');
-  const [notifyVia, setNotifyVia] = useState<'Email' | 'Slack' | 'Webhook'>('Email');
+  const [notifyVia, setNotifyVia] = useState<NotificationChannel>('Email');
   const [message, setMessage] = useState('');
   const fieldsByPipeline: Record<string, string[]> = {
     'Competitor prices': ['Price', 'Availability'],
@@ -363,7 +363,7 @@ export function MonitorsSection() {
             <fieldset className="monitor-fields"><legend>FIELDS TO WATCH</legend>{(fieldsByPipeline[pipeline] ?? []).map((field)=><label key={field}><input type="checkbox" checked={watchedFields.includes(field)} onChange={(event)=>setWatchedFields((current)=>event.target.checked?[...current,field]:current.filter((item)=>item!==field))} /> {field}</label>)}</fieldset>
             <label>ALERT WHEN<SelectField label="Alert when" value={alertWhen} onValueChange={setAlertWhen} options={['Any change','Price falls below','Goes out of stock'].map((value)=>({value,label:value}))} /></label>
             {alertWhen === 'Price falls below' ? <label>VALUE<Input value={priceThreshold} onChange={(event)=>setPriceThreshold(event.target.value)} placeholder="€230" /></label> : null}
-            <label>NOTIFY VIA<SelectField label="Notify via" value={notifyVia} onValueChange={(value)=>setNotifyVia(value as 'Email'|'Slack'|'Webhook')} options={[{value:'Email',label:`Email · ${auth.currentUser?.email ?? 'current user'}`},{value:'Slack',label:'Slack'},{value:'Webhook',label:'Webhook'}]} /></label>
+            <label>NOTIFY VIA<SelectField label="Notify via" value={notifyVia} onValueChange={(value)=>{if(isNotificationChannel(value))setNotifyVia(value);}} options={[{value:'Email',label:`Email · ${auth.currentUser?.email ?? 'current user'}`},{value:'Slack',label:'Slack'},{value:'Webhook',label:'Webhook'}]} /></label>
             <label>SCHEDULE<SelectField label="Schedule" value={schedule} onValueChange={setSchedule} options={['Hourly', 'Daily'].map((value) => ({ value, label: value }))} /></label>
           </div>
           <DialogFooter>

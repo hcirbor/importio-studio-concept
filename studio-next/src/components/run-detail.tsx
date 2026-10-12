@@ -19,6 +19,16 @@ export type RunDetailData = {
   actionLabel?: string;
 };
 
+function detailStatus(state: WorkspaceRun['state']): RunDetailData['status'] {
+  if (state === 'Completed') return 'completed';
+  if (state === 'Failed') return 'failed';
+  return 'running';
+}
+
+function researchStatus(state: 'Running' | 'Complete'): 'running' | 'complete' {
+  return state === 'Complete' ? 'complete' : 'running';
+}
+
 export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
   const runs = useStudio((snapshot) => snapshot.auth.runs);
   const execution = useStudio((snapshot) => snapshot.execution);
@@ -41,7 +51,7 @@ export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
   const workspaceDetail: RunDetailData | null = workspaceRun ? {
     title: workspaceRun.pipeline,
     description: `${workspaceRun.state} run · ${workspaceRun.coverage} · ${workspaceRun.records} ${workspaceRun.records === '1' ? 'record' : 'records'}`,
-    status: workspaceRun.state.toLowerCase() as RunDetailData['status'],
+    status: detailStatus(workspaceRun.state),
     badge: `${workspaceRun.state} · ${workspaceRun.outcome}`,
     tone: workspaceRun.tone,
     metrics: [sourceTotal, workspaceRun.state === 'Completed' ? sourceTotal : workspaceRun.records, ['Partial','Blocked'].includes(workspaceRun.outcome) ? '1' : '0', workspaceRun.records],
@@ -93,7 +103,7 @@ export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
         scenarioKey={scenarioKey}
         researchResolved={researchResolved}
         onResearchResolved={() => setResearchState('complete')}
-        onResearchStateChange={(state) => setResearchState(state.toLowerCase() as 'running' | 'complete')}
+        onResearchStateChange={(state) => setResearchState(researchStatus(state))}
       />
     </div>
   );

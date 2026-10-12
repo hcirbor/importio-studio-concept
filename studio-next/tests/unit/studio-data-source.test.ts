@@ -128,6 +128,25 @@ describe('mock Studio data source', () => {
     expect(legacy.getSnapshot().humanReview.pipelineVersion).toBe(8);
   });
 
+  it('decodes invalid persisted values and falls back to seeded data', () => {
+    storage.setItem('importio-studio-demo-auth', JSON.stringify({
+      session: { user: { id: 'jordan', name: 'Jordan Davis', email: 'jordan@example.com' }, workspaceId: 'studio', role: 'Owner' },
+      workspaces: [{ id: 42 }],
+      sourcesByWorkspace: { studio: ['https://valid.example', 42] },
+      runsByWorkspace: { studio: [{ id: 'broken' }] },
+      demoRole: 'Superuser',
+    }));
+    storage.setItem('importio-studio-review-state', JSON.stringify({ studio: { hasReviewItem: 'yes', pipelineVersion: 'five' } }));
+
+    const source = initialize();
+    const snapshot = source.getSnapshot();
+    expect(snapshot.auth.currentWorkspace?.name).toBe('Import.io Studio');
+    expect(snapshot.auth.sources).toEqual([]);
+    expect(snapshot.auth.runs[0]?.id).toBe('run_batch_91af');
+    expect(snapshot.auth.currentRole).toBe('Owner');
+    expect(snapshot.humanReview.pipelineVersion).toBe(4);
+  });
+
   it('emits mock run events in order and cancellation ends progression', async () => {
     const source = signedInSource();
     const plan = await source.execution.plan({ prompt: 'Research pricing', sources: ['cloudharbor.example', 'letterloop.example', 'brightsend.example'], fields: ['price'] });
