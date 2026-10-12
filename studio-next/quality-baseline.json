@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "issues": [
+    { "tool": "knip", "rule": "unused-file", "file": "src/components/build-header.tsx", "count": 1 },
+    { "tool": "knip", "rule": "unused-file", "file": "src/components/importio-logo.tsx", "count": 1 },
+    { "tool": "knip", "rule": "unused-file", "file": "src/lib/download-json.ts", "count": 1 },
+    { "tool": "knip", "rule": "unused-export", "file": "src/components/design-system.tsx", "count": 1 },
+    { "tool": "knip", "rule": "unused-export", "file": "src/components/relative-time.tsx", "count": 1 },
+    { "tool": "knip", "rule": "unused-export", "file": "src/components/ui/alert-dialog.tsx", "count": 1 },
+    { "tool": "knip", "rule": "unused-export", "file": "src/components/ui/sheet.tsx", "count": 3 },
+    { "tool": "knip", "rule": "unused-export", "file": "src/components/workspace/discovery-sections.tsx", "count": 1 },
+    { "tool": "knip", "rule": "unused-export", "file": "src/lib/dataset-export.ts", "count": 1 },
+    { "tool": "knip", "rule": "unused-export", "file": "src/lib/dataset-slug.ts", "count": 1 },
+    { "tool": "knip", "rule": "unused-export", "file": "src/lib/mock-web-data.ts", "count": 1 },
+    { "tool": "knip", "rule": "unused-type", "file": "src/lib/auth/index.tsx", "count": 6 }
+  ]
+}

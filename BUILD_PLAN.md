@@ -60,11 +60,13 @@ Naming: CiteOtter's `review` is an automated evidence check. Studio's human inbo
 | # | Phase | Prompt | Output | Deploy | Tag | Done when |
 |---|---|---|---|---|---|---|
 | 0 | Safety net | P1 | Classify the working tree; commit the verified app; record whether it's published | No | `demo-9.7` | Clean status (apart from listed artefacts); published/unpublished recorded with file name and checksum comparison |
-| 1 | Behaviour tests | P2 | Playwright: deterministic clock and storage, reduced motion, reset per test; `npm run test:e2e`; CI | No | `tests-baseline` | Tests pass locally and in CI |
+| 1 | Behaviour tests + quality gates | P2 | Playwright: deterministic clock and storage, reduced motion, reset per test; `npm run test:e2e`; CI. TypeScript strict, `no-explicit-any`, unused-code lint; existing violations listed in a baseline (not fixed yet) | No | `tests-baseline` | Tests pass locally and in CI; no new violations allowed beyond the baseline |
 | 2 | Reactive data boundary | P3 | subscribe/getSnapshot source; StudioDataProvider; mock moved behind it; `/build-info.json` (`commit` required, `tag` optional) | Yes, demo | `boundary` | Tests pass with 0 visual differences; live `/build-info.json` commit equals the tagged SHA |
+| 2R | **Code review + cleanup** | P3R | Written review (duplication, components over ~300 lines, `any`, dead code, per-template special cases, text-matching logic); then one cleanup with no visual changes; quality baseline reduced | Yes, demo | `cleanup-1` | Review report saved in `docs/reviews/`; baseline violations reduced; 0 visual differences |
 | 3 | Status labels | P4 | Capabilities map + StatusTag; off on demo | Yes, demo (labels off) | `status-tags` | 0 differences with labels off; labelled states tested |
 | 4 | Protected live host + server | P5 | Server build; access gate; allowlisted `/api/engine/*` proxy; health and Extract smoke test | Yes, live preview | `live-gateway` | Gate blocks anonymous access; `/healthz` OK; bounded Extract smoke test passes (provider path works); no credential reaches the browser |
 | 5 | Extract, live | P6 | Live ExecutionEngine for "Extract from a page" | Live preview | `live-extract` | Supported public HTTPS pages run end to end: plan → run → evidence → dataset → export; blocked/unavailable pages show a clear state |
+| 5R | **Human engineering review** | — | An engineer reviews the CiteOtter translation, the `/api/engine/*` server, the access gate and credential handling. Findings fixed in a follow-up prompt | No | `live-extract-reviewed` | Named reviewer signs off; blocking findings fixed. No wider access to the live preview before this |
 | 6 | Compare + harden | P7 | 10-URL mock-vs-live comparison; error states; usage metrics kept, `cost_usd` unknown | Live preview | `live-extract-hardened` | Blocked, timeout and null cases handled; comparison report written |
 | 7 | Research, live | P8 | Multi-domain research | Live preview | `live-research` | As phase 5, for Research |
 | 8 | Collect, live | P9 | Collect capped at 3 pages / 10 records, with Preview label | Live preview | `live-collect` | Over-cap plans offer "Run a sample (10 records)" |
@@ -73,7 +75,14 @@ Naming: CiteOtter's `review` is an automated evidence check. Studio's human inbo
 
 Out of scope (engineering's decision): real sign-in, multi-tenant workspaces, billing, persistent control-plane storage.
 
-Expect 11 planned prompts plus roughly one fix-up prompt per phase, so 15–20 in total.
+Expect 12 planned prompts plus roughly one fix-up prompt per phase, so 16–22 in total.
+
+## Code quality
+
+- **Gates (from Phase 1):** TypeScript `strict`, ESLint `no-explicit-any` and unused-code rules, all enforced in CI. Existing violations go in a recorded baseline. New code may not add any, and the baseline only shrinks.
+- **Checkpoints:** Phase 2R (agent code review + cleanup, after the data boundary) and Phase 5R (human engineering review before the live preview goes wider). A third agent review after Phase 10 is recommended.
+- **Review reports** are saved in `studio-next/docs/reviews/YYYY-MM-DD-phase-N.md`.
+- **Reviewer for 5R:** ______ (the engineer when back, otherwise whoever covers for him)
 
 ## Design-system dependency (decide before Phase 1)
 
@@ -86,7 +95,7 @@ Studio depends on `"@importio/design-system": "file:../../Import.io design syste
 | C. Monorepo / workspace | High | Restructures both repos. Not now. |
 | D. Vendor a pinned `.tgz` | Low | Works offline, but goes stale silently. Only as a stopgap. |
 
-Recommended: **A now, B later.** The chosen option: ______
+Recommended: **A now, B later.** The chosen option: **A, using the public repository configured by `DESIGN_SYSTEM_REPOSITORY` (fallback: `hcirbor/importio-design-system`) at a pinned commit; no token required.**
 
 ## Decisions needed before Phase 4
 
@@ -94,6 +103,7 @@ Recommended: **A now, B later.** The chosen option: ______
 - [ ] **CiteOtter staging credential** (shared Basic auth), who issues it while the engineer is away, and where it's stored server-side.
 - [ ] **Who pays** for Amber model, Import.io MCP and SearXNG usage on staging.
 - [ ] **His manager or the CTO is told,** and a company owner is named for any CiteOtter change.
+- [ ] **Phase 5R reviewer named** (an engineer who signs off the live integration).
 
 ## Rollback (non-destructive only)
 

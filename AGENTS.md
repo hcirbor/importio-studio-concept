@@ -22,6 +22,15 @@ Read BUILD_PLAN.md first. Work only on what the prompt asks.
 - Don't claim CiteOtter capabilities beyond BUILD_PLAN.md's "CiteOtter limits" table. Unfinished features stay visible, with a "Coming soon" or "Preview" StatusTag driven by `capabilities`. Never hide or silently disable them.
 - Never commit build output, caches, `.env*`, ZIPs, ad-hoc screenshots or verification artefacts. Add them to `.gitignore` if missing. Deliberate Playwright snapshot baselines and stable test fixtures under the test directories are source-controlled.
 
+## Code quality
+
+- TypeScript `strict` stays on. No `any`, `@ts-ignore` or `eslint-disable` without a one-line justification comment.
+- Don't add to the quality baseline (`studio-next/quality-baseline.json`). Only reduce it.
+- No per-template or per-scenario special cases in shared code. Use data/config (templates, capabilities) instead.
+- Components stay focused. If a component you touch is over ~300 lines, flag it in your report (don't split it unless the prompt says so).
+- No dead code, commented-out blocks or unused exports left behind.
+- Shared logic lives in `src/lib/`, not copied into components.
+
 ## Git safety
 
 - Never run `git reset --hard`, `git clean`, force-push, or delete branches or tags without Rob's explicit approval.

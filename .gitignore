@@ -18,6 +18,8 @@ importio-studio-prototype.zip
 /review-viewer-*.jpg
 /review-screenshots/
 /studio-next/verification/
+/studio-next/test-results/
+/studio-next/playwright-report/
 
 # Local deployment receipt note
 /studio-next/.openai/deployment-note.md
