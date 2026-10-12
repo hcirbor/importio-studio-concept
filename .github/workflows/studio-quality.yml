@@ -28,7 +28,13 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: Import Studio/studio-next/package-lock.json
+          cache-dependency-path: |
+            Import.io design system/package-lock.json
+            Import Studio/studio-next/package-lock.json
+
+      - name: Build Import.io design system
+        working-directory: Import.io design system
+        run: npm ci && npm run build
 
       - name: Install dependencies
         working-directory: Import Studio/studio-next
