@@ -1,0 +1,10 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": [
+    "src/app/**/page.tsx",
+    "src/app/layout.tsx",
+    "playwright.config.ts",
+    "tests/**/*.ts"
+  ],
+  "project": ["src/**/*.{ts,tsx}", "tests/**/*.ts", "playwright.config.ts"]
+}
