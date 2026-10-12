@@ -133,6 +133,13 @@ export type MonitorRequest = Omit<WorkspaceMonitor, 'id' | 'baselineDataset'> & 
 type EnrichmentRequest = { enrichmentId: string };
 
 type QualificationVerdict = 'Supported' | 'Unresolved' | 'Not supported';
+export type RecentPipeline = {
+  name: string;
+  status: string;
+  records: string;
+  tone: 'success' | 'warning';
+  href: string;
+};
 export type MockFixtures = {
   searchResults: SearchResult[];
   candidates: { name: string; domain: string; detail: string }[];
@@ -146,6 +153,7 @@ export type MockFixtures = {
   webhooks: { id: string; url: string; events: string; health: 'Healthy' | 'Validating' }[];
   mcpSetups: { id: string; label: string; title: string; setup: string }[];
   recentItems: { label: string; href: string; kind: 'run' | 'pipeline' | 'dataset' }[];
+  homePipelinesByWorkspace: Record<string, Array<RecentPipeline & { reviewLinked?: boolean }>>;
 };
 
 export interface ExecutionEngine {
@@ -229,6 +237,7 @@ export type StudioSnapshot = {
   controlPlane: StudioControlPlane;
   capabilities: CapabilityMap;
   fixtures: MockFixtures;
+  recentPipelines: RecentPipeline[];
 };
 
 export interface StudioDataSource {

@@ -737,11 +737,6 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     </>
   );
 
-  const scenarioRunId = selected === 'research'
-    ? 'run_batch_91af'
-    : selected === 'compare'
-      ? 'run_7f3a'
-      : `run_${selected}`;
   const reviewedRecordCount = promptSpecification.domains.length || recordCountForScenario(selected);
 
   async function workflowPlan() {
@@ -948,7 +943,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
             </Badge>
           </header>
 
-          <RunSession runId={runId} scenarioKey={scenarioRunId} researchResolved={researchResolved} onResearchResolved={resolveResearchRun} customDomains={promptSpecification.domains} customFields={fieldNames} />
+          <RunSession runId={runId} onResearchResolved={resolveResearchRun} />
 
           <div className="stage-actions">
             <Button variant="secondary" onClick={() => setStage(1)}>Review plan</Button>

@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import { Activity, Database, Globe2, Search } from 'lucide-react';
-import { Badge, Eyebrow } from '@/components/design-system';
+import { Eyebrow } from '@/components/design-system';
 import { HomeAttention } from '@/components/home-attention';
+import { HomeRecentPipelines } from '@/components/home-recent-pipelines';
 
 export const metadata = { title: 'Home · Import.io Studio' };
 
@@ -65,7 +66,7 @@ export default function HomePage() {
 
       <section className="dashboard-grid" aria-label="Workspace activity">
         <HomeAttention />
-        <article className="panel"><div className="section-head"><h2>Recent pipelines</h2><Link href="/pipelines" className="text-link">View all</Link></div><table className="data-table"><thead><tr><th>Pipeline</th><th>Status</th><th>Records</th></tr></thead><tbody><tr><td><Link href="/pipelines/competitor-prices">Competitor prices</Link></td><td><Badge tone="warning">Needs review</Badge></td><td>3</td></tr><tr><td><Link href="/pipelines">Outdoor catalogue</Link></td><td><Badge tone="success">Completed</Badge></td><td>1,284</td></tr><tr><td><Link href="/monitors">MAP watch</Link></td><td><Badge tone="success">Healthy</Badge></td><td>9,316</td></tr></tbody></table></article>
+        <HomeRecentPipelines />
       </section>
       <section className="lifecycle-band" aria-labelledby="lifecycle-title">
         <h2 id="lifecycle-title">One workflow, the full web-data lifecycle.</h2>

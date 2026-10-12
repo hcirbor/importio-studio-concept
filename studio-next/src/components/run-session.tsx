@@ -378,12 +378,8 @@ export function RunSession({
   onResearchStateChange,
 }: {
   runId: string;
-  scenarioKey?: string;
-  researchResolved?: boolean;
   onResearchResolved?: () => void;
   onResearchStateChange?: (state: 'Running' | 'Complete') => void;
-  customDomains?: string[];
-  customFields?: string[];
 }) {
   const execution = useStudio((snapshot) => snapshot.execution);
   const researchCallbacks = useRef({ onResearchResolved, onResearchStateChange });

@@ -456,7 +456,10 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       restoreReviewItem: this.restoreReviewItem,
       promotePipeline: this.promotePipeline,
     };
-    return { auth, humanReview, execution: this.execution, controlPlane: this.controlPlane, capabilities: this.capabilities, fixtures: mockFixtures };
+    const recentPipelines = (mockFixtures.homePipelinesByWorkspace[session?.workspaceId ?? ''] ?? []).map((pipeline) => pipeline.reviewLinked
+      ? { ...pipeline, status: currentReview.hasReviewItem ? 'Needs review' : 'Healthy', tone: currentReview.hasReviewItem ? 'warning' as const : 'success' as const }
+      : pipeline);
+    return { auth, humanReview, execution: this.execution, controlPlane: this.controlPlane, capabilities: this.capabilities, fixtures: mockFixtures, recentPipelines };
   }
 
   signIn = (method: SignInMethod) => {

@@ -91,6 +91,15 @@ describe('mock Studio data source', () => {
     expect(notifications).toBe(0);
   });
 
+  it('scopes recent pipelines to the workspace and updates review status', () => {
+    const source = signedInSource();
+    expect(source.getSnapshot().recentPipelines[0]?.status).toBe('Needs review');
+    source.controlPlane.acceptReviewItem();
+    expect(source.getSnapshot().recentPipelines[0]?.status).toBe('Healthy');
+    source.controlPlane.switchWorkspace('northwind');
+    expect(source.getSnapshot().recentPipelines).toEqual([]);
+  });
+
   it('does not re-render a narrow consumer after an unrelated mutation', async () => {
     const source = signedInSource();
     let renders = 0;

@@ -77,14 +77,6 @@ export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
           metrics: ['3', '2', '0', '2'],
         }
     : baseDisplayRun;
-  const scenarioKey = workspaceRun?.scenario === 'research'
-    ? 'run_batch_91af'
-    : workspaceRun?.scenario === 'compare'
-      ? 'run_7f3a'
-      : workspaceRun?.scenario
-        ? `run_${workspaceRun.scenario}`
-        : undefined;
-
   return (
     <div className="page">
       <Link href="/runs" className="back-link">← Runs</Link>
@@ -100,8 +92,6 @@ export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
       </section>
       <RunSession
         runId={currentId}
-        scenarioKey={scenarioKey}
-        researchResolved={researchResolved}
         onResearchResolved={() => setResearchState('complete')}
         onResearchStateChange={(state) => setResearchState(researchStatus(state))}
       />
