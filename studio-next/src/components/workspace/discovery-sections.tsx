@@ -10,12 +10,17 @@ import { useStudio } from '@/lib/data';
 const initialSearchQuery = 'Trailhead 2P Tent price Europe';
 
 export function SearchSection({ showHeader = true }: { showHeader?: boolean }) {
-  const { auth, execution, fixtures } = useStudio((snapshot) => snapshot);
+  const auth = useStudio((snapshot) => ({
+    sources: snapshot.auth.sources,
+    addSource: snapshot.auth.addSource,
+  }));
+  const execution = useStudio((snapshot) => snapshot.execution);
+  const searchResultsFixture = useStudio((snapshot) => snapshot.fixtures.searchResults);
   const router = useRouter();
   const [query, setQuery] = useState(initialSearchQuery);
   const [limit, setLimit] = useState('3');
   const [searchedQuery, setSearchedQuery] = useState(initialSearchQuery);
-  const [searchResults, setSearchResults] = useState(fixtures.searchResults);
+  const [searchResults, setSearchResults] = useState(searchResultsFixture);
 
   async function runSearch() {
     setSearchedQuery(query);
@@ -226,7 +231,11 @@ function QualifySection({
   onBack?: () => void;
   selectedCandidates?: string[];
 }) {
-  const fixtures = useStudio((snapshot) => snapshot.fixtures);
+  const fixtures = useStudio((snapshot) => ({
+    candidates: snapshot.fixtures.candidates,
+    qualificationRows: snapshot.fixtures.qualificationRows,
+    readyCandidateIds: snapshot.fixtures.readyCandidateIds,
+  }));
   const selectedNames = selectedCandidates ?? fixtures.candidates.map((candidate) => candidate.name);
   const qualificationRows: TableRow[] = fixtures.qualificationRows.map((row) => ({
     id: row.id,

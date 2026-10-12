@@ -20,12 +20,20 @@ export type RunDetailData = {
 };
 
 export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
-  const { auth, execution } = useStudio((snapshot) => snapshot);
+  const runs = useStudio((snapshot) => snapshot.auth.runs);
+  const execution = useStudio((snapshot) => snapshot.execution);
   const searchParams = useSearchParams();
   const currentId = searchParams.get('run') ?? id;
-  const [engineRun, setEngineRun] = useState<WorkspaceRun>();
-  const workspaceRun = engineRun ?? auth.runs.find((item) => item.id === currentId);
-  useEffect(() => { void execution.getRun(currentId).then(setEngineRun); }, [currentId, execution, auth.runs]);
+  const [engineResult, setEngineResult] = useState<{ id: string; run?: WorkspaceRun }>();
+  const engineRun = engineResult?.id === currentId ? engineResult.run : undefined;
+  const workspaceRun = engineRun ?? runs.find((item) => item.id === currentId);
+  useEffect(() => {
+    let active = true;
+    void execution.getRun(currentId).then((nextRun) => {
+      if (active) setEngineResult({ id: currentId, run: nextRun });
+    });
+    return () => { active = false; };
+  }, [currentId, execution]);
   const [researchState, setResearchState] = useState<'idle' | 'running' | 'complete'>('idle');
   const isResearch = currentId === 'run_batch_91af';
   const researchResolved = researchState === 'complete';

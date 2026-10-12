@@ -9,7 +9,11 @@ import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
 
 export function WorkspaceEnrichmentDetail({ enrichmentId }: { enrichmentId: string }) {
-  const { auth, execution } = useStudio((snapshot) => snapshot);
+  const auth = useStudio((snapshot) => ({
+    enrichments: snapshot.auth.enrichments,
+    currentWorkspace: snapshot.auth.currentWorkspace,
+  }));
+  const execution = useStudio((snapshot) => snapshot.execution);
   const enrichment = auth.enrichments.find((item) => item.id === enrichmentId);
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
 

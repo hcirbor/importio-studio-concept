@@ -10,7 +10,10 @@ import { useState } from 'react';
 import { RelativeTime } from './relative-time';
 
 export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const auth = useStudio((snapshot) => ({
+    datasets: snapshot.auth.datasets,
+    currentWorkspace: snapshot.auth.currentWorkspace,
+  }));
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const dataset = auth.datasets.find((item) => item.id === datasetId);
   if (!dataset) {

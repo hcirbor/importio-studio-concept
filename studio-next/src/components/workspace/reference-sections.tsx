@@ -21,8 +21,8 @@ const curlExample = `curl -X POST https://api.import.io/v1/tasks \\
   -d '{"workflow":"compare","sources":[...]}'`;
 
 export function DevelopersSection({ showHeader = true }: { showHeader?: boolean }) {
-  const { auth, fixtures } = useStudio((snapshot) => snapshot);
-  const mcpSetups = fixtures.mcpSetups;
+  const apiKeys = useStudio((snapshot) => snapshot.auth.apiKeys);
+  const mcpSetups = useStudio((snapshot) => snapshot.fixtures.mcpSetups);
   const [message, setMessage] = useState('');
   const [connectionChecked, setConnectionChecked] = useState(false);
 
@@ -84,7 +84,7 @@ export function DevelopersSection({ showHeader = true }: { showHeader?: boolean 
             <h2>Import.io MCP</h2>
             <p>10,000 free successful calls. Authenticate with OAuth, or use a scoped bearer token.</p>
           </div>
-          {auth.apiKeys.length ? <div className="developer-key-row"><code>{auth.apiKeys[0].display}</code><Button variant="ghost" size="sm" onClick={() => void copySetup('Credential', 'Authorization: Bearer mcp_live_…')}>Copy</Button></div> : <div className="developer-key-row"><span>No active API key</span></div>}
+          {apiKeys.length ? <div className="developer-key-row"><code>{apiKeys[0].display}</code><Button variant="ghost" size="sm" onClick={() => void copySetup('Credential', 'Authorization: Bearer mcp_live_…')}>Copy</Button></div> : <div className="developer-key-row"><span>No active API key</span></div>}
           <dl className="developer-facts">
             <div><dt>Endpoint</dt><dd>https://mcp.import.io/mcp</dd></div>
             <div><dt>Transport</dt><dd>Streamable HTTP</dd></div>
@@ -106,14 +106,15 @@ export function DevelopersSection({ showHeader = true }: { showHeader?: boolean 
 }
 
 export function WebhooksSection({ showHeader = true }: { showHeader?: boolean }) {
-  const { auth, fixtures } = useStudio((snapshot) => snapshot);
-  const mayManageWebhooks = can(auth.session, 'manage_webhooks');
+  const session = useStudio((snapshot) => snapshot.auth.session);
+  const webhookFixtures = useStudio((snapshot) => snapshot.fixtures.webhooks);
+  const mayManageWebhooks = can(session, 'manage_webhooks');
   const [endpoint, setEndpoint] = useState('https://api.example.com/importio/events');
   const [eventName, setEventName] = useState('Run completed');
   const [secret, setSecret] = useState('Generated after save');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [endpoints, setEndpoints] = useState(fixtures.webhooks);
+  const [endpoints, setEndpoints] = useState(webhookFixtures);
 
   function addWebhook() {
     try {
@@ -198,10 +199,13 @@ export function WebhooksSection({ showHeader = true }: { showHeader?: boolean })
 }
 
 export function UsageSection() {
-  const fixtures = useStudio((snapshot) => snapshot.fixtures);
-  const recentRuns = fixtures.usageTrend.runs;
-  const recentDates = fixtures.usageTrend.dates;
-  const usageRows: TableRow[] = fixtures.usageRows.map((row) => ({ id: row.id, cells: row.values }));
+  const usage = useStudio((snapshot) => ({
+    usageTrend: snapshot.fixtures.usageTrend,
+    usageRows: snapshot.fixtures.usageRows,
+  }));
+  const recentRuns = usage.usageTrend.runs;
+  const recentDates = usage.usageTrend.dates;
+  const usageRows: TableRow[] = usage.usageRows.map((row) => ({ id: row.id, cells: row.values }));
   return (
     <>
       <PageHead
@@ -236,7 +240,20 @@ export function UsageSection() {
 }
 
 export function SettingsSection() {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const auth = useStudio((snapshot) => ({
+    session: snapshot.auth.session,
+    currentUser: snapshot.auth.currentUser,
+    currentRole: snapshot.auth.currentRole,
+    apiKeys: snapshot.auth.apiKeys,
+    members: snapshot.auth.members,
+    createApiKey: snapshot.auth.createApiKey,
+    revokeApiKey: snapshot.auth.revokeApiKey,
+    inviteMembers: snapshot.auth.inviteMembers,
+    changeMemberRole: snapshot.auth.changeMemberRole,
+    removeMember: snapshot.auth.removeMember,
+    resendInvite: snapshot.auth.resendInvite,
+    revokeInvite: snapshot.auth.revokeInvite,
+  }));
   const [keyDialogOpen, setKeyDialogOpen] = useState(false);
   const [keyName, setKeyName] = useState('');
   const [keyAccess, setKeyAccess] = useState<'Full' | 'Read-only'>('Full');

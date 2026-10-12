@@ -1,4 +1,7 @@
+import { createElement } from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StudioDataProvider, useStudio } from '@/lib/data';
 import { createMockStudioDataSource } from '@/lib/data/mock/mock-control-plane';
 import type { StudioDataSource } from '@/lib/data/StudioDataSource';
 
@@ -86,6 +89,28 @@ describe('mock Studio data source', () => {
     unsubscribe();
     source.controlPlane.addSource('https://source.example');
     expect(notifications).toBe(0);
+  });
+
+  it('does not re-render a narrow consumer after an unrelated mutation', async () => {
+    const source = signedInSource();
+    let renders = 0;
+    function SourceCount() {
+      renders += 1;
+      const sourceCount = useStudio((snapshot) => snapshot.auth.sources.length);
+      return createElement('span', null, sourceCount);
+    }
+
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      renderer = TestRenderer.create(createElement(StudioDataProvider, { source }, createElement(SourceCount)));
+    });
+    expect(renders).toBe(1);
+
+    await act(async () => {
+      source.controlPlane.addRun({ id: 'run_unrelated', when: 'Just now', pipeline: 'Unrelated', coverage: '1 / 1 sources', records: '1', queries: 1, state: 'Completed', outcome: 'Succeeded', tone: 'success' });
+    });
+    expect(renders).toBe(1);
+    renderer?.unmount();
   });
 
   it('round-trips persisted state and accepts the legacy review shape', () => {

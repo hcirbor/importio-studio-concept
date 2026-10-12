@@ -48,8 +48,8 @@ function fieldKey(label: string, index: number) {
 }
 
 export function SavedRunsSection({ showHeader = true }: { showHeader?: boolean }) {
-  const fixtures = useStudio((snapshot) => snapshot.fixtures);
-  const memoryRows: TableRow[] = fixtures.memoryRows.map((row) => ({
+  const memoryRowsFixture = useStudio((snapshot) => snapshot.fixtures.memoryRows);
+  const memoryRows: TableRow[] = memoryRowsFixture.map((row) => ({
     id: row.id,
     cells: [row.label, row.runId, row.retention, <Status key="status" tone={row.tone}>{row.status}</Status>, <Button key="action" variant="ghost" size="sm" asChild><Link href={row.href}>Use in new workflow</Link></Button>],
   }));
@@ -100,7 +100,10 @@ export function BatchesSection({ showHeader = true }: { showHeader?: boolean }) 
 }
 
 export function EnrichmentsSection({ showHeader = true, openCreateOnMount = false }: { showHeader?: boolean; openCreateOnMount?: boolean }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const auth = useStudio((snapshot) => ({
+    enrichments: snapshot.auth.enrichments,
+    addEnrichment: snapshot.auth.addEnrichment,
+  }));
   const [dialogOpen, setDialogOpen] = useState(openCreateOnMount);
   const [name, setName] = useState('New supplier enrichment');
   const [fileName, setFileName] = useState('');

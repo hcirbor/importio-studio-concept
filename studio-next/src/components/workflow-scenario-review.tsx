@@ -187,11 +187,16 @@ export function WorkflowScenarioReview({
   const execution = useStudio((snapshot) => snapshot.execution);
   const [feedback, setFeedback] = useState('');
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
-  const [engineRecords, setEngineRecords] = useState<DatasetRecord[]>([]);
+  const [engineResult, setEngineResult] = useState<{ runId: string; records: DatasetRecord[] }>();
+  const engineRecords = engineResult && engineResult.runId === runId ? engineResult.records : [];
 
   useEffect(() => {
     if (!runId || !customDomains.length) return;
-    void execution.evidence(runId).then(setEngineRecords);
+    let active = true;
+    void execution.evidence(runId).then((records) => {
+      if (active) setEngineResult({ runId, records });
+    });
+    return () => { active = false; };
   }, [customDomains.length, execution, runId]);
 
   if (scenario === 'compare') {

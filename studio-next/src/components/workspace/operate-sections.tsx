@@ -31,10 +31,13 @@ import { can, useStudio, viewerTooltip } from '@/lib/data';
 import { isTimestampToday, RelativeTime, useCurrentTime } from '../relative-time';
 
 export function PipelinesSection() {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const session = useStudio((snapshot) => snapshot.auth.session);
   const pipelines = useStudio((snapshot) => snapshot.fixtures.pipelines);
-  const { pipelineVersion, pipelineStatus } = useStudio((snapshot) => snapshot.humanReview);
-  const mayRun = can(auth.session, 'run');
+  const { pipelineVersion, pipelineStatus } = useStudio((snapshot) => ({
+    pipelineVersion: snapshot.humanReview.pipelineVersion,
+    pipelineStatus: snapshot.humanReview.pipelineStatus,
+  }));
+  const mayRun = can(session, 'run');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [inspected, setInspected] = useState<string>();
@@ -102,7 +105,7 @@ export function PipelinesSection() {
 }
 
 export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const runs = useStudio((snapshot) => snapshot.auth.runs);
   const router = useRouter();
   const now = useCurrentTime();
   const [workflow, setWorkflow] = useState('all');
@@ -111,14 +114,14 @@ export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
   const [runId, setRunId] = useState('run_7f3a');
   const [error, setError] = useState('');
 
-  const visibleRuns = auth.runs.filter((run) => (
+  const visibleRuns = runs.filter((run) => (
     (workflow === 'all' || run.pipeline === workflow)
     && (state === 'all' || run.state === state)
     && (outcome === 'all' || run.outcome === outcome)
   ));
 
   function openRun() {
-    const run = auth.runs.find((item) => item.id === runId.trim());
+    const run = runs.find((item) => item.id === runId.trim());
     if (!run) {
       setError('Run ID not found in this interactive demo.');
       return;
@@ -141,11 +144,11 @@ export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
       <Button key="open" variant="ghost" size="sm" asChild><Link href={['run_batch_91af','run_7f3a','run_7e91','run_failed_9d11'].includes(run.id) ? `/runs/${run.id}` : `/runs/run_7f3a?run=${encodeURIComponent(run.id)}`}>Open</Link></Button>,
     ],
   }));
-  const runningCount = auth.runs.filter((run) => run.state === 'Running').length;
-  const partialCount = auth.runs.filter((run) => run.outcome === 'Partial').length;
-  const completedToday = auth.runs.filter((run) => run.state === 'Completed' && (now ? isTimestampToday(run.createdAt, now) : run.when !== 'Yesterday')).length;
-  const usageToday = auth.runs.filter((run) => now ? isTimestampToday(run.createdAt, now) : run.when !== 'Yesterday').reduce((sum, run) => sum + run.queries * 0.007, 0);
-  const workflowOptions = [...new Set(auth.runs.map((run) => run.pipeline))];
+  const runningCount = runs.filter((run) => run.state === 'Running').length;
+  const partialCount = runs.filter((run) => run.outcome === 'Partial').length;
+  const completedToday = runs.filter((run) => run.state === 'Completed' && (now ? isTimestampToday(run.createdAt, now) : run.when !== 'Yesterday')).length;
+  const usageToday = runs.filter((run) => now ? isTimestampToday(run.createdAt, now) : run.when !== 'Yesterday').reduce((sum, run) => sum + run.queries * 0.007, 0);
+  const workflowOptions = [...new Set(runs.map((run) => run.pipeline))];
 
   return (
     <>
@@ -218,7 +221,7 @@ export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
 }
 
 export function DatasetsSection() {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const datasets = useStudio((snapshot) => snapshot.auth.datasets);
   const searchParams = useSearchParams();
   const typeTabs = [
     { value: 'all', label: 'All' },
@@ -232,7 +235,7 @@ export function DatasetsSection() {
   const description = type === 'enrichment'
     ? 'CSV enrichment with a verdict and evidence per cell.'
     : 'Versioned structured outputs ready for review, export and delivery.';
-  const visibleDatasets = auth.datasets.filter((dataset) => (
+  const visibleDatasets = datasets.filter((dataset) => (
     dataset.title.toLowerCase().includes(query.toLowerCase())
     && (validation === 'all' || dataset.status === validation)
   ));
@@ -279,8 +282,13 @@ export function DatasetsSection() {
 }
 
 export function MonitorsSection() {
-  const { auth, execution, fixtures } = useStudio((snapshot) => snapshot);
-  const pipelines = fixtures.pipelines;
+  const auth = useStudio((snapshot) => ({
+    session: snapshot.auth.session,
+    monitors: snapshot.auth.monitors,
+    currentUser: snapshot.auth.currentUser,
+  }));
+  const execution = useStudio((snapshot) => snapshot.execution);
+  const pipelines = useStudio((snapshot) => snapshot.fixtures.pipelines);
   const mayCreateMonitor = can(auth.session, 'create_monitor');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pipeline, setPipeline] = useState('Competitor prices');

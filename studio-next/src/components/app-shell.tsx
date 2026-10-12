@@ -81,7 +81,7 @@ function parentBreadcrumbHref(pathname: string) {
 
 function Breadcrumbs({ pathname }: { pathname: string }) {
   const searchParams = useSearchParams();
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const datasets = useStudio((snapshot) => snapshot.auth.datasets);
   const [liveBuildTitle, setLiveBuildTitle] = useState<string | null>(null);
   useEffect(() => {
     function updateBuildTitle(event: Event) {
@@ -93,7 +93,7 @@ function Breadcrumbs({ pathname }: { pathname: string }) {
   }, []);
   const [parent, defaultCurrent, documentPageTitle] = pageTitle(pathname, searchParams);
   const datasetPageTitle = pathname.startsWith('/datasets/')
-    ? auth.datasets.find((dataset) => dataset.id === pathname.split('/').at(-1))?.title
+    ? datasets.find((dataset) => dataset.id === pathname.split('/').at(-1))?.title
     : undefined;
   const current = pathname === '/build'
     ? liveBuildTitle ?? 'New workflow'
@@ -126,8 +126,13 @@ function Breadcrumbs({ pathname }: { pathname: string }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const auth = useStudio((snapshot) => snapshot.auth);
-  const { reviewCount } = useStudio((snapshot) => snapshot.humanReview);
+  const auth = useStudio((snapshot) => ({
+    ready: snapshot.auth.ready,
+    session: snapshot.auth.session,
+    runs: snapshot.auth.runs,
+    currentWorkspace: snapshot.auth.currentWorkspace,
+  }));
+  const reviewCount = useStudio((snapshot) => snapshot.humanReview.reviewCount);
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const [navOpen, setNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

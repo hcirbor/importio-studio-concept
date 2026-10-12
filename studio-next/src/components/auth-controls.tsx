@@ -27,7 +27,12 @@ import {
 import { type Role, useStudio } from '@/lib/data';
 
 export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const auth = useStudio((snapshot) => ({
+    currentWorkspace: snapshot.auth.currentWorkspace,
+    workspaces: snapshot.auth.workspaces,
+    switchWorkspace: snapshot.auth.switchWorkspace,
+    createWorkspace: snapshot.auth.createWorkspace,
+  }));
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -116,7 +121,12 @@ export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }
 }
 
 export function UserMenu({ compact = false, rail = false }: { compact?: boolean; rail?: boolean }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const auth = useStudio((snapshot) => ({
+    currentUser: snapshot.auth.currentUser,
+    currentRole: snapshot.auth.currentRole,
+    signOut: snapshot.auth.signOut,
+    setDemoRole: snapshot.auth.setDemoRole,
+  }));
   const router = useRouter();
   const user = auth.currentUser;
   const initials = user?.name

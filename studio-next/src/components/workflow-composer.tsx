@@ -275,7 +275,16 @@ export function WorkflowComposer() {
 }
 
 function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt }: { initialTemplate: WorkflowTemplateKey; initialInput: InputMethod; initialPrompt: string }) {
-  const { auth, execution } = useStudio((snapshot) => snapshot);
+  const auth = useStudio((snapshot) => ({
+    session: snapshot.auth.session,
+    sources: snapshot.auth.sources,
+    datasets: snapshot.auth.datasets,
+    currentWorkspace: snapshot.auth.currentWorkspace,
+    currentUser: snapshot.auth.currentUser,
+    addDataset: snapshot.auth.addDataset,
+    removeSource: snapshot.auth.removeSource,
+  }));
+  const execution = useStudio((snapshot) => snapshot.execution);
   const router = useRouter();
   const mayRun = can(auth.session, 'run');
   const initialWorkspaceSources = useRef(auth.sources);

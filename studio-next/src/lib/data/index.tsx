@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useSyncExternalStore } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
+import { useSyncExternalStoreWithSelector } from 'use-sync-external-store/shim/with-selector';
 import type { PermissionAction, Role, StudioDataSource, StudioSnapshot } from '@/lib/data/StudioDataSource';
 import { createMockStudioDataSource } from '@/lib/data/mock/mock-control-plane';
 
@@ -25,8 +26,9 @@ function getStudioDataSource(): StudioDataSource {
 
 const StudioDataContext = createContext<StudioDataSource | null>(null);
 
-export function StudioDataProvider({ children }: { children: React.ReactNode }) {
-  const [source] = useState(getStudioDataSource);
+export function StudioDataProvider({ children, source: providedSource }: { children?: React.ReactNode; source?: StudioDataSource }) {
+  const [defaultSource] = useState(getStudioDataSource);
+  const source = providedSource ?? defaultSource;
 
   useEffect(() => {
     source.initialize();
@@ -38,6 +40,19 @@ export function StudioDataProvider({ children }: { children: React.ReactNode }) 
 export function useStudio<T>(selector: (snapshot: StudioSnapshot) => T): T {
   const source = useContext(StudioDataContext);
   if (!source) throw new Error('useStudio must be used within StudioDataProvider');
-  const snapshot = useSyncExternalStore(source.subscribe, source.getSnapshot, source.getSnapshot);
-  return selector(snapshot);
+  return useSyncExternalStoreWithSelector(
+    source.subscribe,
+    source.getSnapshot,
+    source.getSnapshot,
+    selector,
+    shallowEqual,
+  );
+}
+
+function shallowEqual<T>(left: T, right: T) {
+  if (Object.is(left, right)) return true;
+  if (!left || !right || typeof left !== 'object' || typeof right !== 'object') return false;
+  const leftKeys = Object.keys(left);
+  if (leftKeys.length !== Object.keys(right).length) return false;
+  return leftKeys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && Object.is(Reflect.get(left, key), Reflect.get(right, key)));
 }

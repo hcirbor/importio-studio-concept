@@ -24,9 +24,12 @@ const initialDestinations = [
 ];
 
 export function PipelineDetail() {
-  const auth = useStudio((snapshot) => snapshot.auth);
-  const { pipelineVersion: version, promotePipeline } = useStudio((snapshot) => snapshot.humanReview);
-  const mayPromote = can(auth.session, 'promote');
+  const session = useStudio((snapshot) => snapshot.auth.session);
+  const { version, promotePipeline } = useStudio((snapshot) => ({
+    version: snapshot.humanReview.pipelineVersion,
+    promotePipeline: snapshot.humanReview.promotePipeline,
+  }));
+  const mayPromote = can(session, 'promote');
   const [message, setMessage] = useState('');
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [hasUnreviewedRegression, setHasUnreviewedRegression] = useState(true);
