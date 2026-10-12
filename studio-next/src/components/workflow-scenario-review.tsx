@@ -12,7 +12,7 @@ import type { WorkflowTemplateKey } from './workflow-config';
 
 type ReviewFixture = {
   headings: string[];
-  rows: string[][];
+  rows: Array<Array<string | null>>;
 };
 
 const reviewFixtures: Partial<Record<WorkflowTemplateKey, ReviewFixture>> = {
@@ -101,20 +101,20 @@ function pricingQuote(record: string, cellIndex: number, pending: boolean) {
   return copy.plan;
 }
 
-function evidenceForCell(scenario: WorkflowTemplateKey, fixture: ReviewFixture, row: string[], cellIndex: number): EvidenceDetail {
+function evidenceForCell(scenario: WorkflowTemplateKey, fixture: ReviewFixture, row: Array<string | null>, cellIndex: number): EvidenceDetail {
   const field = fixture.headings[cellIndex];
   const value = row[cellIndex];
-  const record = row[0];
+  const record = String(row[0] ?? 'Record');
   const sourceUrl = scenario === 'research'
-    ? `https://${row[1]}`
+    ? `https://${String(row[1] ?? '')}`
     : scenario === 'discover'
       ? 'https://worthington-directory.example/outdoor-equipment'
       : 'https://northwind-outdoors.example/tents/trailhead-2p';
-  const pending = value === '—' || value === 'Pending input' || value === 'Cookie decision required';
+  const pending = value === null || value === '—' || value === 'Pending input' || value === 'Cookie decision required';
   return {
     field,
     record,
-    value,
+    value: value ?? 'null',
     quote: scenario === 'research'
       ? pricingQuote(record, cellIndex, pending)
       : pending
@@ -128,6 +128,38 @@ function evidenceForCell(scenario: WorkflowTemplateKey, fixture: ReviewFixture, 
     captureLabel: scenario === 'research' ? `${record} pricing page` : `${record} source page`,
     kind: scenario === 'research' ? 'pricing' : 'product',
   };
+}
+
+function normalizedField(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
+
+function fixtureHeadingForField(field: string, headings: string[]) {
+  const aliases: Record<string, string[]> = {
+    product_name: ['product_name', 'product'],
+    availability: ['availability', 'stock', 'status'],
+    stock: ['stock', 'availability', 'status'],
+    pricing_url: ['pricing_url', 'url'],
+    url: ['url', 'pricing_url'],
+    plan_details: ['plan_details', 'plan'],
+  };
+  const wanted = aliases[normalizedField(field)] ?? [normalizedField(field)];
+  return headings.findIndex((heading) => wanted.includes(normalizedField(heading)));
+}
+
+function fixtureSource(scenario: WorkflowTemplateKey, row: Array<string | null>) {
+  if (scenario === 'research') return String(row[1] ?? '').replace(/^https?:\/\//, '').split('/')[0];
+  if (scenario === 'discover') return 'worthington-directory.example';
+  return 'northwind-outdoors.example';
+}
+
+function sourceFromRecord(record: DatasetRecord) {
+  const sourceUrl = Object.values(record.evidence).find((item) => item.sourceUrl)?.sourceUrl ?? '';
+  try {
+    return new URL(sourceUrl).hostname.replace(/^www\./, '');
+  } catch {
+    return sourceUrl;
+  }
 }
 
 export function WorkflowScenarioReview({
@@ -155,39 +187,47 @@ export function WorkflowScenarioReview({
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
 
   if (scenario === 'compare') {
-    return <DatasetReview onSaved={onSaved} workspaceName={workspaceName} datasetName={datasetName} savedDatasetId={savedDatasetId} />;
+    return <DatasetReview fields={customFields} onSaved={onSaved} workspaceName={workspaceName} datasetName={datasetName} savedDatasetId={savedDatasetId} />;
   }
 
-  const customRecords = customDomains.length ? mockDomainRecords(customDomains, customFields) : [];
-  const fixture = customRecords.length ? {
-    headings: ['Source', ...customFields],
-    rows: customRecords.map((record, index) => [customDomains[index], ...customFields.map((field)=>record.values[field] ?? '—')]),
-  } : scenario === 'research' ? researchFixture(researchResolved) : reviewFixtures[scenario] ?? reviewFixtures.collect!;
+  const baseFixture = scenario === 'research' ? researchFixture(researchResolved) : reviewFixtures[scenario] ?? reviewFixtures.collect!;
+  const savedFields = (customFields.length ? customFields : baseFixture.headings.filter((heading) => !['Evidence', 'Source'].includes(heading)))
+    .filter((field) => normalizedField(field) !== 'source');
+  const customRecords = customDomains.length ? mockDomainRecords(customDomains, savedFields) : [];
+  const datasetRecords: DatasetRecord[] = customRecords.length ? customRecords : baseFixture.rows.map((row, rowIndex) => {
+    const source = fixtureSource(scenario, row);
+    const values = Object.fromEntries(savedFields.map((field) => {
+      if (scenario === 'monitor') {
+        const key = normalizedField(field);
+        if (key === 'price') return [field, '€249'];
+        if (key === 'availability' || key === 'stock' || key === 'status') return [field, 'In stock'];
+      }
+      const fieldIndex = fixtureHeadingForField(field, baseFixture.headings);
+      const value = fieldIndex >= 0 ? row[fieldIndex] : null;
+      return [field, value === '—' || value === 'Pending input' || value === 'Cookie decision required' ? null : value ?? null];
+    }));
+    const evidence = Object.fromEntries(savedFields.map((field) => {
+      const fieldIndex = fixtureHeadingForField(field, baseFixture.headings);
+      if (fieldIndex < 0) return [field, { sourceUrl: `https://${source}`, quote: 'Not stated · unknown' }];
+      const detail = evidenceForCell(scenario, baseFixture, row, fieldIndex);
+      return [field, { sourceUrl: detail.sourceUrl, quote: values[field] === null ? 'Not stated · unknown' : detail.quote }];
+    }));
+    return { id: `${scenario}-${rowIndex + 1}`, values, evidence };
+  });
+  const fixture: ReviewFixture = {
+    headings: ['source', ...savedFields],
+    rows: datasetRecords.map((record) => [sourceFromRecord(record), ...savedFields.map((field) => record.values[field])]),
+  };
   const supportedCount = scenario === 'research' && !researchResolved && !customRecords.length ? 2 : fixture.rows.length;
-  const savedFields = customRecords.length ? customFields : fixture.headings.filter((heading)=>heading !== 'Evidence');
-  const datasetRecords: DatasetRecord[] = customRecords.length ? customRecords : fixture.rows.map((row, rowIndex) => ({
-    id: `${scenario}-${rowIndex + 1}`,
-    values: Object.fromEntries(savedFields.map((field) => {
-      const index = fixture.headings.indexOf(field);
-      return [field, row[index] ?? '—'];
-    })),
-    evidence: Object.fromEntries(savedFields.map((field) => {
-      const index = fixture.headings.indexOf(field);
-      const detail = evidenceForCell(scenario, fixture, row, index);
-      return [field, { sourceUrl: detail.sourceUrl, quote: detail.quote }];
-    })),
-  }));
 
   function openEvidence(rowIndex: number, cellIndex: number) {
-    if (!customRecords.length) {
-      setEvidence(evidenceForCell(scenario, fixture, fixture.rows[rowIndex], cellIndex));
-      return;
-    }
     const field = fixture.headings[cellIndex];
-    const record = customRecords[rowIndex];
-    const evidenceField = field === 'Source' ? customFields[0] : field;
-    const item = record.evidence[evidenceField];
-    setEvidence({ field, record: customDomains[rowIndex], value: fixture.rows[rowIndex][cellIndex], quote: item?.quote ?? 'Source page retained.', sourceUrl: item?.sourceUrl ?? `https://${customDomains[rowIndex]}`, captureLabel: `${customDomains[rowIndex]} pricing page`, kind: 'pricing' });
+    const record = datasetRecords[rowIndex];
+    const evidenceField = field === 'source' ? savedFields[0] : field;
+    const item = evidenceField ? record.evidence[evidenceField] : undefined;
+    const source = sourceFromRecord(record);
+    const value = fixture.rows[rowIndex][cellIndex];
+    setEvidence({ field, record: source, value: value ?? 'null', quote: item?.quote ?? 'Source page retained.', sourceUrl: item?.sourceUrl ?? `https://${source}`, captureLabel: `${source} source page`, kind: scenario === 'research' ? 'pricing' : 'product' });
   }
 
   return (
@@ -224,7 +264,7 @@ export function WorkflowScenarioReview({
                       type="button"
                       onClick={() => openEvidence(rowIndex, cellIndex)}
                     >
-                      {cell}
+                      {cell === null ? <><code>null</code><span className="unknown-value">Not stated · unknown</span></> : cell}
                     </button>
                   </td>
                 ))}

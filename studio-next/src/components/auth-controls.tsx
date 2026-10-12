@@ -10,6 +10,9 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
 } from '@/components/design-system';
 import {
   DropdownMenu,
@@ -23,7 +26,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { type Role, useAuth } from '@/lib/auth';
 
-export function WorkspaceSwitcher() {
+export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }) {
   const auth = useAuth();
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -54,14 +57,19 @@ export function WorkspaceSwitcher() {
         if (!value) setCreating(false);
       }}
     >
-      <Button variant="ghost" className="workspace-card" onClick={() => setOpen(true)}>
+      <Tooltip><TooltipTrigger asChild><Button
+        variant="ghost"
+        className={collapsed ? 'workspace-card workspace-card-collapsed' : 'workspace-card'}
+        aria-label={`Switch workspace · ${workspace?.name ?? 'Import.io Studio'}`}
+        onClick={() => setOpen(true)}
+      >
         <span className="workspace-icon">{workspace?.name.slice(0, 1) ?? 'I'}</span>
         <span>
           <strong>{workspace?.name ?? 'Import.io Studio'}</strong>
           <small>{workspace?.subtitle ?? 'Demo workspace'}</small>
         </span>
         <span className="workspace-chevron">⌄</span>
-      </Button>
+      </Button></TooltipTrigger>{collapsed ? <TooltipContent side="right">{workspace?.name ?? 'Import.io Studio'} · {workspace?.subtitle ?? 'Demo workspace'}</TooltipContent> : null}</Tooltip>
       <DialogContent className="workspace-dialog">
         <DialogHeader>
           <DialogTitle>Switch workspace</DialogTitle>
@@ -107,7 +115,7 @@ export function WorkspaceSwitcher() {
   );
 }
 
-export function UserMenu({ compact = false }: { compact?: boolean }) {
+export function UserMenu({ compact = false, rail = false }: { compact?: boolean; rail?: boolean }) {
   const auth = useAuth();
   const router = useRouter();
   const user = auth.currentUser;
@@ -125,13 +133,13 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+      <Tooltip><TooltipTrigger asChild><DropdownMenuTrigger asChild>
         <button
           type="button"
-          className={compact ? 'avatar user-menu-trigger' : 'profile user-menu-trigger'}
+          className={compact || rail ? `avatar user-menu-trigger${rail ? ' sidebar-user-avatar' : ''}` : 'profile user-menu-trigger'}
           aria-label="Open user menu"
         >
-          {compact ? initials : (
+          {compact || rail ? initials : (
             <>
               <span>{initials}</span>
               <div>
@@ -141,7 +149,7 @@ export function UserMenu({ compact = false }: { compact?: boolean }) {
             </>
           )}
         </button>
-      </DropdownMenuTrigger>
+      </DropdownMenuTrigger></TooltipTrigger>{rail ? <TooltipContent side="right">{user?.name} · {auth.currentRole}</TooltipContent> : null}</Tooltip>
       <DropdownMenuContent className="user-menu-dropdown" align={compact ? 'end' : 'start'} side={compact ? 'bottom' : 'right'}>
         <DropdownMenuLabel className="user-menu-identity">
           <strong>{user?.name}</strong>

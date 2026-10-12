@@ -17,11 +17,11 @@ export function mockDomainRecord(domain: string, fields: string[]): DatasetRecor
   const label = domainLabel(domain);
   const quote = `${plan} — $${price}/month. Try free for ${trial} days.`;
   const sourceUrl = `https://${domain}/pricing`;
-  const values: Record<string, string> = {};
+  const values: Record<string, string | null> = {};
   const evidence: DatasetRecord['evidence'] = {};
   fields.forEach((field) => {
     const key = field.toLowerCase().replace(/\s+/g, '_');
-    let value = `${label} ${field}`;
+    let value: string | null = null;
     if (key === 'starting_price' || key === 'price') value = `$${price} / month`;
     else if (key === 'free_trial' || key === 'trial' || key === 'free_trial_length') value = `${trial} days`;
     else if (key === 'plan' || key === 'free_plan' || key === 'plan_details') value = plan;
@@ -32,7 +32,7 @@ export function mockDomainRecord(domain: string, fields: string[]): DatasetRecor
     else if (key === 'seller') value = label;
     else if (key === 'map') value = `$${Math.max(8, price - 3)}`;
     values[field] = value;
-    evidence[field] = { sourceUrl, quote };
+    evidence[field] = { sourceUrl, quote: value === null ? 'Not stated · unknown' : quote };
   });
   return { id: domain.replace(/[^a-z0-9]+/gi, '-'), values, evidence };
 }

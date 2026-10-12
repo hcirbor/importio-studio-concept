@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { ArrowRight, Clock3, Database, FileText, Layers3, Search } from 'lucide-react';
 import {
   Button,
@@ -52,6 +52,7 @@ const recentItems = [
 
 export function CommandPalette() {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
@@ -67,6 +68,10 @@ export function CommandPalette() {
 
   function goTo(href: string) {
     setOpen(false);
+    if (href === '/build' && pathname === '/build') {
+      window.dispatchEvent(new CustomEvent('studio:new-workflow'));
+      return;
+    }
     router.push(href);
   }
 

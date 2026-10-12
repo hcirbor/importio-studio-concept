@@ -11,10 +11,21 @@ function fileStem(name: string) {
 
 function rowsForExport(records: DatasetRecord[]) {
   return records.map((record) => {
+    const retainedSource = Object.entries(record.values).find(([field]) => field.toLowerCase() === 'source')?.[1];
+    const evidenceSource = Object.values(record.evidence).find((item) => item.sourceUrl)?.sourceUrl ?? '';
+    const rawSource = retainedSource || evidenceSource;
+    let source = rawSource;
+    try {
+      source = new URL(rawSource.includes('://') ? rawSource : `https://${rawSource}`).hostname.replace(/^www\./, '');
+    } catch {
+      source = rawSource;
+    }
+    const values = Object.fromEntries(Object.entries(record.values)
+      .filter(([field]) => field.toLowerCase() !== 'source'));
     const evidence = Object.entries(record.evidence)
       .map(([field, item]) => `${field}: ${item.sourceUrl} — ${item.quote}`)
       .join(' | ');
-    return { ...record.values, Evidence: evidence };
+    return { source, ...values, evidence };
   });
 }
 

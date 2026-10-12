@@ -2,6 +2,8 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { useAuth, type WorkspaceEnrichment } from '@/lib/auth';
+import { datasetSlug } from '@/lib/dataset-slug';
 import {
   Button,
   Dialog,
@@ -46,10 +48,36 @@ const groupFixtures = [
   { name: 'SaaS pricing sample', items: '10 items', status: 'Completed · Succeeded', tone: 'success' as const },
 ];
 
-const enrichmentFixtures = [
-  { name: 'Supplier enrichment', rows: '248 rows', status: 'Completed → Partial', tone: 'warning' as const },
-  { name: 'Retailer domain match', rows: '74 rows', status: 'Completed → Succeeded', tone: 'success' as const },
-];
+function uniqueEnrichmentSlug(name: string, existingIds: string[]) {
+  const base = datasetSlug(name);
+  if (!existingIds.includes(base)) return base;
+  let suffix = 2;
+  while (existingIds.includes(`${base}-${suffix}`)) suffix += 1;
+  return `${base}-${suffix}`;
+}
+
+function csvCells(line: string) {
+  const cells: string[] = [];
+  let cell = '';
+  let quoted = false;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (character === '"' && line[index + 1] === '"' && quoted) {
+      cell += '"';
+      index += 1;
+    } else if (character === '"') quoted = !quoted;
+    else if (character === ',' && !quoted) {
+      cells.push(cell.trim());
+      cell = '';
+    } else cell += character;
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
+function fieldKey(label: string, index: number) {
+  return label.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || `column_${index + 1}`;
+}
 
 export function SavedRunsSection({ showHeader = true }: { showHeader?: boolean }) {
   return (
@@ -98,10 +126,23 @@ export function BatchesSection({ showHeader = true }: { showHeader?: boolean }) 
 }
 
 export function EnrichmentsSection({ showHeader = true, openCreateOnMount = false }: { showHeader?: boolean; openCreateOnMount?: boolean }) {
+  const auth = useAuth();
   const [dialogOpen, setDialogOpen] = useState(openCreateOnMount);
   const [name, setName] = useState('New supplier enrichment');
   const [fileName, setFileName] = useState('');
   const [message, setMessage] = useState('');
+  const [rowCount, setRowCount] = useState(0);
+  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
+  const [csvRows, setCsvRows] = useState<string[][]>([]);
+
+  const sampleHeaders = ['Company', 'Website'];
+  const sampleRows = [
+    ['Acme Tools', 'acme-tools.example'],
+    ['WidgetCo', 'widgetco.example'],
+    ['Northwind Outdoors', 'northwind-outdoors.example'],
+    ['Summit Supply', 'summit-supply.example'],
+    ['Trail Shop', 'trail-shop.example'],
+  ];
 
   useEffect(() => {
     if (!openCreateOnMount) return;
@@ -110,27 +151,61 @@ export function EnrichmentsSection({ showHeader = true, openCreateOnMount = fals
   }, [openCreateOnMount]);
 
   function createEnrichment() {
+    const trimmedName = name.trim();
+    const id = uniqueEnrichmentSlug(trimmedName, auth.enrichments.map((item) => item.id));
+    const inputFields = csvHeaders.map(fieldKey);
+    const rows = csvRows.map((row, rowIndex) => ({
+      id: `${id}-${rowIndex + 1}`,
+      values: Object.fromEntries(inputFields.map((field, columnIndex) => [field, row[columnIndex] ?? ''])),
+      enriched: {},
+    }));
+    const enrichment: WorkspaceEnrichment = {
+      id,
+      name: trimmedName,
+      rowCount,
+      state: 'Validated',
+      outcome: 'Ready',
+      sourceFile: fileName,
+      inputFields,
+      enrichedFields: ['category', 'headquarters'],
+      rows,
+    };
+    auth.addEnrichment(enrichment);
     setDialogOpen(false);
-    setMessage(`${name} created from ${fileName}. Upload validation is ready.`);
+    setMessage(`${trimmedName} created from ${fileName}. Upload validation is ready.`);
   }
 
-  const rows: TableRow[] = enrichmentFixtures.map((enrichment) => ({
-    id: enrichment.name,
+  function useSampleCsv() {
+    setFileName('enrichment-sample.csv');
+    setCsvHeaders(sampleHeaders);
+    setCsvRows(sampleRows);
+    setRowCount(sampleRows.length);
+  }
+
+  async function loadCsv(file?: File) {
+    setFileName(file?.name ?? '');
+    if (!file) {
+      setRowCount(0);
+      setCsvHeaders([]);
+      setCsvRows([]);
+      return;
+    }
+    const lines = (await file.text()).replace(/\r/g, '').split('\n').filter((line) => line.trim());
+    const headers = lines.length ? csvCells(lines[0]) : [];
+    const rows = lines.slice(1).map(csvCells);
+    setCsvHeaders(headers);
+    setCsvRows(rows);
+    setRowCount(rows.length);
+  }
+
+  const rows: TableRow[] = auth.enrichments.map((enrichment) => ({
+    id: enrichment.id,
     cells: [
       enrichment.name,
-      enrichment.rows,
-      <Status key="status" tone={enrichment.tone}>{enrichment.status}</Status>,
-      <Button
-        key="open"
-        variant="ghost"
-        size="sm"
-        onClick={() => setMessage(
-          enrichment.name === 'Supplier enrichment'
-            ? 'Supplier enrichment selected · 248 rows · 17 unresolved cells.'
-            : 'Retailer domain match selected · all 74 rows supported.',
-        )}
-      >
-        Open
+      `${enrichment.rowCount} ${enrichment.rowCount === 1 ? 'row' : 'rows'}`,
+      <Status key="status" tone={enrichment.outcome === 'Partial' ? 'warning' : 'success'}>{enrichment.state} → {enrichment.outcome}</Status>,
+      <Button key="open" variant="ghost" size="sm" asChild>
+        <Link href={`/datasets/enrichments/${enrichment.id}`}>Open</Link>
       </Button>,
     ],
   }));
@@ -154,10 +229,11 @@ export function EnrichmentsSection({ showHeader = true, openCreateOnMount = fals
               <Input
                 type="file"
                 accept=".csv,text/csv"
-                onChange={(event) => setFileName(event.target.files?.[0]?.name ?? '')}
+                onChange={(event) => { void loadCsv(event.target.files?.[0]); }}
               />
             </label>
-            {fileName ? <p className="dialog-file-note">Ready to validate · {fileName}</p> : null}
+            <Button variant="ghost" type="button" className="csv-sample" onClick={useSampleCsv}>Use sample CSV</Button>
+            {fileName ? <p className="dialog-file-note">Ready to validate · {fileName} · {rowCount} {rowCount === 1 ? 'row' : 'rows'}</p> : null}
           </div>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setDialogOpen(false)}>Cancel</Button>

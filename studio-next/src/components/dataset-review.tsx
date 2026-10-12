@@ -5,6 +5,7 @@ import { Badge, Button, Tabs, TabsList, TabsTrigger } from '@/components/design-
 import type { DatasetRecord } from '@/lib/auth';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
+import { formatFieldLabel } from '@/lib/field-label';
 
 const records = [
   {
@@ -33,29 +34,52 @@ const records = [
   },
 ];
 
-const exportRecords: DatasetRecord[] = records.map((record) => ({
-  id: record.retailer.toLowerCase().replace(/\W+/g, '-'),
-  values: { Retailer: record.retailer, Product: record.product, Price: record.price, Availability: record.availability },
-  evidence: Object.fromEntries(['Retailer','Product','Price','Availability'].map((field) => [field, { sourceUrl: record.sourceUrl, quote: `${record.product} — ${record.price}${record.availability !== 'Unknown' ? ` · ${record.availability}` : ''}.` }])),
-}));
+function normalizedField(field: string) {
+  return field.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+}
 
-export function DatasetReview({ onSaved, workspaceName = 'Import.io Studio', datasetName = 'Competitor prices', savedDatasetId = '' }: { onSaved?: (records?: DatasetRecord[], fields?: string[]) => void; workspaceName?: string; datasetName?: string; savedDatasetId?: string } = {}) {
+function recordValue(record: (typeof records)[number], field: string) {
+  const key = normalizedField(field);
+  if (key === 'retailer' || key === 'seller' || key === 'company') return record.retailer;
+  if (key === 'product' || key === 'product_name' || key === 'name') return record.product;
+  if (key === 'price' || key === 'starting_price') return record.price;
+  if (key === 'availability' || key === 'stock' || key === 'status') return record.availability === 'Unknown' ? null : record.availability;
+  if (key === 'url' || key === 'pricing_url') return record.sourceUrl;
+  return null;
+}
+
+export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io Studio', datasetName = 'Competitor prices', savedDatasetId = '' }: { fields?: string[]; onSaved?: (records?: DatasetRecord[], fields?: string[]) => void; workspaceName?: string; datasetName?: string; savedDatasetId?: string } = {}) {
   const [tab, setTab] = useState('table');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [feedback, setFeedback] = useState('');
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const selectedRecord = records[selectedIndex];
+  const outputFields = (fields.length ? fields : ['retailer','product_name','price','availability']).filter((field) => normalizedField(field) !== 'source');
+  const exportRecords: DatasetRecord[] = records.map((record) => ({
+    id: record.retailer.toLowerCase().replace(/\W+/g, '-'),
+    values: Object.fromEntries(outputFields.map((field) => [field, recordValue(record, field)])),
+    evidence: Object.fromEntries(outputFields.map((field) => {
+      const value = recordValue(record, field);
+      return [field, { sourceUrl: record.sourceUrl, quote: value === null ? 'Not stated · unknown' : `${record.product} — ${record.price}${record.availability !== 'Unknown' ? ` · ${record.availability}` : ''}.` }];
+    })),
+  }));
+  const hasAvailability = outputFields.some((field) => ['availability','stock','status'].includes(normalizedField(field)));
+  const jsonRows = exportRecords.map((record, index) => ({
+    source: new URL(records[index].sourceUrl).hostname,
+    ...record.values,
+  }));
 
-  function openEvidence(index: number, field: string, value: string) {
+  function openEvidence(index: number, field: string, value: string | null) {
     const record = records[index];
+    const projectedRecord = exportRecords[index];
+    const sourceField = field === 'source' ? outputFields[0] : field;
+    const retained = sourceField ? projectedRecord.evidence[sourceField] : undefined;
     setSelectedIndex(index);
     setEvidence({
       field,
       record: `${record.retailer} · ${record.product}`,
-      value,
-      quote: value === 'Unknown'
-        ? `${record.product} is listed at ${record.price}; no supported availability statement appears on the captured page.`
-        : `${record.product} — ${record.price} · ${record.availability}.`,
+      value: value ?? 'null',
+      quote: retained?.quote ?? 'Source page retained.',
       sourceUrl: record.sourceUrl,
       captureLabel: `${record.retailer} product capture`,
       kind: 'product',
@@ -64,18 +88,18 @@ export function DatasetReview({ onSaved, workspaceName = 'Import.io Studio', dat
 
   function saveDataset() {
     setFeedback(`Dataset saved to ${workspaceName}.`);
-    onSaved?.(exportRecords, ['Retailer','Product','Price','Availability']);
+    onSaved?.(exportRecords, outputFields);
   }
 
   return (
     <section className="panel dataset-review">
       <div className="review-summary">
         <span>PREVIEW COMPLETE · RUN_7F3A</span>
-        <strong>3 retailers checked. 1 field needs review.</strong>
+        <strong>{hasAvailability ? '3 retailers checked. 1 field needs review.' : '3 retailers checked. Records are ready to review.'}</strong>
       </div>
-      <div className="review-warning">
+      {hasAvailability ? <div className="review-warning">
         Availability for Trail Shop is unresolved—not rejected. The record remains in the dataset.
-      </div>
+      </div> : null}
       {feedback ? <p className="review-feedback" role="status">{feedback}</p> : null}
       <Tabs className="dataset-view-tabs" value={tab} onValueChange={setTab}>
         <TabsList>
@@ -90,11 +114,8 @@ export function DatasetReview({ onSaved, workspaceName = 'Import.io Studio', dat
             <table className="data-table review-table">
               <thead>
                 <tr>
-                  <th>Retailer</th>
-                  <th>Product name</th>
-                  <th>Price</th>
-                  <th>Availability</th>
-                  <th>Evidence</th>
+                  <th>Source</th>
+                  {outputFields.map((field) => <th key={field}>{formatFieldLabel(field)}</th>)}
                 </tr>
               </thead>
               <tbody>
@@ -103,20 +124,11 @@ export function DatasetReview({ onSaved, workspaceName = 'Import.io Studio', dat
                     className={selectedIndex === index ? 'selected' : ''}
                     key={record.retailer}
                   >
-                    <td><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, 'Retailer', record.retailer)}>{record.retailer}</button></td>
-                    <td><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, 'Product', record.product)}>{record.product}</button></td>
-                    <td><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, 'Price', record.price)}>{record.price}</button></td>
-                    <td><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, 'Availability', record.availability)}>{record.availability === 'Unknown' ? <Badge tone="warning">Unknown</Badge> : record.availability}</button></td>
-                    <td>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-link"
-                        onClick={() => openEvidence(index, 'Evidence', record.evidence)}
-                      >
-                        {record.evidence}
-                      </Button>
-                    </td>
+                    <td><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, 'source', record.sourceUrl)}>{new URL(record.sourceUrl).hostname}</button></td>
+                    {outputFields.map((field) => {
+                      const value = exportRecords[index].values[field];
+                      return <td key={field}><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, field, value)}>{value === null ? <><code>null</code><span className="unknown-value">Not stated · unknown</span></> : value}</button></td>;
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -125,11 +137,10 @@ export function DatasetReview({ onSaved, workspaceName = 'Import.io Studio', dat
           <aside className="field-evidence">
             <div>
               <span>FIELD EVIDENCE</span>
-              <strong>{selectedRecord.retailer} · {selectedRecord.product}</strong>
+              <strong>{new URL(selectedRecord.sourceUrl).hostname}</strong>
             </div>
             <blockquote>
-              “{selectedRecord.product} — {selectedRecord.price}
-              {selectedRecord.availability !== 'Unknown' ? ` — ${selectedRecord.availability}` : ''}.”
+              “{evidence?.quote ?? exportRecords[selectedIndex].evidence[outputFields[0]]?.quote ?? 'Not stated · unknown'}”
             </blockquote>
             <dl>
               <div>
@@ -144,28 +155,27 @@ export function DatasetReview({ onSaved, workspaceName = 'Import.io Studio', dat
           </aside>
         </>
       ) : tab === 'json' ? (
-        <pre className="code-block dataset-json">{JSON.stringify(records, null, 2)}</pre>
+        <pre className="code-block dataset-json">{JSON.stringify(jsonRows, null, 2)}</pre>
       ) : (
         <div className="record-evidence-grid">
-          {records.map((record, index) => (
+          {records.map((record, index) => {
+            const hasUnknown = Object.values(exportRecords[index].values).some((value) => value === null);
+            const firstField = outputFields[0];
+            const firstEvidence = firstField ? exportRecords[index].evidence[firstField] : undefined;
+            return (
             <article className="record-evidence-card" key={record.retailer}>
               <header>
                 <div>
                   <span>RECORD {String(index + 1).padStart(2, '0')}</span>
                   <strong>{record.retailer}</strong>
                 </div>
-                <Badge tone={record.availability === 'Unknown' ? 'warning' : 'success'}>
-                  {record.availability === 'Unknown' ? 'Needs review' : 'Fully supported'}
+                <Badge tone={hasUnknown ? 'warning' : 'success'}>
+                  {hasUnknown ? 'Needs review' : 'Fully supported'}
                 </Badge>
               </header>
-              <dl>
-                <div><dt>Product</dt><dd>{record.product}</dd></div>
-                <div><dt>Price</dt><dd>{record.price}</dd></div>
-                <div><dt>Availability</dt><dd>{record.availability}</dd></div>
-              </dl>
+              <dl>{outputFields.map((field) => <div key={field}><dt>{formatFieldLabel(field)}</dt><dd>{exportRecords[index].values[field] ?? <><code>null</code> · Not stated · unknown</>}</dd></div>)}</dl>
               <blockquote>
-                “{record.product} — {record.price}
-                {record.availability !== 'Unknown' ? ` — ${record.availability}` : ''}.”
+                “{firstEvidence?.quote ?? 'Not stated · unknown'}”
               </blockquote>
               <footer>
                 <div>
@@ -175,13 +185,13 @@ export function DatasetReview({ onSaved, workspaceName = 'Import.io Studio', dat
                 <Button
                   variant="secondary"
                   size="sm"
-                  onClick={() => openEvidence(index, 'Evidence', record.evidence)}
+                  onClick={() => openEvidence(index, firstField ?? 'Evidence', firstField ? exportRecords[index].values[firstField] : null)}
                 >
                   Open evidence
                 </Button>
               </footer>
             </article>
-          ))}
+          );})}
         </div>
       )}
       <footer className="review-footer">

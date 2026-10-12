@@ -45,7 +45,7 @@ export function ReviewInbox() {
 
   const showUndoToast = useCallback((message: string, undo: () => void) => {
     toast(message, {
-      duration: 5000,
+      duration: 8000,
       action: { label: 'Undo', onClick: undo },
     });
   }, []);
@@ -69,9 +69,15 @@ export function ReviewInbox() {
     setEditing(false);
     setReviewedValue('');
     setReviewNote('');
-    setFeedback('Retry queued for trail-shop.example. The item will remain here until the retry finishes.');
-    showUndoToast('Retry queued', () => setFeedback(''));
-  }, [mayReview, showUndoToast]);
+    setFeedback('');
+    setDecisionSummary('Trailhead availability was resolved by retrying the source.');
+    auth.setDatasetReviewState('competitor-prices', 0);
+    acceptReviewItem();
+    showUndoToast('Retry completed', () => {
+      auth.setDatasetReviewState('competitor-prices', 1);
+      restoreReviewItem();
+    });
+  }, [acceptReviewItem, auth, mayReview, restoreReviewItem, showUndoToast]);
 
   function saveReviewedValue() {
     if (!mayReview) return;
@@ -83,9 +89,11 @@ export function ReviewInbox() {
     setFeedback('');
     setDecisionSummary(`Trailhead availability was reviewed and saved as “${value}”.`);
     auth.updateDatasetValue('competitor-prices', 'trail-shop', 'Availability', value, auth.currentUser?.name ?? 'Jordan Davis', note);
+    auth.setDatasetReviewState('competitor-prices', 0);
     acceptReviewItem();
     showUndoToast('Value saved', () => {
       auth.updateDatasetValue('competitor-prices', 'trail-shop', 'Availability', 'Unknown');
+      auth.setDatasetReviewState('competitor-prices', 1);
       restoreReviewItem();
     });
   }
@@ -96,9 +104,13 @@ export function ReviewInbox() {
     setReviewedValue('');
     setFeedback('');
     setDecisionSummary(acceptedUnknownSummary);
+    auth.setDatasetReviewState('competitor-prices', 0);
     acceptReviewItem();
-    showUndoToast('Unknown value accepted', restoreReviewItem);
-  }, [acceptReviewItem, mayReview, restoreReviewItem, showUndoToast]);
+    showUndoToast('Unknown value accepted', () => {
+      auth.setDatasetReviewState('competitor-prices', 1);
+      restoreReviewItem();
+    });
+  }, [acceptReviewItem, auth, mayReview, restoreReviewItem, showUndoToast]);
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
@@ -131,6 +143,8 @@ export function ReviewInbox() {
     setReviewedValue('');
     setReviewNote('');
     setFeedback('');
+    auth.updateDatasetValue('competitor-prices', 'trail-shop', 'Availability', 'Unknown');
+    auth.setDatasetReviewState('competitor-prices', 1);
     restoreReviewItem();
   }
 

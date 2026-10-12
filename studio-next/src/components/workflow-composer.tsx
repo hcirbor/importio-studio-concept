@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUp,
@@ -43,6 +43,18 @@ import { RunSession } from './run-session';
 import { WorkflowScenarioReview } from './workflow-scenario-review';
 import { can, useAuth, viewerTooltip } from '@/lib/auth';
 import type { DatasetRecord } from '@/lib/auth';
+import { uniqueDatasetIdentity } from '@/lib/dataset-slug';
+import { formatFieldLabel } from '@/lib/field-label';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 const inputMethods = [
   ['urls', 'Paste URLs or domains'],
@@ -55,6 +67,10 @@ const inputMethods = [
 
 type InputMethod = (typeof inputMethods)[number][0];
 type ComposerTool = 'Sources' | 'Browser actions' | 'Fields' | 'Limits' | 'Rules' | 'Improve prompt';
+type FieldType = 'text' | 'number' | 'currency' | 'boolean' | 'duration' | 'url' | 'date' | 'status';
+type PlanField = { id: string; name: string; type: FieldType };
+
+const fieldTypeOptions: FieldType[] = ['text', 'number', 'currency', 'boolean', 'duration', 'url', 'date', 'status'];
 
 const workflowDraftKey = 'importio-studio-workflow-draft';
 
@@ -84,34 +100,61 @@ const workflowPromptExamples = visibleStarterKeys.map((key) => ({
   text: workflowTemplates[key].text,
 }));
 
+function normalizeFieldName(value: string) {
+  return value
+    .trim()
+    .replace(/^(?:(?:please\s+)?(?:return|extract|collect|get|include|show)\s+|(?:the|a|an|all|each|their|its|current)\s+)+/i, '')
+    .replace(/\s+(?:from|for|on|across|per)\b.*$/i, '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '');
+}
+
+function canonicalFieldName(value: string) {
+  const normalized = normalizeFieldName(value);
+  const aliases: Record<string, string> = {
+    pricing_url: 'pricing_url',
+    pricing_link: 'pricing_url',
+    starting_price: 'starting_price',
+    free_plan: 'free_plan',
+    free_trial: 'free_trial',
+    free_trial_length: 'free_trial',
+    trial_length: 'free_trial',
+    plan_details: 'plan_details',
+    company: 'company',
+    company_name: 'company',
+    product_name: 'product_name',
+    current_price: 'price',
+    price: 'price',
+    stock: 'availability',
+    availability: 'availability',
+    url: 'url',
+    rating: 'rating',
+    seller: 'seller',
+    map: 'map',
+  };
+  if (aliases[normalized]) return aliases[normalized];
+  if (!normalized || /(?:official_pricing_page|pricing_page|(?:one_)?record(?:_per)?|pagination|this_page|these_pages|products?_in_)/.test(normalized)) return '';
+  return normalized;
+}
+
+function fieldsFromPrompt(request: string) {
+  const candidates: string[][] = [];
+  const pattern = /\b(?:return|extract|collect)\b\s+([^.;!?]+)/gi;
+  for (const match of request.matchAll(pattern)) {
+    const phrase = match[1].trim();
+    const parts = phrase.split(/,|\band\b/i).map((part) => part.trim()).filter(Boolean);
+    const names = parts.map(canonicalFieldName).filter(Boolean);
+    const listLike = /,|\band\b/i.test(phrase);
+    if (names.length > 1 || (names.length === 1 && (!listLike || parts.length === 1))) candidates.push(names);
+  }
+  return candidates.sort((left, right) => right.length - left.length)[0] ?? [];
+}
+
 function parsePromptSpecification(request: string) {
   const domains = Array.from(new Set(request.match(/\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}\b/gi)?.map((value) => value.toLowerCase()) ?? []));
-  const fields = new Set<string>();
-  const patterns: Array<[string, RegExp]> = [
-    ['starting_price', /\bstarting\s+price\b/i],
-    ['free_plan', /\bfree\s+plan\b/i],
-    ['free_trial', /\b(?:free\s+trial(?:\s+length)?|trial(?:\s+length)?)\b/i],
-    ['availability', /\b(?:stock|availability)\b/i],
-    ['product_name', /\b(?:product\s+name|product|name)\b/i],
-    ['url', /\burl\b/i],
-    ['rating', /\brating\b/i],
-    ['seller', /\bseller\b/i],
-    ['MAP', /\bMAP\b/],
-    ['plan', /\bplan\b/i],
-    ['price', /\bprice\b/i],
-  ];
-  patterns.forEach(([name, pattern]) => { if (pattern.test(request)) fields.add(name); });
-  if (fields.has('starting_price')) fields.delete('price');
-  if (fields.has('free_plan') || fields.has('free_trial')) fields.delete('plan');
-  const listed = request.match(/\b(?:return|extract|find)\s+([^.;]+)/i)?.[1];
-  if (listed) {
-    listed.split(/,|\band\b/i).map((item) => item.trim().replace(/\b(?:from|for|on)\b.*$/i, '').trim()).filter((item) => item && !domains.some((domain) => item.includes(domain))).forEach((item) => {
-      const canonical = patterns.find(([, pattern]) => pattern.test(item))?.[0];
-      if (canonical) fields.add(canonical);
-      else if (item.length < 36) fields.add(item.toLowerCase().replace(/^(?:the|a|an)\s+/i, '').replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''));
-    });
-  }
-  return { domains, fields: Array.from(fields) };
+  return { domains, fields: Array.from(new Set(fieldsFromPrompt(request))) };
 }
 
 function inferWorkflowTemplate(request: string): WorkflowTemplateKey | null {
@@ -125,18 +168,20 @@ function inferWorkflowTemplate(request: string): WorkflowTemplateKey | null {
 }
 
 function sourceLabelForDataset(domain: string) {
-  return domain.split('.')[0].split('-').filter(Boolean).map((part) => part.replace(/^./, (letter) => letter.toUpperCase())).join(' ');
-}
-
-function nextDatasetId(existingIds: string[]) {
-  const used = new Set(existingIds);
-  let index = 1;
-  while (used.has(`saved-dataset-${index}`)) index += 1;
-  return `saved-dataset-${index}`;
+  const host = domain.replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '').toLowerCase();
+  const root = host.split('.')[0];
+  const knownNames: Record<string, string> = {
+    cloudharbor: 'CloudHarbor',
+    letterloop: 'Letterloop',
+    brightsend: 'BrightSend',
+  };
+  return knownNames[root] ?? root.split('-').filter(Boolean).map((part) => part.replace(/^./, (letter) => letter.toUpperCase())).join(' ');
 }
 
 type WorkflowDraft = {
   dirty?: boolean;
+  workflowName?: string;
+  fieldTypes?: Record<string, FieldType>;
   selected: WorkflowTemplateKey;
   mode: string;
   inputMethod: InputMethod;
@@ -163,6 +208,21 @@ const templateFields: Record<WorkflowTemplateKey, string> = {
   discover: 'company, location, product_categories, minimum_order',
   monitor: 'price, availability',
 };
+
+function inferredFieldType(field: string) {
+  const normalized = field.toLowerCase().replaceAll(' ', '_');
+  if (/(?:^|_)(?:price|map)(?:_|$)/.test(normalized)) return 'currency';
+  if (/(?:^|_)(?:url|link)(?:_|$)/.test(normalized)) return 'url';
+  if (/(?:^|_)(?:stock|availability|status)(?:_|$)/.test(normalized)) return 'status';
+  if (/(?:^|_)(?:rating|count|quantity)(?:_|$)/.test(normalized)) return 'number';
+  if (/(?:^|_)(?:free_plan|available)(?:_|$)/.test(normalized)) return 'boolean';
+  if (/(?:^|_)(?:trial|duration|length)(?:_|$)/.test(normalized)) return 'duration';
+  return 'text';
+}
+
+function inferredFieldTypes(fields: string[]) {
+  return Object.fromEntries(fields.map((field) => [field, inferredFieldType(field)])) as Record<string, FieldType>;
+}
 
 function parseCsvRows(text: string) {
   return text.replace(/\r/g, '').split('\n').filter((line) => line.trim()).map((line) => {
@@ -228,6 +288,7 @@ export function WorkflowComposer() {
 
 function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt }: { initialTemplate: WorkflowTemplateKey; initialInput: InputMethod; initialPrompt: string }) {
   const auth = useAuth();
+  const router = useRouter();
   const mayRun = can(auth.session, 'run');
   const initialWorkspaceSources = useRef(auth.sources);
   const activeDraftKey = `${workflowDraftKey}:${auth.session?.workspaceId ?? 'signed-out'}`;
@@ -241,7 +302,14 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   const [templatesOpen, setTemplatesOpen] = useState(true);
   const [templateBrowserOpen, setTemplateBrowserOpen] = useState(false);
   const [activeTool, setActiveTool] = useState<ComposerTool | null>(null);
-  const [fields, setFields] = useState(initialPrompt ? parsePromptSpecification(initialPrompt).fields.join(', ') : '');
+  const parsedInitialFields = initialPrompt ? parsePromptSpecification(initialPrompt).fields : [];
+  const initialFieldNames = initialPrompt
+    ? (parsedInitialFields.length ? parsedInitialFields : templateFields[initialTemplate].split(',').map((field) => field.trim()))
+    : [];
+  const [fields, setFields] = useState(initialFieldNames.join(', '));
+  const [fieldTypes, setFieldTypes] = useState<Record<string, FieldType>>(() => inferredFieldTypes(initialFieldNames));
+  const [editingPlanFields, setEditingPlanFields] = useState(false);
+  const [planFields, setPlanFields] = useState<PlanField[]>([]);
   const [access, setAccess] = useState('Approved public sources');
   const [downloads, setDownloads] = useState('Block downloads');
   const [region, setRegion] = useState('Automatic');
@@ -271,6 +339,9 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   const [csvDragging, setCsvDragging] = useState(false);
   const [researchResolved, setResearchResolved] = useState(false);
   const [savedDatasetId, setSavedDatasetId] = useState('');
+  const [savedDatasetTitle, setSavedDatasetTitle] = useState('');
+  const [runId, setRunId] = useState('');
+  const [workflowName, setWorkflowName] = useState('');
   const [monitorDialogOpen, setMonitorDialogOpen] = useState(false);
   const [monitorSchedule, setMonitorSchedule] = useState('Daily');
   const [monitorFields, setMonitorFields] = useState<string[]>(['Price', 'Availability']);
@@ -278,6 +349,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   const [monitorThreshold, setMonitorThreshold] = useState('€230');
   const [monitorNotifyVia, setMonitorNotifyVia] = useState<'Email'|'Slack'|'Webhook'>('Email');
   const [monitorCreated, setMonitorCreated] = useState(false);
+  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [draftReady, setDraftReady] = useState(false);
   const [draftDirty, setDraftDirty] = useState(false);
   const [draftStatus, setDraftStatus] = useState('');
@@ -286,6 +358,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   const [demoStopped, setDemoStopped] = useState(Boolean(initialPrompt));
   const skipNextDraftSave = useRef(false);
   const csvInputRef = useRef<HTMLInputElement>(null);
+  const nextFieldId = useRef(0);
   const template = useMemo(() => workflowTemplates[selected], [selected]);
   const promptSpecification = useMemo(() => parsePromptSpecification(prompt), [prompt]);
   function markDraftDirty() {
@@ -296,6 +369,12 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     markDraftDirty();
     setter(value);
   }
+  function updateFieldsText(value: string) {
+    markDraftDirty();
+    setFields(value);
+    const names = value.split(',').map((field) => normalizeFieldName(field)).filter(Boolean);
+    setFieldTypes((current) => Object.fromEntries(names.map((name) => [name, current[name] ?? inferredFieldType(name)])) as Record<string, FieldType>);
+  }
   function updatePrompt(value: string) {
     markDraftDirty();
     setPrompt(value);
@@ -304,10 +383,11 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     if (inferred) setSelected(inferred);
     if (parsed.domains.length) setSources(parsed.domains.map((domain) => `https://${domain}`).join('\n'));
     setFields(parsed.fields.join(', '));
+    setFieldTypes(inferredFieldTypes(parsed.fields));
   }
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent('studio:workflow-title', { detail: template.title }));
-  }, [template.title]);
+    window.dispatchEvent(new CustomEvent('studio:workflow-title', { detail: prompt.trim() ? template.title : 'New workflow' }));
+  }, [prompt, template.title]);
   useEffect(() => {
     if (!auth.sources.length || promptSpecification.domains.length) return;
     const timer = window.setTimeout(() => setSources((current) => [...new Set([...current.split('\n').map((source) => source.trim()).filter(Boolean), ...auth.sources])].join('\n')), 0);
@@ -361,11 +441,15 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
           const hasUserDraft = draft.dirty ?? (Boolean(storedPrompt.trim()) && !isGeneratedPrompt);
           if (hasUserDraft && !initialPrompt) {
             if (draft.selected && workflowTemplates[draft.selected]) setSelected(draft.selected);
+            setWorkflowName(draft.workflowName ?? '');
             if (draft.mode === 'prompt' || draft.mode === 'guided') setMode(draft.mode);
             if (inputMethods.some(([key]) => key === draft.inputMethod)) setInputMethod(draft.inputMethod);
             setPrompt(storedPrompt);
             setSources(draft.sources ?? templateSources(initialTemplate, initialWorkspaceSources.current));
-            setFields(draft.fields ?? templateFields[initialTemplate]);
+            const restoredFields = draft.fields ?? templateFields[initialTemplate];
+            const restoredFieldNames = restoredFields.split(',').map((field) => normalizeFieldName(field)).filter(Boolean);
+            setFields(restoredFields);
+            setFieldTypes(draft.fieldTypes ?? inferredFieldTypes(restoredFieldNames));
             setAccess(draft.access ?? 'Approved public sources');
             setDownloads(draft.downloads ?? 'Block downloads');
             setRegion(draft.region ?? 'Automatic');
@@ -396,12 +480,12 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     }
     if (!draftDirty || (!demoStopped && !prompt.trim() && mode === 'prompt')) return;
     const timer = window.setTimeout(() => {
-      const draft: WorkflowDraft = { dirty: true, selected, mode, inputMethod, prompt, sources, fields, access, downloads, region, missingData, evidence, deduplication, validation, maxPages, maxRecords, timeout };
+      const draft: WorkflowDraft = { dirty: true, workflowName, fieldTypes, selected, mode, inputMethod, prompt, sources, fields, access, downloads, region, missingData, evidence, deduplication, validation, maxPages, maxRecords, timeout };
       localStorage.setItem(activeDraftKey, JSON.stringify(draft));
       setDraftStatus('Draft saved · just now');
     }, 300);
     return () => window.clearTimeout(timer);
-  }, [access, activeDraftKey, deduplication, demoStopped, downloads, draftDirty, draftReady, evidence, fields, inputMethod, maxPages, maxRecords, missingData, mode, prompt, region, selected, sources, timeout, validation]);
+  }, [access, activeDraftKey, deduplication, demoStopped, downloads, draftDirty, draftReady, evidence, fieldTypes, fields, inputMethod, maxPages, maxRecords, missingData, mode, prompt, region, selected, sources, timeout, validation, workflowName]);
   function setTemplateVisibility(open: boolean) {
     setTemplatesOpen(open);
     sessionStorage.setItem('studio-templates-open', String(open));
@@ -413,11 +497,19 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     setMode(initialInput === 'research' ? 'guided' : 'prompt');
     setInputMethod(initialInput);
     setPrompt(initialPrompt);
+    setWorkflowName('');
     setDemoStopped(Boolean(initialPrompt));
     setDraftDirty(false);
     setExampleIndex(0);
     setSources(templateSources(initialTemplate, auth.sources));
-    setFields(initialPrompt ? parsePromptSpecification(initialPrompt).fields.join(', ') : '');
+    const parsedResetFields = initialPrompt ? parsePromptSpecification(initialPrompt).fields : [];
+    const resetFieldNames = initialPrompt
+      ? (parsedResetFields.length ? parsedResetFields : templateFields[initialTemplate].split(',').map((field) => field.trim()))
+      : [];
+    setFields(resetFieldNames.join(', '));
+    setFieldTypes(inferredFieldTypes(resetFieldNames));
+    setEditingPlanFields(false);
+    setPlanFields([]);
     setAccess('Approved public sources');
     setDownloads('Block downloads');
     setRegion('Automatic');
@@ -430,16 +522,62 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     setTimeoutValue('5 minutes');
     setDraftStatus('');
   }
+  function resetNewWorkflow() {
+    const unsavedRun = Boolean(runId) && !savedDatasetId && !monitorCreated;
+    if (unsavedRun) {
+      setDiscardDialogOpen(true);
+      return;
+    }
+    performNewWorkflowReset();
+  }
+  function performNewWorkflowReset() {
+    localStorage.removeItem(activeDraftKey);
+    skipNextDraftSave.current = true;
+    setStage(0);
+    setMode('prompt');
+    setSelected('research');
+    setPrompt('');
+    setSources(templateSources('research', auth.sources));
+    setInputMethod('urls');
+    setFields('');
+    setFieldTypes({});
+    setEditingPlanFields(false);
+    setPlanFields([]);
+    setActiveTool(null);
+    setResearchResolved(false);
+    setSavedDatasetId('');
+    setSavedDatasetTitle('');
+    setWorkflowName('');
+    setRunId('');
+    setMonitorDialogOpen(false);
+    setMonitorCreated(false);
+    setDraftDirty(false);
+    setDraftStatus('');
+    setDemoStopped(false);
+    setExampleIndex(0);
+    setTypedExample('');
+    setDiscardDialogOpen(false);
+    router.replace('/build', { scroll: false });
+  }
+  useEffect(() => {
+    window.addEventListener('studio:new-workflow', resetNewWorkflow);
+    return () => window.removeEventListener('studio:new-workflow', resetNewWorkflow);
+  });
   function applyTemplate(key: WorkflowTemplateKey) {
     markDraftDirty();
     setSelected(key);
     setPrompt(workflowTemplates[key].text);
     setSources(templateSources(key, auth.sources));
     setFields(templateFields[key]);
+    setFieldTypes(inferredFieldTypes(templateFields[key].split(',').map((field) => field.trim())));
+    setEditingPlanFields(false);
+    setPlanFields([]);
     setInputMethod('urls');
     setActiveTool(null);
     setResearchResolved(false);
     setSavedDatasetId('');
+    setSavedDatasetTitle('');
+    setWorkflowName('');
     setSourcePulse(true);
     window.setTimeout(() => setSourcePulse(false), 520);
   }
@@ -516,9 +654,43 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     setGuidedFeedback(`${researchSet} added as labelled context. ${researchPolicy}.`);
   }
   const sourceCount = useMemo(() => new Set(sources.split('\n').map((source) => source.trim()).filter(Boolean)).size, [sources]);
-  const fieldCount = useMemo(() => fields.split(',').map((field) => field.trim()).filter(Boolean).length, [fields]);
+  const fieldNames = useMemo(() => fields.split(',').map((field) => normalizeFieldName(field)).filter(Boolean), [fields]);
+  const fieldCount = fieldNames.length;
   const understoodFieldCount = fieldCount;
-  const fieldNames = useMemo(() => fields.split(',').map((field) => field.trim()).filter(Boolean), [fields]);
+  const fieldDefinitions = useMemo(() => fieldNames.map((name, index) => ({
+    id: `field-${index}`,
+    name,
+    type: fieldTypes[name] ?? inferredFieldType(name),
+  })), [fieldNames, fieldTypes]);
+  const activeFieldRows = editingPlanFields ? planFields : fieldDefinitions;
+  const normalizedActiveFieldNames = activeFieldRows.map((field) => normalizeFieldName(field.name));
+  const duplicateFieldNames = normalizedActiveFieldNames.filter((name, index) => name && normalizedActiveFieldNames.indexOf(name) !== index);
+  const fieldValidationMessage = activeFieldRows.length === 0
+    ? 'Add at least one field.'
+    : activeFieldRows.some((field) => !field.name.trim())
+      ? 'Field names can’t be empty.'
+      : duplicateFieldNames.length
+        ? 'Field names must be unique.'
+        : '';
+  function syncPlanFieldRows(nextRows: PlanField[]) {
+    setPlanFields(nextRows);
+    const normalizedNames = nextRows.map((field) => normalizeFieldName(field.name));
+    setFields(normalizedNames.join(', '));
+    setFieldTypes(Object.fromEntries(nextRows.filter((field) => normalizeFieldName(field.name)).map((field) => [normalizeFieldName(field.name), field.type])) as Record<string, FieldType>);
+    markDraftDirty();
+  }
+  function openPlanFieldEditor() {
+    setPlanFields(fieldDefinitions.map((field) => ({ ...field, id: `plan-field-${nextFieldId.current += 1}` })));
+    setEditingPlanFields(true);
+  }
+  function finishPlanFieldEditor() {
+    if (fieldValidationMessage) return;
+    const normalizedRows = planFields.map((field) => ({ ...field, name: normalizeFieldName(field.name) }));
+    setPlanFields(normalizedRows);
+    setFields(normalizedRows.map((field) => field.name).join(', '));
+    setFieldTypes(Object.fromEntries(normalizedRows.map((field) => [field.name, field.type])) as Record<string, FieldType>);
+    setEditingPlanFields(false);
+  }
   const sourceDomains = useMemo(() => sources.split('\n').map((source) => source.trim()).filter(Boolean).map((source) => {
     try {
       return new URL(source.includes('://') ? source : `https://${source}`).hostname;
@@ -526,7 +698,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
       return source;
     }
   }), [sources]);
-  const datasetName = useMemo(() => {
+  const suggestedWorkflowName = useMemo(() => {
     const requestedDomains = promptSpecification.domains.length ? promptSpecification.domains : sourceDomains;
     const names = requestedDomains.map(sourceLabelForDataset).filter(Boolean);
     if (selected === 'research') return `Pricing · ${names.slice(0, 3).join(', ') || 'research'}`;
@@ -535,8 +707,9 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     if (selected === 'monitor') return `${names[0] || 'Page'} baseline`;
     return `${names[0] || 'Web'} research`;
   }, [promptSpecification.domains, selected, sourceDomains]);
+  const effectiveWorkflowName = workflowName.trim() || suggestedWorkflowName;
   const estimateQueries = Math.max(1, sourceCount) * Math.max(1, Number(maxPages) || 1);
-  const estimate = `${estimateQueries} ${estimateQueries === 1 ? 'query' : 'queries'} · ${(estimateQueries * 0.6).toFixed(1)} browser minutes · estimated cost $${(estimateQueries * 0.007).toFixed(2)}`;
+  const estimate = `${estimateQueries} ${estimateQueries === 1 ? 'query' : 'queries'} · ${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'} · ${(estimateQueries * 0.6).toFixed(1)} browser minutes · estimated cost $${(estimateQueries * 0.007).toFixed(2)}`;
   const urlSourceLabel = `${sourceCount} ${sourceCount === 1 ? 'source' : 'sources'}`;
   const guidedSourceLabel = inputMethod === 'urls'
     ? urlSourceLabel
@@ -577,13 +750,18 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
             : <section className="guided-source-card"><div className="guided-source-intro"><Eyebrow>Prior research</Eyebrow><strong>Continue from reviewed research</strong><p>Reuse retained leads as labelled context, then verify every requested fact against live sources.</p></div><div className="guided-option-controls"><div className="guided-option-grid guided-option-grid-three"><ToolSelect label="Prior research" value={researchSet} onValueChange={(value) => { markDraftDirty(); setResearchSet(value); setGuidedFeedback(''); }} options={['SaaS pricing research · 74 records','Retailer coverage study · 128 records','Supplier discovery · 42 records']} /><ToolSelect label="Reuse policy" value={researchPolicy} onValueChange={(value) => { markDraftDirty(); setResearchPolicy(value); setGuidedFeedback(''); }} options={['Use as leads; re-verify every fact','Use only to seed discovery']} /><div className="guided-retention"><span>Retention</span><strong>24 days remaining</strong></div></div><Button variant="secondary" type="button" onClick={usePriorResearch}>Use selected research</Button>{guidedFeedback ? <p className="guided-option-status" role="status">{guidedFeedback}</p> : null}</div></section>;
 
   const stepper = (
+    <>
     <div className="stepper" aria-label="Workflow progress">
       {['Describe', 'Review plan', 'Watch run', 'Review data'].map((label, index) => (
         <div className="step-segment" key={label}>
           <Button
             variant="ghost"
             className={index === stage ? 'step active' : index < stage ? 'step done' : 'step'}
-            onClick={() => index <= stage && setStage(index)}
+            onClick={() => {
+              if (index > stage) return;
+              if (index === 0) setEditingPlanFields(false);
+              setStage(index);
+            }}
             disabled={index > stage}
           >
             <i>{index < stage ? '✓' : index + 1}</i>
@@ -593,9 +771,21 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
         </div>
       ))}
     </div>
+    <AlertDialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Discard this run?</AlertDialogTitle>
+          <AlertDialogDescription>The run and its results won&apos;t be saved.</AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel asChild><Button variant="secondary">Cancel</Button></AlertDialogCancel>
+          <AlertDialogAction asChild><Button variant="primary" onClick={performNewWorkflowReset}>Discard</Button></AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 
-  const [runId, setRunId] = useState('');
   const scenarioRunId = selected === 'research'
     ? 'run_batch_91af'
     : selected === 'compare'
@@ -607,10 +797,13 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     const nextRunId = uniqueRunId(new Set(auth.runs.map((run) => run.id)));
     const completed = selected !== 'research' || promptSpecification.domains.length > 0;
     const needsReview = selected === 'compare' && promptSpecification.domains.length === 0;
+    setSavedDatasetId('');
+    setSavedDatasetTitle('');
     auth.addRun({
       id: nextRunId,
       when: completed ? 'Just now' : 'Running now',
-      pipeline: selected === 'research' ? 'SaaS pricing research' : template.title,
+      createdAt: Date.now(),
+      pipeline: effectiveWorkflowName,
       coverage: completed ? `${sourceCount} / ${sourceCount} sources` : `2 / ${sourceCount} sources`,
       records: completed ? String(reviewedRecordCount) : '2',
       queries: estimateQueries,
@@ -637,53 +830,70 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   }
 
   function saveDataset(records?: DatasetRecord[], savedFields?: string[]) {
-    const datasetId = nextDatasetId(auth.datasets.map((dataset) => dataset.id));
+    const dataset = uniqueDatasetIdentity(effectiveWorkflowName, auth.datasets.map((item) => item.id));
     const needsReview = promptSpecification.domains.length === 0 && (selected === 'compare' || (selected === 'research' && !researchResolved));
     auth.addDataset({
-      id: datasetId,
+      id: dataset.id,
       version: 'DATASET · V1',
-      title: datasetName,
+      title: dataset.title,
       detail: `${reviewedRecordCount} ${reviewedRecordCount === 1 ? 'record' : 'records'} · ${fieldCount} fields${needsReview ? ' · 1 unresolved' : ' · fully validated'}`,
       status: needsReview ? 'Needs review' : 'Validated',
       tone: needsReview ? 'warning' : 'success',
-      href: `/datasets/${datasetId}`,
+      href: `/datasets/${dataset.id}`,
       recordCount: reviewedRecordCount,
       fields: savedFields ?? fieldNames,
       lastUpdated: 'Just now',
+      updatedAt: Date.now(),
+      unresolvedCount: needsReview ? 1 : 0,
       sourceWorkflow: template.title,
       sourceRunId: runId,
       records,
     });
-    setSavedDatasetId(datasetId);
+    setSavedDatasetId(dataset.id);
+    setSavedDatasetTitle(dataset.title);
   }
 
   function createMonitor() {
-    const baselineTitle = datasetName;
-    const datasetId = nextDatasetId(auth.datasets.map((dataset) => dataset.id));
+    const baselineTitle = effectiveWorkflowName;
+    const dataset = uniqueDatasetIdentity(baselineTitle, auth.datasets.map((item) => item.id));
     const monitorAlertRule = monitorAlertWhen === 'Price falls below' ? `Price falls below ${monitorThreshold}` : monitorAlertWhen;
+    const baselineSource = sourceDomains[0] || 'northwind-outdoors.example';
+    const baselineRecords: DatasetRecord[] = [0, 1].map((index) => ({
+      id: `baseline-${index + 1}`,
+      values: Object.fromEntries(fieldNames.map((field) => {
+        const key = normalizeFieldName(field);
+        if (key === 'price' || key === 'starting_price') return [field, '€249'];
+        if (key === 'availability' || key === 'stock' || key === 'status') return [field, 'In stock'];
+        return [field, null];
+      })),
+      evidence: Object.fromEntries(fieldNames.map((field) => {
+        const key = normalizeFieldName(field);
+        const known = ['price','starting_price','availability','stock','status'].includes(key);
+        return [field, { sourceUrl: `https://${baselineSource}`, quote: known ? 'Trailhead 2P Tent — €249 · In stock.' : 'Not stated · unknown' }];
+      })),
+    }));
     auth.addDataset({
-      id: datasetId,
+      id: dataset.id,
       version: 'DATASET · V1',
-      title: baselineTitle,
-      detail: '2 records · 2 fields · fully validated',
+      title: dataset.title,
+      detail: `2 records · ${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'} · fully validated`,
       status: 'Validated',
       tone: 'success',
-      href: `/datasets/${datasetId}`,
+      href: `/datasets/${dataset.id}`,
       recordCount: 2,
-      fields: ['Price','Availability'],
+      fields: fieldNames,
       lastUpdated: 'Just now',
-      sourceWorkflow: template.title,
+      updatedAt: Date.now(),
+      unresolvedCount: 0,
+      sourceWorkflow: effectiveWorkflowName,
       sourceRunId: runId,
-      records: [
-        {id:'price',values:{Field:'Price',Baseline:'€249'},evidence:{Field:{sourceUrl:'https://northwind-outdoors.example/tents/trailhead-2p',quote:'Trailhead 2P Tent — €249 · In stock.'},Baseline:{sourceUrl:'https://northwind-outdoors.example/tents/trailhead-2p',quote:'Trailhead 2P Tent — €249 · In stock.'}}},
-        {id:'availability',values:{Field:'Availability',Baseline:'In stock'},evidence:{Field:{sourceUrl:'https://northwind-outdoors.example/tents/trailhead-2p',quote:'Trailhead 2P Tent — €249 · In stock.'},Baseline:{sourceUrl:'https://northwind-outdoors.example/tents/trailhead-2p',quote:'Trailhead 2P Tent — €249 · In stock.'}}},
-      ],
+      records: baselineRecords,
     });
     auth.addMonitor({
       id: `monitor-${runId}`,
       name: 'Trailhead price and availability',
       detail: `${monitorAlertRule} · ${monitorNotifyVia}`,
-      baselineDataset: baselineTitle,
+      baselineDataset: dataset.title,
       schedule: monitorSchedule,
       lastChange: 'Not checked yet',
       status: 'Scheduled',
@@ -692,7 +902,8 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
       alertRule: monitorAlertRule,
       notifyVia: monitorNotifyVia,
     });
-    setSavedDatasetId(datasetId);
+    setSavedDatasetId(dataset.id);
+    setSavedDatasetTitle(dataset.title);
     setMonitorCreated(true);
     setMonitorDialogOpen(false);
   }
@@ -742,6 +953,11 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
                   </div>
                 </li>
               </ol>
+              <label className="plan-workflow-name">
+                <span>Workflow name</span>
+                <Input value={workflowName || suggestedWorkflowName} onChange={(event) => { markDraftDirty(); setWorkflowName(event.target.value); }} aria-label="Workflow name" />
+                <small>Suggested from your request · editable</small>
+              </label>
             </article>
 
             <aside className="panel plan-contract">
@@ -757,12 +973,39 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
               </dl>
               <div className="plan-contract-details">
                 <div><span>Source domains</span><ul>{sourceDomains.map((domain) => <li key={domain}>{domain}</li>)}</ul></div>
-                <div><span>Field names</span><ul>{fieldNames.map((field) => <li key={field}>{field.replaceAll('_', ' ')}</li>)}</ul></div>
+                <div>
+                  <div className="plan-detail-heading">
+                    <span>Fields</span>
+                    {editingPlanFields
+                      ? <Button variant="ghost" size="sm" disabled={Boolean(fieldValidationMessage)} onClick={finishPlanFieldEditor}>Done</Button>
+                      : <Button variant="ghost" size="sm" onClick={openPlanFieldEditor}>Edit fields</Button>}
+                  </div>
+                  {editingPlanFields
+                    ? <div className="plan-field-editor">
+                        {planFields.map((field, index) => (
+                          <div className="plan-field-row" key={field.id}>
+                            <Input
+                              value={field.name}
+                              aria-label={`Field ${index + 1} name`}
+                              onChange={(event) => syncPlanFieldRows(planFields.map((item) => item.id === field.id ? { ...item, name: event.target.value } : item))}
+                            />
+                            <Select value={field.type} onValueChange={(value) => syncPlanFieldRows(planFields.map((item) => item.id === field.id ? { ...item, type: value as FieldType } : item))}>
+                              <SelectTrigger className="plan-field-type" aria-label={`Field ${index + 1} type`}><SelectValue /></SelectTrigger>
+                              <SelectContent>{fieldTypeOptions.map((type) => <SelectItem value={type} key={type}>{type}</SelectItem>)}</SelectContent>
+                            </Select>
+                            <Button variant="ghost" size="sm" className="plan-field-remove" aria-label={`Remove ${field.name || `field ${index + 1}`}`} onClick={() => syncPlanFieldRows(planFields.filter((item) => item.id !== field.id))}><X size={14} /></Button>
+                          </div>
+                        ))}
+                        <Button variant="ghost" size="sm" className="plan-add-field" onClick={() => syncPlanFieldRows([...planFields, { id: `plan-field-${nextFieldId.current += 1}`, name: '', type: 'text' }])}>+ Add field</Button>
+                      </div>
+                    : <ul>{fieldDefinitions.map((field) => <li key={field.id}>{field.name.replaceAll('_', ' ')} · {field.type}</li>)}</ul>}
+                  {fieldValidationMessage ? <p className="plan-field-error" role="alert">{fieldValidationMessage}</p> : null}
+                </div>
                 <p>{estimate}</p>
               </div>
               <div className="stage-actions">
-                <Button variant="secondary" onClick={() => setStage(0)}>Back to describe</Button>
-                <Button variant="primary" disabled={!mayRun} title={!mayRun ? viewerTooltip : undefined} onClick={startRun}>Approve and run →</Button>
+                <Button variant="primary" disabled={!mayRun || Boolean(fieldValidationMessage)} title={!mayRun ? viewerTooltip : undefined} onClick={startRun}>Approve and run →</Button>
+                <Button variant="secondary" onClick={() => { setEditingPlanFields(false); setStage(0); }}>Back to describe</Button>
               </div>
             </aside>
           </div>
@@ -830,11 +1073,11 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
             scenario={selected}
             researchResolved={researchResolved}
             onSaved={saveDataset}
-            onCreateMonitor={() => setMonitorDialogOpen(true)}
+            onCreateMonitor={() => { setMonitorFields(fieldNames); setMonitorDialogOpen(true); }}
             workspaceName={auth.currentWorkspace?.name}
             customDomains={promptSpecification.domains}
             customFields={fieldNames}
-            datasetName={datasetName}
+            datasetName={savedDatasetTitle || effectiveWorkflowName}
             savedDatasetId={savedDatasetId}
           />
 
@@ -845,7 +1088,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
                 <DialogDescription>Schedule checks against the two-record Trailhead baseline dataset.</DialogDescription>
               </DialogHeader>
               <div className="dialog-form">
-                <label>PIPELINE<Select value={template.title} disabled><SelectTrigger aria-label="Pipeline"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={template.title}>{template.title}</SelectItem></SelectContent></Select></label>
+                <label>PIPELINE<Select value={effectiveWorkflowName} disabled><SelectTrigger aria-label="Pipeline"><SelectValue /></SelectTrigger><SelectContent><SelectItem value={effectiveWorkflowName}>{effectiveWorkflowName}</SelectItem></SelectContent></Select></label>
                 <label>
                   SCHEDULE
                   <Select value={monitorSchedule} onValueChange={setMonitorSchedule}>
@@ -858,14 +1101,14 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
                 </label>
                 <fieldset className="monitor-field-picker">
                   <legend>FIELDS TO WATCH</legend>
-                  {['Price', 'Availability'].map((field) => (
+                  {fieldNames.map((field) => (
                     <label key={field}>
                       <input
                         type="checkbox"
                         checked={monitorFields.includes(field)}
                         onChange={(event) => setMonitorFields((current) => event.target.checked ? [...current, field] : current.filter((item) => item !== field))}
                       />
-                      {field}
+                      {formatFieldLabel(field)}
                     </label>
                   ))}
                 </fieldset>
@@ -918,14 +1161,14 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
               <header><div><h2 id="workflow-tool-title">{activeTool}</h2><p>{activeTool === 'Sources' ? 'Add public HTTPS URLs or domains, one per line.' : activeTool === 'Browser actions' ? 'Choose how Studio may navigate the public web.' : activeTool === 'Fields' ? 'Make the expected output explicit.' : activeTool === 'Limits' ? 'Bound browser work before the plan is approved.' : activeTool === 'Rules' ? 'Set evidence and missing-data behavior.' : 'Review the proposed rewrite before changing your draft.'}</p></div><Button variant="ghost" size="icon" aria-label={`Close ${activeTool}`} onClick={() => setActiveTool(null)}><X size={16} /></Button></header>
               {activeTool === 'Sources' ? <div className="source-editor"><div className="source-preview-chips" aria-label={`${sourceCount} configured sources`}>{sources.split('\n').map((source) => source.trim()).filter(Boolean).map((source, index) => <span key={`${source}-${index}`}>{source.replace(/^https?:\/\//, '')}<button type="button" aria-label={`Remove ${source}`} onClick={() => { markDraftDirty(); setSources((current) => current.split('\n').map((item) => item.trim()).filter((item) => item && item !== source).join('\n')); if (auth.sources.includes(source)) auth.removeSource(source); }}><X size={12} /></button></span>)}</div><label className="tool-field tool-field-wide"><span>Sources</span><Textarea value={sources} onChange={(event) => updateSetting(setSources, event.target.value)} aria-label="Sources" /></label></div> : null}
               {activeTool === 'Browser actions' ? <div className="tool-grid"><ToolSelect label="Access" value={access} onValueChange={(value) => updateSetting(setAccess, value)} options={['Approved public sources','Public web discovery','Approved domains only']} /><ToolSelect label="Downloads" value={downloads} onValueChange={(value) => updateSetting(setDownloads, value)} options={['Block downloads','Allow documents','Allow all downloads']} /><ToolSelect label="Region" value={region} onValueChange={(value) => updateSetting(setRegion, value)} options={['Automatic','Europe','United States']} /></div> : null}
-              {activeTool === 'Fields' ? <div className="tool-grid"><label className="tool-field tool-field-span-2"><span>Output fields</span><Input value={fields} onChange={(event) => updateSetting(setFields, event.target.value)} aria-label="Output fields" /></label><ToolSelect label="Missing values" value={missingData} onValueChange={(value) => updateSetting(setMissingData, value)} options={['Use null; never invent','Omit missing fields','Send to review']} /><ToolSelect label="Validation" value={validation} onValueChange={(value) => updateSetting(setValidation, value)} options={['Require type match','Coerce safe values','Review mismatches']} /></div> : null}
+              {activeTool === 'Fields' ? <div className="tool-grid"><label className="tool-field tool-field-span-2"><span>Output fields</span><Input value={fields} onChange={(event) => updateFieldsText(event.target.value)} aria-label="Output fields" /></label><ToolSelect label="Missing values" value={missingData} onValueChange={(value) => updateSetting(setMissingData, value)} options={['Use null; never invent','Omit missing fields','Send to review']} /><ToolSelect label="Validation" value={validation} onValueChange={(value) => updateSetting(setValidation, value)} options={['Require type match','Coerce safe values','Review mismatches']} /></div> : null}
               {activeTool === 'Limits' ? <div className="tool-grid"><label className="tool-field"><span>Maximum pages</span><Input type="number" min="1" value={maxPages} onChange={(event) => updateSetting(setMaxPages, event.target.value)} /></label><label className="tool-field"><span>Maximum records</span><Input type="number" min="1" value={maxRecords} onChange={(event) => updateSetting(setMaxRecords, event.target.value)} /></label><ToolSelect label="Timeout" value={timeout} onValueChange={(value) => updateSetting(setTimeoutValue, value)} options={['2 minutes','5 minutes','15 minutes']} /></div> : null}
               {activeTool === 'Rules' ? <div className="tool-grid"><ToolSelect label="Missing data" value={missingData} onValueChange={(value) => updateSetting(setMissingData, value)} options={['Use null; never invent','Omit missing fields','Send to review']} /><ToolSelect label="Evidence" value={evidence} onValueChange={(value) => updateSetting(setEvidence, value)} options={['Source quote per value','Page evidence per record','No evidence required']} /><ToolSelect label="Deduplication" value={deduplication} onValueChange={(value) => updateSetting(setDeduplication, value)} options={['Canonical URL + primary key','Canonical URL only','Keep every result']} /></div> : null}
               {activeTool === 'Improve prompt' ? <div className="prompt-rewrite"><div className="prompt-rewrite-diff"><del>{prompt.trim() || 'No complete prompt yet.'}</del><ins>{improvedPrompt}</ins></div><div className="prompt-rewrite-actions"><Button variant="secondary" onClick={() => setActiveTool(null)}>Undo</Button><Button variant="primary" onClick={acceptRewrite}>Accept rewrite</Button></div></div> : null}
             </section> : null}
           </div>
           {draftDirty ? <div className="draft-status" role="status"><span>{draftStatus || 'Draft saved · just now'}</span><Button variant="ghost" size="sm" onClick={discardDraft}>Discard draft</Button></div> : null}
-          <div className="understood"><strong>STUDIO UNDERSTOOD</strong><Badge tone="info">{template.type}</Badge><span className={sourcePulse ? 'source-chip pulse' : 'source-chip'}><Badge tone="success">{sourceLabel}</Badge></span><Badge tone="success">{understoodFieldCount} fields</Badge><Badge tone="success">{evidence}</Badge><Badge tone="success">{missingData}</Badge><Badge tone="warning">{maxPages ? `Capped at ${maxPages} pages` : 'No page limit set'}</Badge></div>
+          <div className="understood"><strong>STUDIO UNDERSTOOD</strong>{prompt.trim() ? <><Badge tone="info">{template.type}</Badge><span className={sourcePulse ? 'source-chip pulse' : 'source-chip'}><Badge tone="success">{sourceLabel}</Badge></span><Badge tone="success">{understoodFieldCount} fields</Badge><Badge tone="success">{evidence}</Badge><Badge tone="success">{missingData}</Badge><Badge tone="warning">{maxPages ? `Capped at ${maxPages} pages` : 'No page limit set'}</Badge></> : <span className="muted">Describe a task to see the plan</span>}</div>
           <div className="builder-foot"><span>Nothing runs until you approve the plan.</span><span>Local mockup only · no extraction is submitted</span></div>
         </div>
         {templatesOpen ? <aside className="templates"><div className="templates-head"><p>Start from</p><Button variant="ghost" size="icon" onClick={() => setTemplateVisibility(false)} aria-label="Hide templates" title="Hide templates"><ChevronRight size={15}/></Button></div>

@@ -485,12 +485,13 @@ export function RunSession({
       completed: true,
       workers: customDomains.map((domain) => {
         const record = mockDomainRecord(domain, customFields);
+        const statedValues = Object.values(record.values).filter((value): value is string => value !== null);
         return {
           name: domainLabel(domain),
           domain,
           state: 'Complete',
-          price: record.values.starting_price ?? record.values.price ?? Object.values(record.values)[0],
-          planDetails: record.values.free_trial ? `${record.values.free_trial} free trial` : Object.values(record.values)[1],
+          price: record.values.starting_price ?? record.values.price ?? statedValues[0],
+          planDetails: record.values.free_trial ? `${record.values.free_trial} free trial` : statedValues[1],
         };
       }),
     };
@@ -678,17 +679,9 @@ export function RunSession({
         <div className="capture-strip">
           {workerSteps(scenario.workers[workerIndex]).map((capture, index) => (
             <div
-              role="button"
-              tabIndex={0}
-              aria-label={`Jump to ${capture.title}`}
+              inert
+              aria-hidden="true"
               className={index === step ? 'active' : ''}
-              onClick={() => setStep(index)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  setStep(index);
-                }
-              }}
               key={capture.title}
             >
               <ProductFrame

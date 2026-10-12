@@ -2,3 +2,22 @@
 importio-studio-concept.html
 importio-studio-unified-concept.html
 importio-studio-prototype.zip
+
+# Local prototype archives and backups
+/importio-studio-*.zip
+/importio-studio-compact-rebuild-backup.html
+/index 2.html
+
+# Ad-hoc visual verification captures
+/login-*.jpg
+/login-*.png
+/signup-*.jpg
+/signup-*.png
+/settings-team-*.jpg
+/settings-team-*.png
+/review-viewer-*.jpg
+/review-screenshots/
+/studio-next/verification/
+
+# Local deployment receipt note
+/studio-next/.openai/deployment-note.md

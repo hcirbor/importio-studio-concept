@@ -44,13 +44,12 @@ function RunsWorkspace() {
 
 function SearchWorkspace() {
   const tab = useSectionTab('tab', searchTabs, 'pages');
-  const title = tab === 'companies' ? 'Companies' : 'Pages';
   const description = tab === 'companies'
     ? 'Discover first; qualify selected candidates separately.'
     : 'Ranked sources to inspect, not verified answers.';
 
   return <>
-    <PageHead group="Build" title={title} description={description} />
+    <PageHead group="Build" title="Search" description={description} />
     <SectionTabs value={tab} tabs={searchTabs} fallback="pages" />
     {tab === 'companies' ? <CandidatesSection showHeader={false} /> : <SearchSection showHeader={false} />}
   </>;

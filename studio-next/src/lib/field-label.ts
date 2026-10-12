@@ -1,12 +1,13 @@
 const fieldLabels: Record<string, string> = {
-  product: 'Product name',
+  source: 'Source',
+  product: 'Product',
   product_name: 'Product name',
   plan: 'Plan',
-  plan_details: 'Plan',
+  plan_details: 'Plan details',
   price: 'Price',
-  starting_price: 'Price',
-  url: 'Source',
-  pricing_url: 'Source',
+  starting_price: 'Starting price',
+  url: 'URL',
+  pricing_url: 'Pricing URL',
 };
 
 export function formatFieldLabel(field: string) {

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Suspense, useEffect, useLayoutEffect, useRef, useState, type UIEvent } from 'react';
+import { Suspense, useEffect, useLayoutEffect, useRef, useState, type MouseEvent, type ReactElement, type UIEvent } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -11,9 +11,8 @@ import {
 } from 'lucide-react';
 import { ThemeControl } from './theme-control';
 import { CommandPalette } from './command-palette';
-import { resolveWorkflowTemplate, workflowTemplates } from './workflow-config';
-import { ReviewRailCount } from './review-state';
-import { BrandMark, Button } from '@/components/design-system';
+import { ReviewRailCount, useReviewState } from './review-state';
+import { BrandMark, Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/design-system';
 import { useAuth } from '@/lib/auth';
 import { UserMenu, WorkspaceSwitcher } from './auth-controls';
 
@@ -39,7 +38,7 @@ type QueryReader = { get: (name: string) => string | null };
 
 function pageTitle(pathname: string, searchParams: QueryReader): [string, string, string] {
   if (pathname === '/') return ['Studio', 'Home', 'Home'];
-  if (pathname === '/build') return ['Build', 'Research', 'Build'];
+  if (pathname === '/build') return ['Build', 'New workflow', 'Build'];
   if (pathname === '/runs') {
     const tab = searchParams.get('tab');
     if (tab === 'saved') return ['Runs', 'Saved', 'Saved runs'];
@@ -47,8 +46,7 @@ function pageTitle(pathname: string, searchParams: QueryReader): [string, string
     return ['Runs', 'All runs', 'All runs'];
   }
   if (pathname === '/search') {
-    const current = searchParams.get('tab') === 'companies' ? 'Companies' : 'Pages';
-    return ['Search', current, current];
+    return ['Build', 'Search', 'Search'];
   }
   if (pathname === '/developers') {
     const current = searchParams.get('tab') === 'webhooks' ? 'Webhooks' : 'API & MCP';
@@ -70,6 +68,11 @@ function pageTitle(pathname: string, searchParams: QueryReader): [string, string
   return ['Studio', current, current];
 }
 
+function RailTooltip({ enabled, label, children }: { enabled: boolean; label: string; children: ReactElement }) {
+  if (!enabled) return children;
+  return <Tooltip><TooltipTrigger asChild>{children}</TooltipTrigger><TooltipContent side="right">{label}</TooltipContent></Tooltip>;
+}
+
 function parentBreadcrumbHref(pathname: string) {
   if (pathname.startsWith('/runs/')) return '/runs';
   if (pathname.startsWith('/datasets/')) return '/datasets';
@@ -79,6 +82,7 @@ function parentBreadcrumbHref(pathname: string) {
 
 function Breadcrumbs({ pathname }: { pathname: string }) {
   const searchParams = useSearchParams();
+  const auth = useAuth();
   const [liveBuildTitle, setLiveBuildTitle] = useState<string | null>(null);
   useEffect(() => {
     function updateBuildTitle(event: Event) {
@@ -89,11 +93,14 @@ function Breadcrumbs({ pathname }: { pathname: string }) {
     return () => window.removeEventListener('studio:workflow-title', updateBuildTitle);
   }, []);
   const [parent, defaultCurrent, documentPageTitle] = pageTitle(pathname, searchParams);
+  const datasetPageTitle = pathname.startsWith('/datasets/')
+    ? auth.datasets.find((dataset) => dataset.id === pathname.split('/').at(-1))?.title
+    : undefined;
   const current = pathname === '/build'
-    ? liveBuildTitle ?? workflowTemplates[resolveWorkflowTemplate(searchParams.get('template'))].title
-    : defaultCurrent;
+    ? liveBuildTitle ?? 'New workflow'
+    : datasetPageTitle ?? defaultCurrent;
   const parentHref = parentBreadcrumbHref(pathname);
-  const fullDocumentTitle = `${documentPageTitle} · Import.io Studio`;
+  const fullDocumentTitle = `${datasetPageTitle ?? documentPageTitle} · Import.io Studio`;
 
   useEffect(() => {
     const syncDocumentTitle = () => {
@@ -123,8 +130,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const auth = useAuth();
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const [navOpen, setNavOpen] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
+  const [desktopNavigation, setDesktopNavigation] = useState(false);
   const runsBadge = auth.runs.filter((run) => run.badge).length;
-  const hasWorkspaceReview = auth.runs.some((run) => run.outcome === 'Partial');
+  const { reviewCount } = useReviewState();
   const previousPathname = useRef(pathname);
   const sidebarRef = useRef<HTMLElement>(null);
   const stableSidebarScroll = useRef(0);
@@ -135,6 +145,34 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     if (previousPathname.current !== pathname) toast.dismiss();
     previousPathname.current = pathname;
   }, [pathname]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const syncViewport = () => {
+      setDesktopNavigation(media.matches);
+      if (media.matches) setNavOpen(false);
+    };
+    const timer = window.setTimeout(() => {
+      syncViewport();
+      setSidebarCollapsed(window.localStorage.getItem('importio-studio-sidebar-collapsed') === 'true');
+      setSidebarPreferenceLoaded(true);
+    }, 0);
+    media.addEventListener('change', syncViewport);
+    return () => {
+      window.clearTimeout(timer);
+      media.removeEventListener('change', syncViewport);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sidebarPreferenceLoaded) return;
+    window.localStorage.setItem('importio-studio-sidebar-collapsed', String(sidebarCollapsed));
+  }, [sidebarCollapsed, sidebarPreferenceLoaded]);
+
+  function toggleNavigation() {
+    if (desktopNavigation) setSidebarCollapsed((collapsed) => !collapsed);
+    else setNavOpen((open) => !open);
+  }
 
   function handleSidebarScroll(event: UIEvent<HTMLElement>) {
     const scrollTop = event.currentTarget.scrollTop;
@@ -154,6 +192,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setNavOpen(false);
   }
 
+  function handleNewWorkflow(event: MouseEvent<HTMLAnchorElement>) {
+    if (pathname !== '/build') {
+      handleSidebarNavigation();
+      return;
+    }
+    event.preventDefault();
+    window.dispatchEvent(new CustomEvent('studio:new-workflow'));
+    handleSidebarNavigation();
+  }
+
   useLayoutEffect(() => {
     if (!pendingSidebarRestore.current || !sidebarRef.current) return;
     const sidebar = sidebarRef.current;
@@ -167,15 +215,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [pathname]);
 
   useEffect(() => {
-    function closeOnEscape(event: KeyboardEvent) {
+    function handleNavigationKey(event: KeyboardEvent) {
       if (event.key === 'Escape') setNavOpen(false);
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'b') {
+        event.preventDefault();
+        if (desktopNavigation) setSidebarCollapsed((collapsed) => !collapsed);
+        else setNavOpen((open) => !open);
+      }
     }
-    window.addEventListener('keydown', closeOnEscape);
+    window.addEventListener('keydown', handleNavigationKey);
     return () => {
-      window.removeEventListener('keydown', closeOnEscape);
+      window.removeEventListener('keydown', handleNavigationKey);
       if (sidebarScrollTimer.current) window.clearTimeout(sidebarScrollTimer.current);
     };
-  }, []);
+  }, [desktopNavigation]);
   useEffect(() => {
     if (!auth.ready) return;
     if (isAuthRoute && auth.session) {
@@ -187,17 +240,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   if (isAuthRoute) return <>{children}</>;
   if (!auth.ready || !auth.session) return <div className="auth-loading"><span className="demo-chip">INTERACTIVE DEMO</span><p>Opening Studio…</p></div>;
+  const rail = desktopNavigation && sidebarCollapsed;
   return (
-    <div className="app-shell">
+    <TooltipProvider delayDuration={300}>
+    <div className={rail ? 'app-shell sidebar-collapsed' : 'app-shell'}>
       {navOpen ? <Button variant="ghost" className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} /> : null}
       <aside ref={sidebarRef} onScroll={handleSidebarScroll} className={navOpen ? 'sidebar mobile-open' : 'sidebar'}>
-        <Link href="/" className="brand" aria-label="Import.io Studio home" onClick={handleSidebarNavigation}>
+        <RailTooltip enabled={rail} label="Import.io Studio"><Link href="/" className="brand" aria-label="Import.io Studio home" onClick={handleSidebarNavigation}>
           <BrandMark className="brand-mark" title="" />
           <span className="brand-name">import.io</span>
-        </Link>
-        <WorkspaceSwitcher />
+        </Link></RailTooltip>
+        <WorkspaceSwitcher collapsed={rail} />
         <nav aria-label="Primary navigation">
-          <Link href="/" onClick={handleSidebarNavigation} className={pathname === '/' ? 'nav-item active' : 'nav-item'}><Home /><span>Home</span></Link>
+          <RailTooltip enabled={rail} label="Home"><Link href="/" aria-label="Home" onClick={handleSidebarNavigation} className={pathname === '/' ? 'nav-item active' : 'nav-item'}><Home /><span>Home</span></Link></RailTooltip>
           {groups.map((group) => (
             <section className="nav-group" key={group.label}>
               <p>{group.label}</p>
@@ -205,20 +260,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 const active = pathname === item.href || (item.href === '/pipelines' && pathname.startsWith('/pipelines/'));
                 const Icon = item.icon;
                 const className = `${active ? 'nav-item active' : 'nav-item'}${item.label === 'Usage' ? ' usage-nav' : ''}`;
-                return <Link href={item.href} onClick={handleSidebarNavigation} className={className} key={item.href}><Icon /><span>{item.label}</span>{item.label === 'Review' && hasWorkspaceReview ? <ReviewRailCount /> : item.label === 'Runs' && runsBadge > 0 ? <em>{runsBadge}</em> : null}{item.label === 'Usage' ? <span className="nav-usage-meter" role="progressbar" aria-label="Monthly usage: 36% of the spend alert" aria-valuemin={0} aria-valuemax={100} aria-valuenow={36} title="$8.98 estimated · 36% of $25 monthly alert"><i /></span> : null}</Link>;
+                const count = item.label === 'Review' ? reviewCount : item.label === 'Runs' ? runsBadge : 0;
+                const tooltip = count > 0 ? `${item.label} · ${count} ${count === 1 ? 'item' : 'items'}` : item.label;
+                return <RailTooltip enabled={rail} label={tooltip} key={item.href}><Link href={item.href} aria-label={tooltip} onClick={item.href === '/build' ? handleNewWorkflow : handleSidebarNavigation} className={className}><Icon /><span>{item.label}</span>{item.label === 'Review' && reviewCount > 0 ? <ReviewRailCount /> : item.label === 'Runs' && runsBadge > 0 ? <em>{runsBadge}</em> : null}{item.label === 'Usage' ? <span className="nav-usage-meter" role="progressbar" aria-label="Monthly usage: 36% of the spend alert" aria-valuemin={0} aria-valuemax={100} aria-valuenow={36}><i /></span> : null}</Link></RailTooltip>;
               })}
             </section>
           ))}
         </nav>
         <div className="sidebar-footer">
-          <Link href="/settings" onClick={handleSidebarNavigation} className={pathname === '/settings' ? 'nav-item active' : 'nav-item'}><Settings /><span>Settings</span></Link>
-          <UserMenu />
+          <RailTooltip enabled={rail} label="Settings"><Link href="/settings" aria-label="Settings" onClick={handleSidebarNavigation} className={pathname === '/settings' ? 'nav-item active' : 'nav-item'}><Settings /><span>Settings</span></Link></RailTooltip>
+          <UserMenu rail={rail} />
         </div>
       </aside>
       <div className="workspace">
         <header className="topbar">
-          <Button variant="ghost" className="mobile-menu" aria-label="Open navigation" onClick={() => setNavOpen(true)}><PanelLeft /></Button>
-          <Suspense fallback={<div className="breadcrumbs"><span>Build</span><i>/</i><strong>Workflow</strong></div>}><Breadcrumbs pathname={pathname} /></Suspense>
+          <div className="topbar-start">
+            <Button variant="ghost" className="nav-toggle" aria-label={desktopNavigation ? (sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation') : (navOpen ? 'Close navigation' : 'Open navigation')} onClick={toggleNavigation}><PanelLeft /></Button>
+            <Suspense fallback={<div className="breadcrumbs"><span>Build</span><i>/</i><strong>Workflow</strong></div>}><Breadcrumbs pathname={pathname} /></Suspense>
+          </div>
           <div className="top-actions"><CommandPalette /><span className="demo-chip">INTERACTIVE DEMO</span><span className="ready-chip"><i /> API &amp; database ready</span><ThemeControl /><UserMenu compact /></div>
         </header>
         <main id="main">{auth.currentWorkspace?.empty && !['/build','/settings','/developers','/usage'].includes(pathname)
@@ -226,5 +285,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           : children}</main>
       </div>
     </div>
+    </TooltipProvider>
   );
 }

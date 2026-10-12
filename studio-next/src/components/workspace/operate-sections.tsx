@@ -29,6 +29,7 @@ import { EnrichmentsSection } from './library-sections';
 import { SectionTabs, useSectionTab } from './section-tabs';
 import { useReviewState } from '../review-state';
 import { can, useAuth, viewerTooltip } from '@/lib/auth';
+import { isTimestampToday, RelativeTime, useCurrentTime } from '../relative-time';
 
 const pipelines = [
   {
@@ -134,6 +135,7 @@ export function PipelinesSection() {
 export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
   const auth = useAuth();
   const router = useRouter();
+  const now = useCurrentTime();
   const [workflow, setWorkflow] = useState('all');
   const [state, setState] = useState('all');
   const [outcome, setOutcome] = useState('all');
@@ -159,7 +161,7 @@ export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
   const rows: TableRow[] = visibleRuns.map((run) => ({
     id: run.id,
     cells: [
-      <span key="run"><strong>{run.id}</strong><small>{run.when}</small></span>,
+      <span key="run"><strong>{run.id}</strong><small><RelativeTime timestamp={run.createdAt} fallback={run.when} /></small></span>,
       run.pipeline,
       run.coverage,
       run.records,
@@ -172,8 +174,8 @@ export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
   }));
   const runningCount = auth.runs.filter((run) => run.state === 'Running').length;
   const partialCount = auth.runs.filter((run) => run.outcome === 'Partial').length;
-  const completedToday = auth.runs.filter((run) => run.state === 'Completed' && run.when !== 'Yesterday').length;
-  const usageToday = auth.runs.filter((run) => run.when !== 'Yesterday').reduce((sum, run) => sum + run.queries * 0.007, 0);
+  const completedToday = auth.runs.filter((run) => run.state === 'Completed' && (now ? isTimestampToday(run.createdAt, now) : run.when !== 'Yesterday')).length;
+  const usageToday = auth.runs.filter((run) => now ? isTimestampToday(run.createdAt, now) : run.when !== 'Yesterday').reduce((sum, run) => sum + run.queries * 0.007, 0);
   const workflowOptions = [...new Set(auth.runs.map((run) => run.pipeline))];
 
   return (
