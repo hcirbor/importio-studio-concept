@@ -2,13 +2,36 @@
 
 import { useState } from 'react';
 import { Badge, Button } from '@/components/design-system';
-import type { RunPresentation as Scenario, RunWorker as Worker } from '@/lib/data';
+import { StatusTag, statusTagsEnabled } from '@/components/status-tag';
+import { useCapability, type RunPresentation as Scenario, type RunWorker as Worker } from '@/lib/data';
 import { ReplayControls } from './replay-controls';
 
 export function ProductFrame({ worker, step, scenario, onCookieDecision }: { worker: Worker; step: number; scenario: Scenario; onCookieDecision?: (decision: string) => void }) {
+  const takeControlCapability = useCapability('take-control');
+  const inputDecisionsCapability = useCapability('input-decisions');
   const [decision, setDecision] = useState('');
+  const [takeControlNoteOpen, setTakeControlNoteOpen] = useState(false);
+  const [inputDecisionNoteOpen, setInputDecisionNoteOpen] = useState(false);
+
+  function chooseInputDecision(value: string) {
+    if (statusTagsEnabled && inputDecisionsCapability.status === 'coming-soon') {
+      setInputDecisionNoteOpen(true);
+      return;
+    }
+    if (value === 'Necessary cookies accepted') onCookieDecision?.(value);
+    else setDecision(value);
+  }
+
+  function takeControl() {
+    if (statusTagsEnabled && takeControlCapability.status === 'coming-soon') {
+      setTakeControlNoteOpen(true);
+      return;
+    }
+    setDecision('Control handed to you');
+  }
+
   if (worker.state === 'Failed') return <div className="browser-frame cookie-frame failed-frame"><div className="mock-site-head"><strong>{worker.name}</strong><span>{worker.domain}</span></div><section>{decision ? <><Badge tone="info">Recovery requested</Badge><h3>{decision}</h3><p>The failed checkpoint and retained evidence remain attached to this run.</p><Button variant="secondary" onClick={() => setDecision('')}>Back to stop reason</Button></> : <><Badge tone="danger">Failed</Badge><h3>Access challenge blocked the final source</h3><p>The worker stopped safely after two supported sources. No availability value was invented.</p><div><Button variant="primary" onClick={() => setDecision('Retry queued from the retained checkpoint')}>Retry</Button><Button variant="secondary" onClick={() => setDecision('Handed to Import.io experts')}>Hand to Import.io experts</Button></div></>}</section></div>;
-  if (worker.state === 'Needs input') return <div className="browser-frame cookie-frame"><div className="mock-site-head"><strong>{worker.name}</strong><span>Pricing</span></div><section>{decision ? <><Badge tone="success">Decision recorded</Badge><h3>{decision}</h3><p>The worker can continue from this retained checkpoint.</p><Button variant="secondary" onClick={() => setDecision('')}>Change decision</Button></> : <><Badge tone="warning">Needs input</Badge><h3>Choose your cookie preferences</h3><p>The worker stopped before choosing optional cookies.</p><div><Button variant="primary" onClick={() => onCookieDecision?.('Necessary cookies accepted')}>Accept necessary only</Button><Button variant="secondary" onClick={() => setDecision('Domain skipped')}>Skip domain</Button><Button variant="secondary" onClick={() => setDecision('Control handed to you')}>Take control</Button></div></>}</section></div>;
+  if (worker.state === 'Needs input') return <div className="browser-frame cookie-frame"><div className="mock-site-head"><strong>{worker.name}</strong><span>Pricing</span></div><section>{decision ? <><Badge tone="success">Decision recorded</Badge><h3>{decision}</h3><p>The worker can continue from this retained checkpoint.</p><Button variant="secondary" onClick={() => setDecision('')}>Change decision</Button></> : <><Badge tone="warning">Needs input</Badge><h3>Choose your cookie preferences</h3><p>The worker stopped before choosing optional cookies.</p><div className="decision-actions"><span className="capability-control"><Button variant="primary" onClick={() => chooseInputDecision('Necessary cookies accepted')}>Accept necessary only</Button><StatusTag capabilityId="input-decisions" open={inputDecisionNoteOpen} onOpenChange={setInputDecisionNoteOpen} /></span><Button variant="secondary" onClick={() => chooseInputDecision('Domain skipped')}>Skip domain</Button><span className="capability-control"><Button variant="secondary" onClick={takeControl}>Take control</Button><StatusTag capabilityId="take-control" open={takeControlNoteOpen} onOpenChange={setTakeControlNoteOpen} /></span></div></>}</section></div>;
   if (scenario.kind === 'research') {
     if (step === 0) return <div className="browser-frame"><div className="mock-site-head"><strong>{worker.name}</strong><span>Platform&nbsp;&nbsp; Customers&nbsp;&nbsp; Resources</span></div><div className="pricing-cards capture-landing-cards"><article><i /><strong>Product</strong><span>What teams can automate</span></article><article><i /><strong>Customers</strong><span>Stories and outcomes</span></article><article><i /><strong>Pricing</strong><span>Plans for every team</span></article></div></div>;
     if (step === 1) return <div className="browser-frame"><div className="mock-site-head"><strong>{worker.name}</strong><span>Pricing overview</span></div><div className="pricing-cards capture-navigation-cards"><article><i /><strong>Free</strong><span>Explore core features</span></article><article className="observed"><label>Opened pricing</label><i /><strong>Starter</strong><span>For growing teams</span></article><article><i /><strong>Business</strong><span>Advanced controls</span></article></div></div>;

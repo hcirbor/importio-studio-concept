@@ -8,7 +8,7 @@ import {
   Input,
 } from '@/components/design-system';
 import { resolveWorkflowTemplate, visibleStarterKeys, workflowRuntimeTemplates, workflowTemplates, type WorkflowTemplateKey } from '@/lib/workflow/templates';
-import { can, useStudio, type DatasetRecord, type NotificationChannel } from '@/lib/data';
+import { can, useCapability, useStudio, type DatasetRecord } from '@/lib/data';
 import { uniqueDatasetIdentity } from '@/lib/dataset-slug';
 import { fieldTypeRecord, inferFieldType, inferFieldTypes, normalizeFieldName, type FieldType } from '@/lib/workflow/fields';
 import { inferWorkflowTemplate, parsePromptSpecification } from '@/lib/workflow/prompt-parser';
@@ -86,6 +86,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     removeSource: snapshot.auth.removeSource,
   }));
   const execution = useStudio((snapshot) => snapshot.execution);
+  const largeCollectCapability = useCapability('large-collect');
   const router = useRouter();
   const mayRun = can(auth.session, 'run');
   const initialWorkspaceSources = useRef(auth.sources);
@@ -141,11 +142,6 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   const [runId, setRunId] = useState('');
   const [workflowName, setWorkflowName] = useState('');
   const [monitorDialogOpen, setMonitorDialogOpen] = useState(false);
-  const [monitorSchedule, setMonitorSchedule] = useState('Daily');
-  const [monitorFields, setMonitorFields] = useState<string[]>(['Price', 'Availability']);
-  const [monitorAlertWhen, setMonitorAlertWhen] = useState('Any change');
-  const [monitorThreshold, setMonitorThreshold] = useState('€230');
-  const [monitorNotifyVia, setMonitorNotifyVia] = useState<NotificationChannel>('Email');
   const [monitorCreated, setMonitorCreated] = useState(false);
   const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
   const [draftDirty, setDraftDirty] = useState(false);
@@ -433,7 +429,11 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   }, [promptSpecification.domains, selected, sourceDomains]);
   const effectiveWorkflowName = workflowName.trim() || suggestedWorkflowName;
   const estimateQueries = Math.max(1, sourceCount) * Math.max(1, Number(maxPages) || 1);
-  const estimate = `${estimateQueries} ${estimateQueries === 1 ? 'query' : 'queries'} · ${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'} · ${(estimateQueries * 0.6).toFixed(1)} browser minutes · estimated cost $${(estimateQueries * 0.007).toFixed(2)}`;
+  const usageEstimate = `${estimateQueries} ${estimateQueries === 1 ? 'query' : 'queries'} · ${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'} · ${(estimateQueries * 0.6).toFixed(1)} browser minutes`;
+  const costEstimate = `estimated cost $${(estimateQueries * 0.007).toFixed(2)}`;
+  const sampleLimit = selected === 'collect' && largeCollectCapability.status === 'preview' && largeCollectCapability.limit && Number(maxRecords) > largeCollectCapability.limit
+    ? largeCollectCapability.limit
+    : undefined;
   const urlSourceLabel = `${sourceCount} ${sourceCount === 1 ? 'source' : 'sources'}`;
   const guidedSourceLabel = inputMethod === 'urls'
     ? urlSourceLabel
@@ -559,30 +559,8 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     setSavedDatasetTitle(dataset.title);
   }
 
-  async function createMonitor() {
-    const monitorAlertRule = monitorAlertWhen === 'Price falls below' ? `Price falls below ${monitorThreshold}` : monitorAlertWhen;
-    const { dataset } = await execution.createMonitor({
-      name: 'Trailhead price and availability',
-      detail: `${monitorAlertRule} · ${monitorNotifyVia}`,
-      workflowName: effectiveWorkflowName,
-      sources: sourceDomains,
-      runId,
-      schedule: monitorSchedule,
-      lastChange: 'Not checked yet',
-      status: 'Scheduled',
-      tone: 'info',
-      fields: monitorFields,
-      alertRule: monitorAlertRule,
-      notifyVia: monitorNotifyVia,
-    });
-    setSavedDatasetId(dataset.id);
-    setSavedDatasetTitle(dataset.title);
-    setMonitorCreated(true);
-    setMonitorDialogOpen(false);
-  }
-
   if (stage === 1) {
-    return <ReviewPlanStage stepper={stepper} templateType={template.type} sourceLabel={sourceLabel} fieldCount={fieldCount} workflowName={workflowName} suggestedWorkflowName={suggestedWorkflowName} onWorkflowName={(value) => { markDraftDirty(); setWorkflowName(value); }} missingData={missingData} evidence={evidence} sourceDomains={sourceDomains} editingPlanFields={editingPlanFields} fieldValidationMessage={fieldValidationMessage} finishPlanFieldEditor={finishPlanFieldEditor} openPlanFieldEditor={openPlanFieldEditor} planFields={planFields} syncPlanFieldRows={syncPlanFieldRows} addPlanField={() => syncPlanFieldRows([...planFields, { id: `plan-field-${nextFieldId.current += 1}`, name: '', type: 'text' }])} fieldDefinitions={fieldDefinitions} estimate={estimate} mayRun={mayRun} startRun={() => void startRun()} back={() => { setEditingPlanFields(false); setStage(0); }} />;
+    return <ReviewPlanStage stepper={stepper} templateType={template.type} sourceLabel={sourceLabel} fieldCount={fieldCount} workflowName={workflowName} suggestedWorkflowName={suggestedWorkflowName} onWorkflowName={(value) => { markDraftDirty(); setWorkflowName(value); }} missingData={missingData} evidence={evidence} sourceDomains={sourceDomains} editingPlanFields={editingPlanFields} fieldValidationMessage={fieldValidationMessage} finishPlanFieldEditor={finishPlanFieldEditor} openPlanFieldEditor={openPlanFieldEditor} planFields={planFields} syncPlanFieldRows={syncPlanFieldRows} addPlanField={() => syncPlanFieldRows([...planFields, { id: `plan-field-${nextFieldId.current += 1}`, name: '', type: 'text' }])} fieldDefinitions={fieldDefinitions} usageEstimate={usageEstimate} costEstimate={costEstimate} mayRun={mayRun} startRun={() => void startRun()} sampleLimit={sampleLimit} runSample={() => { setMaxRecords(String(sampleLimit)); void startRun(); }} needsInputDecision={selected === 'research'} back={() => { setEditingPlanFields(false); setStage(0); }} />;
   }
 
   if (stage === 2) {
@@ -592,7 +570,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
 
   if (stage === 3) {
     const needsReview = promptSpecification.domains.length === 0 && runtimeTemplate.needsReviewWithoutDomains && (!runtimeTemplate.waitsForDecisionWithoutDomains || !researchResolved);
-    return <ReviewDataStage stepper={stepper} needsReview={needsReview} scenario={selected} researchResolved={researchResolved} onSaved={saveDataset} openMonitor={() => { setMonitorFields(fieldNames); setMonitorDialogOpen(true); }} workspaceName={auth.currentWorkspace?.name} domains={promptSpecification.domains} fieldNames={fieldNames} datasetName={savedDatasetTitle || effectiveWorkflowName} savedDatasetId={savedDatasetId} runId={runId} monitorOpen={monitorDialogOpen} setMonitorOpen={setMonitorDialogOpen} workflowName={effectiveWorkflowName} monitorSchedule={monitorSchedule} setMonitorSchedule={setMonitorSchedule} monitorFields={monitorFields} setMonitorFields={setMonitorFields} monitorAlertWhen={monitorAlertWhen} setMonitorAlertWhen={setMonitorAlertWhen} monitorThreshold={monitorThreshold} setMonitorThreshold={setMonitorThreshold} monitorNotifyVia={monitorNotifyVia} setMonitorNotifyVia={setMonitorNotifyVia} email={auth.currentUser?.email} createMonitor={() => void createMonitor()} back={() => setStage(2)} monitorCreated={monitorCreated} />;
+    return <ReviewDataStage stepper={stepper} needsReview={needsReview} scenario={selected} researchResolved={researchResolved} onSaved={saveDataset} openMonitor={() => setMonitorDialogOpen(true)} workspaceName={auth.currentWorkspace?.name} domains={promptSpecification.domains} fieldNames={fieldNames} datasetName={savedDatasetTitle || effectiveWorkflowName} savedDatasetId={savedDatasetId} runId={runId} monitorOpen={monitorDialogOpen} setMonitorOpen={setMonitorDialogOpen} workflowName={effectiveWorkflowName} onMonitorCreated={(datasetName, datasetId) => { setSavedDatasetId(datasetId); setSavedDatasetTitle(datasetName); setMonitorCreated(true); }} back={() => setStage(2)} monitorCreated={monitorCreated} />;
   }
 
   return <DescribeStage stepper={stepper} templatesOpen={templatesOpen} mode={mode} setMode={setMode} markDraftDirty={markDraftDirty} activeTool={activeTool} setActiveTool={setActiveTool} prompt={prompt} demoStopped={demoStopped} stopDemo={() => setDemoStopped(true)} typedExample={typedExample} updatePrompt={updatePrompt} inputMethod={inputMethod} chooseInputMethod={chooseInputMethod} sourceCount={sourceCount} csvRows={csvRows} sources={sources} csvColumn={csvColumn} guidedSourceLabel={guidedSourceLabel} guidedInputDetail={guidedInputDetail} reviewPlan={() => void reviewPlan()} sourcePulse={sourcePulse} sourceLabel={sourceLabel} understoodFieldCount={understoodFieldCount} evidence={evidence} missingData={missingData} maxPages={maxPages} draftDirty={draftDirty} draftStatus={draftStatus} discardDraft={discardDraft} removeSource={auth.removeSource} workspaceSources={auth.sources} setSources={setSources} access={access} setAccess={setAccess} downloads={downloads} setDownloads={setDownloads} region={region} setRegion={setRegion} fields={fields} updateFieldsText={updateFieldsText} validation={validation} setValidation={setValidation} maxRecords={maxRecords} setMaxPages={setMaxPages} setMaxRecords={setMaxRecords} timeout={timeout} setTimeout={setTimeoutValue} deduplication={deduplication} setEvidence={setEvidence} setMissingData={setMissingData} setDeduplication={setDeduplication} improvedPrompt={improvedPrompt} acceptRewrite={acceptRewrite} selected={selected} applyTemplate={applyTemplate} setTemplateVisibility={setTemplateVisibility} templateBrowserOpen={templateBrowserOpen} setTemplateBrowserOpen={setTemplateBrowserOpen} templateType={template.type} />;
