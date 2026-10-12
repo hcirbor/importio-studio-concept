@@ -9,22 +9,24 @@ permissions:
 
 jobs:
   quality:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container:
+      image: mcr.microsoft.com/playwright:v1.64.0-noble
     steps:
       - name: Check out Studio
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           path: Import Studio
 
       - name: Check out Import.io design system
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7.0.1
         with:
           repository: ${{ vars.DESIGN_SYSTEM_REPOSITORY || 'hcirbor/importio-design-system' }}
           ref: ac9e379164dcfdd6c6b2711c073466af756a937a
           path: Import.io design system
 
       - name: Set up Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7.1.0
         with:
           node-version: 22
           cache: npm
@@ -39,10 +41,6 @@ jobs:
       - name: Install dependencies
         working-directory: Import Studio/studio-next
         run: npm ci
-
-      - name: Install Playwright Chromium
-        working-directory: Import Studio/studio-next
-        run: npx playwright install --with-deps chromium
 
       - name: Lint
         working-directory: Import Studio/studio-next

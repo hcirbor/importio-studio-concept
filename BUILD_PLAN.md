@@ -119,6 +119,7 @@ Recommended: **A now, B later.** The chosen option: **A, using the public reposi
 
 ## Decisions needed before Phase 4
 
+- [ ] **Repository home:** move `hcirbor/importio-studio-concept` into the Import.io company GitHub organisation before live integration, or keep it in its current owner through the preview?
 - [ ] **Live preview host** that can run a Next.js server **behind an access gate** (VPN, IAP or SSO). Not chatgpt.site, not public, not CiteOtter's repo.
 - [ ] **CiteOtter staging credential** (shared Basic auth), who issues it while the engineer is away, and where it's stored server-side.
 - [ ] **Who pays** for Amber model, Import.io MCP and SearXNG usage on staging.
