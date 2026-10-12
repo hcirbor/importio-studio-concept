@@ -38,6 +38,13 @@ Read BUILD_PLAN.md first. Work only on what the prompt asks.
 - Roll back committed work with `git revert`. Compare old versions with `git worktree add`.
 - If a task fails with uncommitted changes, stop and report. Discard nothing.
 
+## Starting a phase (new thread)
+
+1. Read AGENTS.md and BUILD_PLAN.md in full. The Log table is the source of truth for what's done.
+2. `git fetch --tags`, then confirm: a new branch from the latest `origin/main`, a clean working tree, and the previous phase's tag on `main`. If any check fails, stop and report.
+3. Do only the phase the prompt names. Don't continue or redo earlier phases.
+4. If the prompt contradicts AGENTS.md or BUILD_PLAN.md, stop and ask. Don't guess.
+
 ## Phase prompts that authorise commit, tag, push or deploy end with
 
 (Only when the prompt says so. Other prompts make changes and report, nothing more.)
