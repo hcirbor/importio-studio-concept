@@ -3,10 +3,10 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Button } from '@/components/design-system';
-import { can, useAuth, viewerTooltip } from '@/lib/auth';
+import { can, useStudio, viewerTooltip } from '@/lib/data';
 
 export function RunDetailAction({ status, href = '/datasets/competitor-prices', label = 'Review data' }: { status: 'running' | 'completed' | 'failed'; href?: string; label?: string }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const mayRun = can(auth.session, 'run');
   const [paused, setPaused] = useState(false);
   if (status === 'completed') return <Button variant="primary" asChild><Link href={href}>{label}</Link></Button>;

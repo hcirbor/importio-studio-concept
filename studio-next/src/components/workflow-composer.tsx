@@ -41,8 +41,7 @@ import {
 import { resolveWorkflowTemplate, visibleStarterKeys, workflowTemplates, type WorkflowTemplateKey } from './workflow-config';
 import { RunSession } from './run-session';
 import { WorkflowScenarioReview } from './workflow-scenario-review';
-import { can, useAuth, viewerTooltip } from '@/lib/auth';
-import type { DatasetRecord } from '@/lib/auth';
+import { can, useStudio, viewerTooltip, type DatasetRecord } from '@/lib/data';
 import { uniqueDatasetIdentity } from '@/lib/dataset-slug';
 import { formatFieldLabel } from '@/lib/field-label';
 import {
@@ -287,7 +286,7 @@ export function WorkflowComposer() {
 }
 
 function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt }: { initialTemplate: WorkflowTemplateKey; initialInput: InputMethod; initialPrompt: string }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const router = useRouter();
   const mayRun = can(auth.session, 'run');
   const initialWorkspaceSources = useRef(auth.sources);

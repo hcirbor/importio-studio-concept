@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, Eyebrow } from '@/components/design-system';
-import { useAuth, type DatasetRecord, type EnrichmentCell } from '@/lib/auth';
+import { useStudio, type DatasetRecord, type EnrichmentCell } from '@/lib/data';
 import { formatFieldLabel } from '@/lib/field-label';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
@@ -32,7 +32,7 @@ function enrichedValue(field: string, rowIndex: number, values: Record<string, s
 }
 
 export function WorkspaceEnrichmentDetail({ enrichmentId }: { enrichmentId: string }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const enrichment = auth.enrichments.find((item) => item.id === enrichmentId);
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const [running, setRunning] = useState(false);

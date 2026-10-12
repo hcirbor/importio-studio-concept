@@ -11,9 +11,8 @@ import {
 } from 'lucide-react';
 import { ThemeControl } from './theme-control';
 import { CommandPalette } from './command-palette';
-import { ReviewRailCount, useReviewState } from './review-state';
 import { BrandMark, Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/design-system';
-import { useAuth } from '@/lib/auth';
+import { useStudio } from '@/lib/data';
 import { UserMenu, WorkspaceSwitcher } from './auth-controls';
 
 const groups = [
@@ -82,7 +81,7 @@ function parentBreadcrumbHref(pathname: string) {
 
 function Breadcrumbs({ pathname }: { pathname: string }) {
   const searchParams = useSearchParams();
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const [liveBuildTitle, setLiveBuildTitle] = useState<string | null>(null);
   useEffect(() => {
     function updateBuildTitle(event: Event) {
@@ -127,14 +126,14 @@ function Breadcrumbs({ pathname }: { pathname: string }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
+  const { reviewCount } = useStudio((snapshot) => snapshot.humanReview);
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const [navOpen, setNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [sidebarPreferenceLoaded, setSidebarPreferenceLoaded] = useState(false);
   const [desktopNavigation, setDesktopNavigation] = useState(false);
   const runsBadge = auth.runs.filter((run) => run.badge).length;
-  const { reviewCount } = useReviewState();
   const previousPathname = useRef(pathname);
   const sidebarRef = useRef<HTMLElement>(null);
   const stableSidebarScroll = useRef(0);
@@ -262,7 +261,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 const className = `${active ? 'nav-item active' : 'nav-item'}${item.label === 'Usage' ? ' usage-nav' : ''}`;
                 const count = item.label === 'Review' ? reviewCount : item.label === 'Runs' ? runsBadge : 0;
                 const tooltip = count > 0 ? `${item.label} · ${count} ${count === 1 ? 'item' : 'items'}` : item.label;
-                return <RailTooltip enabled={rail} label={tooltip} key={item.href}><Link href={item.href} aria-label={tooltip} onClick={item.href === '/build' ? handleNewWorkflow : handleSidebarNavigation} className={className}><Icon /><span>{item.label}</span>{item.label === 'Review' && reviewCount > 0 ? <ReviewRailCount /> : item.label === 'Runs' && runsBadge > 0 ? <em>{runsBadge}</em> : null}{item.label === 'Usage' ? <span className="nav-usage-meter" role="progressbar" aria-label="Monthly usage: 36% of the spend alert" aria-valuemin={0} aria-valuemax={100} aria-valuenow={36}><i /></span> : null}</Link></RailTooltip>;
+                return <RailTooltip enabled={rail} label={tooltip} key={item.href}><Link href={item.href} aria-label={tooltip} onClick={item.href === '/build' ? handleNewWorkflow : handleSidebarNavigation} className={className}><Icon /><span>{item.label}</span>{item.label === 'Review' && reviewCount > 0 ? <em>{reviewCount}</em> : item.label === 'Runs' && runsBadge > 0 ? <em>{runsBadge}</em> : null}{item.label === 'Usage' ? <span className="nav-usage-meter" role="progressbar" aria-label="Monthly usage: 36% of the spend alert" aria-valuemin={0} aria-valuemax={100} aria-valuenow={36}><i /></span> : null}</Link></RailTooltip>;
               })}
             </section>
           ))}

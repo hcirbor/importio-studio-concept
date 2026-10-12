@@ -16,6 +16,17 @@ export default defineConfig([
     },
   },
   {
+    files: ['src/app/**/*.{ts,tsx}', 'src/components/**/*.{ts,tsx}'],
+    rules: {
+      'no-restricted-imports': ['error', {
+        patterns: [{
+          group: ['@/lib/data/mock', '@/lib/data/mock/*'],
+          message: 'UI code must access mock state through src/lib/data hooks.',
+        }],
+      }],
+    },
+  },
+  {
     files: ['tests/**/*.ts'],
     rules: {
       'react-hooks/rules-of-hooks': 'off',

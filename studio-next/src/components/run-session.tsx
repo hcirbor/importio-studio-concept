@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Camera, Expand, Pause, Play, X } from 'lucide-react';
 import { Badge, Button } from '@/components/design-system';
-import { domainLabel, mockDomainRecord } from '@/lib/mock-web-data';
+import { useStudio } from '@/lib/data';
 
 type WorkerState = 'Running' | 'Complete' | 'Needs input' | 'Failed';
 type ScenarioKind = 'compare' | 'research' | 'collect' | 'discover' | 'extract' | 'monitor';
@@ -477,6 +477,7 @@ export function RunSession({
   customDomains?: string[];
   customFields?: string[];
 }) {
+  const execution = useStudio((snapshot) => snapshot.execution);
   const baseScenario = useMemo<Scenario>(() => {
     if (!customDomains.length) return scenarios[scenarioKey ?? runId] ?? scenarios.run_7f3a;
     return {
@@ -484,10 +485,10 @@ export function RunSession({
       kind: 'research',
       completed: true,
       workers: customDomains.map((domain) => {
-        const record = mockDomainRecord(domain, customFields);
+        const record = execution.recordForDomain(domain, customFields);
         const statedValues = Object.values(record.values).filter((value): value is string => value !== null);
         return {
-          name: domainLabel(domain),
+          name: execution.domainLabel(domain),
           domain,
           state: 'Complete',
           price: record.values.starting_price ?? record.values.price ?? statedValues[0],
@@ -495,7 +496,7 @@ export function RunSession({
         };
       }),
     };
-  }, [customDomains, customFields, runId, scenarioKey]);
+  }, [customDomains, customFields, execution, runId, scenarioKey]);
   const [workerIndex, setWorkerIndex] = useState(0);
   const [step, setStep] = useState(0);
   const [playing, setPlaying] = useState(false);

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { useAuth, type WorkspaceEnrichment } from '@/lib/auth';
+import { useStudio, type WorkspaceEnrichment } from '@/lib/data';
 import { datasetSlug } from '@/lib/dataset-slug';
 import {
   Button,
@@ -126,7 +126,7 @@ export function BatchesSection({ showHeader = true }: { showHeader?: boolean }) 
 }
 
 export function EnrichmentsSection({ showHeader = true, openCreateOnMount = false }: { showHeader?: boolean; openCreateOnMount?: boolean }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const [dialogOpen, setDialogOpen] = useState(openCreateOnMount);
   const [name, setName] = useState('New supplier enrichment');
   const [fileName, setFileName] = useState('');

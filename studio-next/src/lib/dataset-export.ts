@@ -1,7 +1,7 @@
 'use client';
 
 import * as XLSX from 'xlsx';
-import type { DatasetRecord, WorkspaceDataset } from '@/lib/auth';
+import type { DatasetRecord, WorkspaceDataset } from '@/lib/data';
 
 export type DatasetExportFormat = 'csv' | 'xlsx' | 'json';
 

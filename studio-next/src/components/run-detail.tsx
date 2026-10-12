@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { Badge, Eyebrow } from '@/components/design-system';
 import { RunSession } from './run-session';
 import { RunDetailAction } from './run-detail-action';
-import { useAuth } from '@/lib/auth';
+import { useStudio } from '@/lib/data';
 
 export type RunDetailData = {
   title: string;
@@ -20,7 +20,7 @@ export type RunDetailData = {
 };
 
 export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const searchParams = useSearchParams();
   const currentId = searchParams.get('run') ?? id;
   const workspaceRun = auth.runs.find((item) => item.id === currentId);

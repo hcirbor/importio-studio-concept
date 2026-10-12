@@ -2,9 +2,8 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/design-system';
-import type { DatasetRecord } from '@/lib/auth';
+import { useStudio, type DatasetRecord } from '@/lib/data';
 import { formatFieldLabel } from '@/lib/field-label';
-import { mockDomainRecords } from '@/lib/mock-web-data';
 import { DatasetReview } from './dataset-review';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
@@ -183,6 +182,7 @@ export function WorkflowScenarioReview({
   datasetName: string;
   savedDatasetId?: string;
 }) {
+  const execution = useStudio((snapshot) => snapshot.execution);
   const [feedback, setFeedback] = useState('');
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
 
@@ -193,7 +193,7 @@ export function WorkflowScenarioReview({
   const baseFixture = scenario === 'research' ? researchFixture(researchResolved) : reviewFixtures[scenario] ?? reviewFixtures.collect!;
   const savedFields = (customFields.length ? customFields : baseFixture.headings.filter((heading) => !['Evidence', 'Source'].includes(heading)))
     .filter((field) => normalizedField(field) !== 'source');
-  const customRecords = customDomains.length ? mockDomainRecords(customDomains, savedFields) : [];
+  const customRecords = customDomains.length ? execution.recordsForDomains(customDomains, savedFields) : [];
   const datasetRecords: DatasetRecord[] = customRecords.length ? customRecords : baseFixture.rows.map((row, rowIndex) => {
     const source = fixtureSource(scenario, row);
     const values = Object.fromEntries(savedFields.map((field) => {

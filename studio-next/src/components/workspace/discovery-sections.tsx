@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { Button, Eyebrow, Input } from '@/components/design-system';
 import { Feedback, PageHead, SelectField, Status, TablePanel, type TableRow } from './shared';
-import { useAuth } from '@/lib/auth';
+import { useStudio } from '@/lib/data';
 
 const initialSearchQuery = 'Trailhead 2P Tent price Europe';
 
@@ -69,7 +69,7 @@ const qualificationRows: TableRow[] = [
 const readyCandidateIds = new Set(['northwind-trade', 'summit-supply-europe']);
 
 export function SearchSection({ showHeader = true }: { showHeader?: boolean }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const router = useRouter();
   const [query, setQuery] = useState(initialSearchQuery);
   const [limit, setLimit] = useState('3');

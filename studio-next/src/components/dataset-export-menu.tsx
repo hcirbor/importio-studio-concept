@@ -2,7 +2,7 @@
 
 import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/design-system';
 import { useState } from 'react';
-import type { WorkspaceDataset } from '@/lib/auth';
+import type { WorkspaceDataset } from '@/lib/data';
 import { createDatasetExport, type DatasetExportFormat } from '@/lib/dataset-export';
 
 type DownloadLink = { href: string; filename: string };

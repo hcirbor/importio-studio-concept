@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { Badge, Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/design-system';
-import { useAuth, can, type Member, type Role, type WorkspaceApiKey } from '@/lib/auth';
+import { useStudio, can, type Member, type Role, type WorkspaceApiKey } from '@/lib/data';
 import {
   Feedback,
   PageHead,
@@ -52,7 +52,7 @@ const usageRows: TableRow[] = [
 ];
 
 export function DevelopersSection({ showHeader = true }: { showHeader?: boolean }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const [message, setMessage] = useState('');
   const [connectionChecked, setConnectionChecked] = useState(false);
 
@@ -136,7 +136,7 @@ export function DevelopersSection({ showHeader = true }: { showHeader?: boolean 
 }
 
 export function WebhooksSection({ showHeader = true }: { showHeader?: boolean }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const mayManageWebhooks = can(auth.session, 'manage_webhooks');
   const [endpoint, setEndpoint] = useState('https://api.example.com/importio/events');
   const [eventName, setEventName] = useState('Run completed');
@@ -264,7 +264,7 @@ export function UsageSection() {
 }
 
 export function SettingsSection() {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const [keyDialogOpen, setKeyDialogOpen] = useState(false);
   const [keyName, setKeyName] = useState('');
   const [keyAccess, setKeyAccess] = useState<'Full' | 'Read-only'>('Full');

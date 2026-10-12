@@ -2,10 +2,10 @@
 
 import Link from 'next/link';
 import { Badge } from '@/components/design-system';
-import { useReviewState } from './review-state';
+import { useStudio } from '@/lib/data';
 
 export function HomeAttention() {
-  const { hasReviewItem } = useReviewState();
+  const { hasReviewItem } = useStudio((snapshot) => snapshot.humanReview);
   return (
     <article className="panel attention-panel">
       <div className="section-head">

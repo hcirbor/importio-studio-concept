@@ -13,8 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/design-system';
-import { useReviewState } from './review-state';
-import { can, useAuth, viewerTooltip } from '@/lib/auth';
+import { can, useStudio, viewerTooltip } from '@/lib/data';
 
 const acceptedUnknownSummary = 'The Trailhead availability item was accepted as unknown.';
 
@@ -33,9 +32,9 @@ function PipelineFilter() {
 }
 
 export function ReviewInbox() {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
+  const { hasReviewItem, reviewCount, pipelineVersion, acceptReviewItem, restoreReviewItem } = useStudio((snapshot) => snapshot.humanReview);
   const mayReview = can(auth.session, 'review');
-  const { hasReviewItem, reviewCount, pipelineVersion, acceptReviewItem, restoreReviewItem } = useReviewState();
   const [editing, setEditing] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [reviewedValue, setReviewedValue] = useState('');

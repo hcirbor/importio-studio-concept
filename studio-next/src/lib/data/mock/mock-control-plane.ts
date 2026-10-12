@@ -1,108 +1,23 @@
-'use client';
-
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { datasetDisplayName } from '@/lib/dataset-slug';
-
-export type Role = 'Owner' | 'Admin' | 'Editor' | 'Viewer';
-export type PermissionAction = 'run' | 'review' | 'promote' | 'create_monitor' | 'create_dataset' | 'manage_members' | 'assign_owner' | 'manage_api_keys' | 'manage_webhooks' | 'manage_billing' | 'delete_workspace';
-
-export type AuthUser = { id: string; name: string; email: string };
-export type Workspace = { id: string; name: string; subtitle: string; role: Role; empty?: boolean };
-export type Member = { id: string; name: string; email: string; role: Role; lastActive: string; status?: 'Invited' };
-export type WorkspaceRun = {
-  id: string;
-  when: string;
-  createdAt?: number;
-  pipeline: string;
-  coverage: string;
-  records: string;
-  queries: number;
-  state: 'Running' | 'Completed' | 'Failed';
-  outcome: 'Running' | 'Succeeded' | 'Partial' | 'Blocked';
-  tone: 'info' | 'success' | 'warning' | 'danger';
-  badge?: boolean;
-  scenario?: 'compare' | 'research' | 'collect' | 'discover' | 'extract' | 'monitor';
-};
-export type WorkspaceDataset = {
-  id: string;
-  version: string;
-  title: string;
-  detail: string;
-  status: 'Validated' | 'Needs review' | 'Partial';
-  tone: 'success' | 'warning';
-  href?: string;
-  recordCount?: number;
-  fields?: string[];
-  lastUpdated?: string;
-  updatedAt?: number;
-  unresolvedCount?: number;
-  sourceWorkflow?: string;
-  sourceRunId?: string;
-  records?: DatasetRecord[];
-};
-export type DatasetEvidence = { sourceUrl: string; quote: string };
-export type DatasetRecord = {
-  id: string;
-  values: Record<string, string | null>;
-  evidence: Record<string, DatasetEvidence>;
-  reviewedBy?: Record<string, string>;
-  reviewNotes?: Record<string, string>;
-};
-export type WorkspaceApiKey = { id: string; name: string; display: string; createdBy: string; access?: 'Full' | 'Read-only' };
-export type WorkspaceMonitor = {
-  id: string;
-  name: string;
-  detail: string;
-  baselineDataset: string;
-  schedule: string;
-  lastChange: string;
-  status: 'Healthy' | 'Paused' | 'Scheduled';
-  tone: 'success' | 'warning' | 'info';
-  fields: string[];
-  alertRule: string;
-  notifyVia?: 'Email' | 'Slack' | 'Webhook';
-};
-export type EnrichmentVerdict = 'Supported' | 'Not stated' | 'Conflicting';
-export type EnrichmentCell = {
-  value: string | null;
-  verdict: EnrichmentVerdict;
-  evidence: DatasetEvidence;
-};
-export type EnrichmentRow = {
-  id: string;
-  values: Record<string, string>;
-  enriched: Record<string, EnrichmentCell>;
-};
-export type WorkspaceEnrichment = {
-  id: string;
-  name: string;
-  rowCount: number;
-  state: 'Validated' | 'Running' | 'Completed';
-  outcome: 'Ready' | 'Succeeded' | 'Partial';
-  sourceFile: string;
-  inputFields: string[];
-  enrichedFields: string[];
-  rows: EnrichmentRow[];
-  runId?: string;
-};
-export type Session = { user: AuthUser; workspaceId: string; role: Role };
-export type SignInMethod =
-  | { type: 'google' | 'microsoft' | 'sso' }
-  | { type: 'email'; email: string }
-  | { type: 'signup'; email: string; name: string; workspaceName: string };
-
-export const viewerTooltip = "Viewers can't run workflows. Ask an Admin for Editor access.";
-
-const permissions: Record<Role, Set<PermissionAction>> = {
-  Owner: new Set(['run','review','promote','create_monitor','create_dataset','manage_members','assign_owner','manage_api_keys','manage_webhooks','manage_billing','delete_workspace']),
-  Admin: new Set(['run','review','promote','create_monitor','create_dataset','manage_members','manage_api_keys','manage_webhooks']),
-  Editor: new Set(['run','review','promote','create_monitor','create_dataset']),
-  Viewer: new Set(),
-};
-
-export function can(user: { role: Role } | null | undefined, action: PermissionAction) {
-  return Boolean(user && permissions[user.role].has(action));
-}
+import type {
+  AuthInterface,
+  AuthUser,
+  Member,
+  Role,
+  Session,
+  SignInMethod,
+  StudioControlPlane,
+  StudioDataSource,
+  StudioSnapshot,
+  Workspace,
+  WorkspaceApiKey,
+  WorkspaceDataset,
+  WorkspaceEnrichment,
+  WorkspaceMonitor,
+  WorkspaceRun,
+} from '@/lib/data/StudioDataSource';
+import { mockCapabilities } from '@/lib/data/mock/mock-capabilities';
+import { createMockExecution } from '@/lib/data/mock/mock-execution';
 
 type AuthState = {
   session: Session | null;
@@ -117,45 +32,8 @@ type AuthState = {
   demoRole?: Role;
 };
 
-export type AuthInterface = {
-  ready: boolean;
-  session: Session | null;
-  currentUser: AuthUser | null;
-  currentRole: Role | null;
-  currentWorkspace: Workspace | null;
-  workspaces: Workspace[];
-  members: Member[];
-  runs: WorkspaceRun[];
-  datasets: WorkspaceDataset[];
-  apiKeys: WorkspaceApiKey[];
-  monitors: WorkspaceMonitor[];
-  enrichments: WorkspaceEnrichment[];
-  sources: string[];
-  demoRole?: Role;
-  getSession: () => Session | null;
-  signIn: (method: SignInMethod) => void;
-  signOut: () => void;
-  switchWorkspace: (id: string) => void;
-  createWorkspace: (name: string) => void;
-  setDemoRole: (role?: Role) => void;
-  inviteMembers: (emails: string[], role: Role) => void;
-  resendInvite: (id: string) => void;
-  revokeInvite: (id: string) => void;
-  changeMemberRole: (id: string, role: Role) => { ok: boolean; message?: string };
-  removeMember: (id: string) => { ok: boolean; message?: string };
-  addRun: (run: WorkspaceRun) => void;
-  updateRun: (id: string, updates: Partial<WorkspaceRun>) => void;
-  addDataset: (dataset: WorkspaceDataset) => void;
-  updateDatasetValue: (datasetId: string, recordId: string, field: string, value: string, reviewedBy?: string, note?: string) => void;
-  setDatasetReviewState: (datasetId: string, unresolvedCount: number) => void;
-  createApiKey: (key: WorkspaceApiKey) => void;
-  revokeApiKey: (id: string) => void;
-  addMonitor: (monitor: WorkspaceMonitor) => void;
-  addEnrichment: (enrichment: WorkspaceEnrichment) => void;
-  updateEnrichment: (id: string, updates: Partial<WorkspaceEnrichment>) => void;
-  addSource: (source: string) => void;
-  removeSource: (source: string) => void;
-};
+type WorkspaceReviewState = { hasReviewItem: boolean; pipelineVersion: number };
+type ReviewStateMap = Record<string, WorkspaceReviewState>;
 
 const jordan: AuthUser = { id: 'jordan', name: 'Jordan Davis', email: 'jordan@example.com' };
 const seededWorkspaces: Workspace[] = [
@@ -352,10 +230,12 @@ function normalizeDatasets(collections: Record<string, WorkspaceDataset[]> | und
 }
 
 const storageKey = 'importio-studio-demo-auth';
-const AuthContext = createContext<AuthInterface | null>(null);
-
-export function DemoAuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({
+const reviewStateKey = 'importio-studio-review-state';
+const seededReviewState: ReviewStateMap = {
+  studio: { hasReviewItem: true, pipelineVersion: 4 },
+  northwind: { hasReviewItem: false, pipelineVersion: 4 },
+};
+const initialState = (): AuthState => ({
     session: null,
     workspaces: seededWorkspaces,
     membersByWorkspace: seededMembers,
@@ -365,16 +245,31 @@ export function DemoAuthProvider({ children }: { children: React.ReactNode }) {
     monitorsByWorkspace: seededMonitors,
     enrichmentsByWorkspace: seededEnrichments,
     sourcesByWorkspace: seededSources,
-  });
-  const [ready, setReady] = useState(false);
+});
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
+class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
+  readonly source = 'mock' as const;
+  readonly capabilities = mockCapabilities;
+  private state = initialState();
+  private reviewState: ReviewStateMap = seededReviewState;
+  private ready = false;
+  private initialized = false;
+  private listeners = new Set<() => void>();
+  private snapshot: StudioSnapshot;
+
+  constructor() {
+    this.snapshot = this.createSnapshot();
+  }
+
+  initialize = () => {
+    if (this.initialized || typeof window === 'undefined') return;
+    this.initialized = true;
+    window.setTimeout(() => {
       const stored = window.localStorage.getItem(storageKey);
       if (stored) {
         try {
           const parsed = JSON.parse(stored) as Partial<AuthState>;
-          setState({
+          this.state = {
             session: parsed.session ?? null,
             workspaces: parsed.workspaces ?? seededWorkspaces,
             membersByWorkspace: { ...seededMembers, ...parsed.membersByWorkspace },
@@ -385,19 +280,86 @@ export function DemoAuthProvider({ children }: { children: React.ReactNode }) {
             enrichmentsByWorkspace: { ...seededEnrichments, ...parsed.enrichmentsByWorkspace },
             sourcesByWorkspace: { ...seededSources, ...parsed.sourcesByWorkspace },
             demoRole: parsed.demoRole,
-          });
+          };
         } catch { window.localStorage.removeItem(storageKey); }
       }
-      setReady(true);
+      const storedReview = window.localStorage.getItem(reviewStateKey);
+      if (storedReview) {
+        try {
+          const parsed = JSON.parse(storedReview) as ReviewStateMap | WorkspaceReviewState;
+          this.reviewState = 'hasReviewItem' in parsed
+            ? { ...seededReviewState, studio: parsed as WorkspaceReviewState }
+            : { ...seededReviewState, ...parsed };
+        } catch { window.localStorage.removeItem(reviewStateKey); }
+      }
+      this.ready = true;
+      this.publish();
     }, 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-  useEffect(() => {
-    if (ready) window.localStorage.setItem(storageKey, JSON.stringify(state));
-  }, [ready, state]);
+  };
 
-  const signIn = useCallback((method: SignInMethod) => {
-    setState((current) => {
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  };
+
+  getSnapshot = () => this.snapshot;
+
+  private publish() {
+    this.snapshot = this.createSnapshot();
+    if (this.ready && typeof window !== 'undefined') {
+      window.localStorage.setItem(storageKey, JSON.stringify(this.state));
+      window.localStorage.setItem(reviewStateKey, JSON.stringify(this.reviewState));
+    }
+    this.listeners.forEach((listener) => listener());
+  }
+
+  private commit(updater: (state: AuthState) => AuthState) {
+    const next = updater(this.state);
+    if (next === this.state) return;
+    this.state = next;
+    this.publish();
+  }
+
+  private createSnapshot(): StudioSnapshot {
+    const state = this.state;
+    const currentWorkspace = state.session
+      ? state.workspaces.find((item) => item.id === state.session?.workspaceId) ?? null
+      : null;
+    const currentRole = state.session ? state.demoRole ?? state.session.role : null;
+    const session = state.session && currentRole ? { ...state.session, role: currentRole } : null;
+    const currentReview = this.reviewState[session?.workspaceId ?? 'studio'] ?? { hasReviewItem: false, pipelineVersion: 4 };
+    const auth: AuthInterface = {
+      ready: this.ready,
+      session,
+      currentUser: session?.user ?? null,
+      currentRole,
+      currentWorkspace,
+      workspaces: state.workspaces,
+      members: session ? state.membersByWorkspace[session.workspaceId] ?? [] : [],
+      runs: session ? state.runsByWorkspace[session.workspaceId] ?? [] : [],
+      datasets: session ? state.datasetsByWorkspace[session.workspaceId] ?? [] : [],
+      apiKeys: session ? state.apiKeysByWorkspace[session.workspaceId] ?? [] : [],
+      monitors: session ? state.monitorsByWorkspace[session.workspaceId] ?? [] : [],
+      enrichments: session ? state.enrichmentsByWorkspace[session.workspaceId] ?? [] : [],
+      sources: session ? state.sourcesByWorkspace[session.workspaceId] ?? [] : [],
+      demoRole: state.demoRole,
+      ...this.auth,
+      ...this.controlPlane,
+    };
+    const humanReview = {
+      hasReviewItem: currentReview.hasReviewItem,
+      reviewCount: currentReview.hasReviewItem ? 1 : 0,
+      pipelineVersion: currentReview.pipelineVersion,
+      pipelineStatus: currentReview.hasReviewItem ? 'Needs review' as const : 'Healthy' as const,
+      acceptReviewItem: this.acceptReviewItem,
+      restoreReviewItem: this.restoreReviewItem,
+      promotePipeline: this.promotePipeline,
+    };
+    return { auth, humanReview, execution: this.execution, controlPlane: this.controlPlane, capabilities: this.capabilities };
+  }
+
+  signIn = (method: SignInMethod) => {
+    this.commit((current) => {
       if (method.type === 'signup') {
         const user: AuthUser = { id: `user-${Date.now()}`, name: method.name.trim(), email: method.email.trim() };
         const id = `workspace-${Date.now()}`;
@@ -420,15 +382,18 @@ export function DemoAuthProvider({ children }: { children: React.ReactNode }) {
         : jordan;
       return { ...current, session: { user, workspaceId: 'studio', role: 'Owner' }, demoRole: undefined };
     });
-  }, []);
-  const signOut = useCallback(() => setState((current) => ({ ...current, session: null, demoRole: undefined })), []);
-  const switchWorkspace = useCallback((id: string) => setState((current) => {
+  };
+
+  signOut = () => this.commit((current) => ({ ...current, session: null, demoRole: undefined }));
+
+  switchWorkspace = (id: string) => this.commit((current) => {
     if (!current.session) return current;
     const workspace = current.workspaces.find((item) => item.id === id);
     if (!workspace) return current;
     return { ...current, session: { ...current.session, workspaceId: id, role: workspace.role }, demoRole: undefined };
-  }), []);
-  const createWorkspace = useCallback((name: string) => setState((current) => {
+  });
+
+  createWorkspace = (name: string) => this.commit((current) => {
     if (!current.session || !name.trim()) return current;
     const id = `workspace-${Date.now()}`;
     const workspace: Workspace = { id, name: name.trim(), subtitle: 'Owner', role: 'Owner', empty: true };
@@ -446,37 +411,45 @@ export function DemoAuthProvider({ children }: { children: React.ReactNode }) {
       sourcesByWorkspace: { ...current.sourcesByWorkspace, [id]: [] },
       demoRole: undefined,
     };
-  }), []);
-  const setDemoRole = useCallback((role?: Role) => setState((current) => ({ ...current, demoRole: role })), []);
-  const updateMembers = useCallback((updater: (members: Member[]) => Member[]) => setState((current) => {
+  });
+
+  setDemoRole = (role?: Role) => this.commit((current) => ({ ...current, demoRole: role }));
+
+  private updateMembers(updater: (members: Member[]) => Member[]) {
+    this.commit((current) => {
     if (!current.session) return current;
     const id = current.session.workspaceId;
     return { ...current, membersByWorkspace: { ...current.membersByWorkspace, [id]: updater(current.membersByWorkspace[id] ?? []) } };
-  }), []);
-  const inviteMembers = useCallback((emails: string[], role: Role) => updateMembers((members) => [...members, ...emails.map((email) => ({ id: `invite-${email}-${Date.now()}`, name: 'Pending invite', email, role, lastActive: 'Invited', status: 'Invited' as const }))]), [updateMembers]);
-  const resendInvite = useCallback((id: string) => updateMembers((members) => members.map((member) => member.id === id ? { ...member, lastActive: 'Invited · resent now' } : member)), [updateMembers]);
-  const revokeInvite = useCallback((id: string) => updateMembers((members) => members.filter((member) => member.id !== id)), [updateMembers]);
-  const changeMemberRole = useCallback((id: string, role: Role) => {
-    if (!state.session) return { ok: false, message: 'Sign in to manage members.' };
-    if ((state.demoRole ?? state.session.role) !== 'Owner' && role === 'Owner') return { ok: false, message: 'Only an Owner can assign the Owner role.' };
-    const members = state.membersByWorkspace[state.session.workspaceId] ?? [];
+    });
+  }
+
+  inviteMembers = (emails: string[], role: Role) => this.updateMembers((members) => [...members, ...emails.map((email) => ({ id: `invite-${email}-${Date.now()}`, name: 'Pending invite', email, role, lastActive: 'Invited', status: 'Invited' as const }))]);
+  resendInvite = (id: string) => this.updateMembers((members) => members.map((member) => member.id === id ? { ...member, lastActive: 'Invited · resent now' } : member));
+  revokeInvite = (id: string) => this.updateMembers((members) => members.filter((member) => member.id !== id));
+
+  changeMemberRole = (id: string, role: Role) => {
+    if (!this.state.session) return { ok: false, message: 'Sign in to manage members.' };
+    if ((this.state.demoRole ?? this.state.session.role) !== 'Owner' && role === 'Owner') return { ok: false, message: 'Only an Owner can assign the Owner role.' };
+    const members = this.state.membersByWorkspace[this.state.session.workspaceId] ?? [];
     const target = members.find((member) => member.id === id);
     const owners = members.filter((member) => member.role === 'Owner' && member.status !== 'Invited');
     if (target?.role === 'Owner' && role !== 'Owner' && owners.length === 1) return { ok: false, message: 'At least one Owner must remain.' };
-    updateMembers((current) => current.map((member) => member.id === id ? { ...member, role } : member));
+    this.updateMembers((current) => current.map((member) => member.id === id ? { ...member, role } : member));
     return { ok: true };
-  }, [state.demoRole, state.membersByWorkspace, state.session, updateMembers]);
-  const removeMember = useCallback((id: string) => {
-    if (!state.session) return { ok: false, message: 'Sign in to manage members.' };
-    const members = state.membersByWorkspace[state.session.workspaceId] ?? [];
+  };
+
+  removeMember = (id: string) => {
+    if (!this.state.session) return { ok: false, message: 'Sign in to manage members.' };
+    const members = this.state.membersByWorkspace[this.state.session.workspaceId] ?? [];
     const target = members.find((member) => member.id === id);
     const owners = members.filter((member) => member.role === 'Owner' && member.status !== 'Invited');
     if (target?.role === 'Owner' && owners.length === 1) return { ok: false, message: 'The last Owner cannot be removed.' };
-    updateMembers((current) => current.filter((member) => member.id !== id));
+    this.updateMembers((current) => current.filter((member) => member.id !== id));
     return { ok: true };
-  }, [state.membersByWorkspace, state.session, updateMembers]);
-  const updateWorkspaceCollection = useCallback(<T,>(key: 'runsByWorkspace' | 'datasetsByWorkspace' | 'apiKeysByWorkspace' | 'monitorsByWorkspace' | 'enrichmentsByWorkspace' | 'sourcesByWorkspace', updater: (items: T[]) => T[]) => {
-    setState((current) => {
+  };
+
+  private updateWorkspaceCollection<T>(key: 'runsByWorkspace' | 'datasetsByWorkspace' | 'apiKeysByWorkspace' | 'monitorsByWorkspace' | 'enrichmentsByWorkspace' | 'sourcesByWorkspace', updater: (items: T[]) => T[]) {
+    this.commit((current) => {
       if (!current.session) return current;
       const workspaceId = current.session.workspaceId;
       const collections = current[key] as Record<string, T[]>;
@@ -487,11 +460,12 @@ export function DemoAuthProvider({ children }: { children: React.ReactNode }) {
         workspaces: current.workspaces.map((workspace) => workspace.id === workspaceId ? { ...workspace, empty: false } : workspace),
       } as AuthState;
     });
-  }, []);
-  const addRun = useCallback((run: WorkspaceRun) => updateWorkspaceCollection<WorkspaceRun>('runsByWorkspace', (runs) => [run, ...runs.filter((item) => item.id !== run.id)]), [updateWorkspaceCollection]);
-  const updateRun = useCallback((id: string, updates: Partial<WorkspaceRun>) => updateWorkspaceCollection<WorkspaceRun>('runsByWorkspace', (runs) => runs.map((run) => run.id === id ? { ...run, ...updates } : run)), [updateWorkspaceCollection]);
-  const addDataset = useCallback((dataset: WorkspaceDataset) => updateWorkspaceCollection<WorkspaceDataset>('datasetsByWorkspace', (datasets) => [dataset, ...datasets.filter((item) => item.id !== dataset.id)]), [updateWorkspaceCollection]);
-  const updateDatasetValue = useCallback((datasetId: string, recordId: string, field: string, value: string, reviewedBy?: string, note?: string) => updateWorkspaceCollection<WorkspaceDataset>('datasetsByWorkspace', (datasets) => datasets.map((dataset) => dataset.id !== datasetId ? dataset : {
+  }
+
+  addRun = (run: WorkspaceRun) => this.updateWorkspaceCollection<WorkspaceRun>('runsByWorkspace', (runs) => [run, ...runs.filter((item) => item.id !== run.id)]);
+  updateRun = (id: string, updates: Partial<WorkspaceRun>) => this.updateWorkspaceCollection<WorkspaceRun>('runsByWorkspace', (runs) => runs.map((run) => run.id === id ? { ...run, ...updates } : run));
+  addDataset = (dataset: WorkspaceDataset) => this.updateWorkspaceCollection<WorkspaceDataset>('datasetsByWorkspace', (datasets) => [dataset, ...datasets.filter((item) => item.id !== dataset.id)]);
+  updateDatasetValue = (datasetId: string, recordId: string, field: string, value: string, reviewedBy?: string, note?: string) => this.updateWorkspaceCollection<WorkspaceDataset>('datasetsByWorkspace', (datasets) => datasets.map((dataset) => dataset.id !== datasetId ? dataset : {
     ...dataset,
     lastUpdated: 'Just now',
     updatedAt: Date.now(),
@@ -510,8 +484,8 @@ export function DemoAuthProvider({ children }: { children: React.ReactNode }) {
         reviewNotes: nextReviewNotes,
       };
     }),
-  })), [updateWorkspaceCollection]);
-  const setDatasetReviewState = useCallback((datasetId: string, unresolvedCount: number) => updateWorkspaceCollection<WorkspaceDataset>('datasetsByWorkspace', (datasets) => datasets.map((dataset) => {
+  }));
+  setDatasetReviewState = (datasetId: string, unresolvedCount: number) => this.updateWorkspaceCollection<WorkspaceDataset>('datasetsByWorkspace', (datasets) => datasets.map((dataset) => {
     if (dataset.id !== datasetId) return dataset;
     const status = unresolvedCount > 0 ? 'Needs review' as const : 'Validated' as const;
     const tone = unresolvedCount > 0 ? 'warning' as const : 'success' as const;
@@ -526,35 +500,66 @@ export function DemoAuthProvider({ children }: { children: React.ReactNode }) {
       lastUpdated: 'Just now',
       updatedAt: Date.now(),
     };
-  })), [updateWorkspaceCollection]);
-  const createApiKey = useCallback((key: WorkspaceApiKey) => updateWorkspaceCollection<WorkspaceApiKey>('apiKeysByWorkspace', (keys) => [...keys, key]), [updateWorkspaceCollection]);
-  const revokeApiKey = useCallback((id: string) => updateWorkspaceCollection<WorkspaceApiKey>('apiKeysByWorkspace', (keys) => keys.filter((key) => key.id !== id)), [updateWorkspaceCollection]);
-  const addMonitor = useCallback((monitor: WorkspaceMonitor) => updateWorkspaceCollection<WorkspaceMonitor>('monitorsByWorkspace', (monitors) => [monitor, ...monitors.filter((item) => item.id !== monitor.id)]), [updateWorkspaceCollection]);
-  const addEnrichment = useCallback((enrichment: WorkspaceEnrichment) => updateWorkspaceCollection<WorkspaceEnrichment>('enrichmentsByWorkspace', (enrichments) => [enrichment, ...enrichments.filter((item) => item.id !== enrichment.id)]), [updateWorkspaceCollection]);
-  const updateEnrichment = useCallback((id: string, updates: Partial<WorkspaceEnrichment>) => updateWorkspaceCollection<WorkspaceEnrichment>('enrichmentsByWorkspace', (enrichments) => enrichments.map((enrichment) => enrichment.id === id ? { ...enrichment, ...updates } : enrichment)), [updateWorkspaceCollection]);
-  const addSource = useCallback((source: string) => updateWorkspaceCollection<string>('sourcesByWorkspace', (sources) => sources.includes(source) ? sources : [...sources, source]), [updateWorkspaceCollection]);
-  const removeSource = useCallback((source: string) => updateWorkspaceCollection<string>('sourcesByWorkspace', (sources) => sources.filter((item) => item !== source)), [updateWorkspaceCollection]);
+  }));
+  createApiKey = (key: WorkspaceApiKey) => this.updateWorkspaceCollection<WorkspaceApiKey>('apiKeysByWorkspace', (keys) => [...keys, key]);
+  revokeApiKey = (id: string) => this.updateWorkspaceCollection<WorkspaceApiKey>('apiKeysByWorkspace', (keys) => keys.filter((key) => key.id !== id));
+  addMonitor = (monitor: WorkspaceMonitor) => this.updateWorkspaceCollection<WorkspaceMonitor>('monitorsByWorkspace', (monitors) => [monitor, ...monitors.filter((item) => item.id !== monitor.id)]);
+  addEnrichment = (enrichment: WorkspaceEnrichment) => this.updateWorkspaceCollection<WorkspaceEnrichment>('enrichmentsByWorkspace', (enrichments) => [enrichment, ...enrichments.filter((item) => item.id !== enrichment.id)]);
+  updateEnrichment = (id: string, updates: Partial<WorkspaceEnrichment>) => this.updateWorkspaceCollection<WorkspaceEnrichment>('enrichmentsByWorkspace', (enrichments) => enrichments.map((enrichment) => enrichment.id === id ? { ...enrichment, ...updates } : enrichment));
+  addSource = (source: string) => this.updateWorkspaceCollection<string>('sourcesByWorkspace', (sources) => sources.includes(source) ? sources : [...sources, source]);
+  removeSource = (source: string) => this.updateWorkspaceCollection<string>('sourcesByWorkspace', (sources) => sources.filter((item) => item !== source));
 
-  const currentWorkspace = state.session ? state.workspaces.find((item) => item.id === state.session?.workspaceId) ?? null : null;
-  const currentRole = state.session ? state.demoRole ?? state.session.role : null;
-  const session = useMemo(() => state.session && currentRole ? { ...state.session, role: currentRole } : null, [currentRole, state.session]);
-  const value = useMemo<AuthInterface>(() => ({
-    ready, session, currentUser: session?.user ?? null, currentRole, currentWorkspace, workspaces: state.workspaces,
-    members: session ? state.membersByWorkspace[session.workspaceId] ?? [] : [], demoRole: state.demoRole,
-    runs: session ? state.runsByWorkspace[session.workspaceId] ?? [] : [],
-    datasets: session ? state.datasetsByWorkspace[session.workspaceId] ?? [] : [],
-    apiKeys: session ? state.apiKeysByWorkspace[session.workspaceId] ?? [] : [],
-    monitors: session ? state.monitorsByWorkspace[session.workspaceId] ?? [] : [],
-    enrichments: session ? state.enrichmentsByWorkspace[session.workspaceId] ?? [] : [],
-    sources: session ? state.sourcesByWorkspace[session.workspaceId] ?? [] : [],
-    getSession: () => session, signIn, signOut, switchWorkspace, createWorkspace, setDemoRole, inviteMembers, resendInvite, revokeInvite, changeMemberRole, removeMember,
-    addRun, updateRun, addDataset, updateDatasetValue, setDatasetReviewState, createApiKey, revokeApiKey, addMonitor, addEnrichment, updateEnrichment, addSource, removeSource,
-  }), [addDataset, addEnrichment, addMonitor, addRun, addSource, changeMemberRole, createApiKey, createWorkspace, currentRole, currentWorkspace, inviteMembers, ready, removeMember, removeSource, resendInvite, revokeApiKey, revokeInvite, session, setDatasetReviewState, signIn, signOut, state.apiKeysByWorkspace, state.datasetsByWorkspace, state.demoRole, state.enrichmentsByWorkspace, state.membersByWorkspace, state.monitorsByWorkspace, state.runsByWorkspace, state.sourcesByWorkspace, state.workspaces, switchWorkspace, setDemoRole, updateDatasetValue, updateEnrichment, updateRun]);
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  private updateCurrentReview(updates: Partial<WorkspaceReviewState>) {
+    const workspaceId = this.state.session?.workspaceId ?? 'studio';
+    this.reviewState = {
+      ...this.reviewState,
+      [workspaceId]: {
+        ...(this.reviewState[workspaceId] ?? { hasReviewItem: false, pipelineVersion: 4 }),
+        ...updates,
+      },
+    };
+    this.publish();
+  }
+
+  acceptReviewItem = () => this.updateCurrentReview({ hasReviewItem: false });
+  restoreReviewItem = () => this.updateCurrentReview({ hasReviewItem: true });
+  promotePipeline = () => this.updateCurrentReview({ pipelineVersion: 5 });
+
+  readonly auth = {
+    getSession: () => this.snapshot.auth.session,
+    signIn: this.signIn,
+    signOut: this.signOut,
+    setDemoRole: this.setDemoRole,
+  };
+
+  readonly controlPlane: StudioControlPlane = {
+    switchWorkspace: this.switchWorkspace,
+    createWorkspace: this.createWorkspace,
+    inviteMembers: this.inviteMembers,
+    resendInvite: this.resendInvite,
+    revokeInvite: this.revokeInvite,
+    changeMemberRole: this.changeMemberRole,
+    removeMember: this.removeMember,
+    addRun: this.addRun,
+    updateRun: this.updateRun,
+    addDataset: this.addDataset,
+    updateDatasetValue: this.updateDatasetValue,
+    setDatasetReviewState: this.setDatasetReviewState,
+    createApiKey: this.createApiKey,
+    revokeApiKey: this.revokeApiKey,
+    addMonitor: this.addMonitor,
+    addEnrichment: this.addEnrichment,
+    updateEnrichment: this.updateEnrichment,
+    addSource: this.addSource,
+    removeSource: this.removeSource,
+    acceptReviewItem: this.acceptReviewItem,
+    restoreReviewItem: this.restoreReviewItem,
+    promotePipeline: this.promotePipeline,
+  };
+
+  readonly execution = createMockExecution(this.controlPlane, this.getSnapshot);
 }
 
-export function useAuth() {
-  const value = useContext(AuthContext);
-  if (!value) throw new Error('useAuth must be used within DemoAuthProvider');
-  return value;
+export function createMockStudioDataSource(): StudioDataSource {
+  return new MockStudioDataSource();
 }

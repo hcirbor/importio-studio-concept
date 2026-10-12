@@ -27,8 +27,7 @@ import {
 } from './shared';
 import { EnrichmentsSection } from './library-sections';
 import { SectionTabs, useSectionTab } from './section-tabs';
-import { useReviewState } from '../review-state';
-import { can, useAuth, viewerTooltip } from '@/lib/auth';
+import { can, useStudio, viewerTooltip } from '@/lib/data';
 import { isTimestampToday, RelativeTime, useCurrentTime } from '../relative-time';
 
 const pipelines = [
@@ -63,9 +62,9 @@ const pipelines = [
 ];
 
 export function PipelinesSection() {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
+  const { pipelineVersion, pipelineStatus } = useStudio((snapshot) => snapshot.humanReview);
   const mayRun = can(auth.session, 'run');
-  const { pipelineVersion, pipelineStatus } = useReviewState();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [inspected, setInspected] = useState<string>();
@@ -133,7 +132,7 @@ export function PipelinesSection() {
 }
 
 export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const router = useRouter();
   const now = useCurrentTime();
   const [workflow, setWorkflow] = useState('all');
@@ -249,7 +248,7 @@ export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
 }
 
 export function DatasetsSection() {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const searchParams = useSearchParams();
   const typeTabs = [
     { value: 'all', label: 'All' },
@@ -310,7 +309,7 @@ export function DatasetsSection() {
 }
 
 export function MonitorsSection() {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
   const mayCreateMonitor = can(auth.session, 'create_monitor');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pipeline, setPipeline] = useState('Competitor prices');

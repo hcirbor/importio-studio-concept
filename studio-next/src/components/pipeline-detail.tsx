@@ -13,8 +13,7 @@ import {
   DialogTitle,
   Eyebrow,
 } from '@/components/design-system';
-import { useReviewState } from './review-state';
-import { can, useAuth, viewerTooltip } from '@/lib/auth';
+import { can, useStudio, viewerTooltip } from '@/lib/data';
 
 const initialDestinations = [
   { name: 'Webhook', status: 'Last delivery · Healthy', action: 'Configure', connected: true },
@@ -25,9 +24,9 @@ const initialDestinations = [
 ];
 
 export function PipelineDetail() {
-  const auth = useAuth();
+  const auth = useStudio((snapshot) => snapshot.auth);
+  const { pipelineVersion: version, promotePipeline } = useStudio((snapshot) => snapshot.humanReview);
   const mayPromote = can(auth.session, 'promote');
-  const { pipelineVersion: version, promotePipeline } = useReviewState();
   const [message, setMessage] = useState('');
   const [promoteOpen, setPromoteOpen] = useState(false);
   const [hasUnreviewedRegression, setHasUnreviewedRegression] = useState(true);
