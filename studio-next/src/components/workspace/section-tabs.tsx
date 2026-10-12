@@ -1,7 +1,7 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Tabs, TabsList, TabsTrigger } from '@/components/design-system';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/design-system';
 
 export type SectionTab = {
   value: string;
@@ -44,7 +44,7 @@ export function SectionTabs({
       <TabsList aria-label="Page sections">
         {tabs.map((tab) => <TabsTrigger value={tab.value} key={tab.value}>{tab.label}</TabsTrigger>)}
       </TabsList>
+      {tabs.map((tab) => <TabsContent value={tab.value} forceMount hidden key={`${tab.value}-panel`} />)}
     </Tabs>
   );
 }
-

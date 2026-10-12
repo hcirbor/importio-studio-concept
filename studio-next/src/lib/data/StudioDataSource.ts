@@ -62,7 +62,7 @@ export type WorkspaceMonitor = {
   alertRule: string;
   notifyVia?: NotificationChannel;
 };
-export const NOTIFICATION_CHANNELS = ['Email', 'Slack', 'Webhook'] as const;
+const NOTIFICATION_CHANNELS = ['Email', 'Slack', 'Webhook'] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
 export function isNotificationChannel(value: unknown): value is NotificationChannel {
   return typeof value === 'string' && NOTIFICATION_CHANNELS.some((channel) => channel === value);
@@ -133,7 +133,7 @@ export type MonitorRequest = Omit<WorkspaceMonitor, 'id' | 'baselineDataset'> & 
 type EnrichmentRequest = { enrichmentId: string };
 
 type QualificationVerdict = 'Supported' | 'Unresolved' | 'Not supported';
-export type RecentPipeline = {
+type RecentPipeline = {
   name: string;
   status: string;
   records: string;

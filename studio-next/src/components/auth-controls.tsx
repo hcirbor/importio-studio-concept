@@ -65,7 +65,7 @@ export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }
       <Tooltip><TooltipTrigger asChild><Button
         variant="ghost"
         className={collapsed ? 'workspace-card workspace-card-collapsed' : 'workspace-card'}
-        aria-label={`Switch workspace · ${workspace?.name ?? 'Import.io Studio'}`}
+        aria-label={`${workspace?.name.slice(0, 1) ?? 'I'} ${workspace?.name ?? 'Import.io Studio'} ${workspace?.subtitle ?? 'Demo workspace'} · Switch workspace`}
         onClick={() => setOpen(true)}
       >
         <span className="workspace-icon">{workspace?.name.slice(0, 1) ?? 'I'}</span>
@@ -147,7 +147,7 @@ export function UserMenu({ compact = false, rail = false }: { compact?: boolean;
         <button
           type="button"
           className={compact || rail ? `avatar user-menu-trigger${rail ? ' sidebar-user-avatar' : ''}` : 'profile user-menu-trigger'}
-          aria-label="Open user menu"
+          aria-label={`${initials} ${user?.name ?? ''} ${auth.currentRole ?? ''} · Open user menu`}
         >
           {compact || rail ? initials : (
             <>

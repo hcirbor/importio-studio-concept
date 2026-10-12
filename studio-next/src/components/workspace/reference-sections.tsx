@@ -219,7 +219,7 @@ export function UsageSection() {
       />
       <section className="panel usage-spend-banner" aria-label="Monthly spend example">
         <div><span>SPEND THIS MONTH</span><strong>$8.98 estimated</strong><small>Based on $7 per 1,000 queries · $25.00 monthly alert</small></div>
-        <div className="spend-progress" aria-label="$8.98 of $25 monthly alert"><span /></div>
+        <div className="spend-progress" role="progressbar" aria-label="$8.98 of $25 monthly alert" aria-valuemin={0} aria-valuemax={25} aria-valuenow={8.98}><span /></div>
         <Status tone="success">Within budget</Status>
       </section>
       <section className="metric-grid">

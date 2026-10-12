@@ -545,7 +545,7 @@ export function RunSession({
           <h2>Capture history</h2>
           <span className="mono-label">{stepDefinitions.length} retained captures</span>
         </div>
-        <div className="capture-strip">
+        <div className="capture-strip" role="region" aria-label="Capture history" tabIndex={0}>
           {workerSteps(scenario.workers[workerIndex]).map((capture, index) => (
             <div
               inert
