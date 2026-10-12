@@ -3,8 +3,10 @@ import type {
   EnrichmentCell, ExecutionEngine, MonitorRequest, RunEvent, RunPresentation, RunWorker,
   StudioControlPlane, StudioSnapshot, WorkflowPlan, WorkflowRequest, WorkspaceRun,
 } from '@/lib/data/StudioDataSource';
-import { domainLabel, mockDomainRecord } from '@/lib/data/mock/mock-web-data';
+import { mockDomainRecord } from '@/lib/data/mock/mock-web-data';
 import { mockFixtures } from '@/lib/data/mock/mock-fixtures';
+import { normalizeFieldName } from '@/lib/workflow/fields';
+import { sourceDisplayLabel, sourceDomain } from '@/lib/web/source-domain';
 
 const seededPresentations: Record<string, RunPresentation> = {
   run_7f3a: { title: 'Competitor prices', kind: 'compare', completed: true, workers: [
@@ -38,16 +40,16 @@ function uniqueRunId(existingIds: Set<string>) {
 
 function presentationForPlan(plan: WorkflowPlan): RunPresentation {
   const kind = plan.scenario ?? 'research';
-  const domains = plan.sources.map((source) => source.replace(/^https?:\/\//, '').split('/')[0]);
+  const domains = plan.sources.map(sourceDomain);
   const seededKey = kind === 'research' ? 'run_batch_91af' : kind === 'compare' ? 'run_7f3a' : `run_${kind}`;
   const seeded = seededPresentations[seededKey];
   if (seeded && seeded.workers.map((worker) => worker.domain).join('|') === domains.join('|')) return seeded;
   const workers: RunWorker[] = plan.sources.map((source) => {
-    const domain = source.replace(/^https?:\/\//, '').split('/')[0];
+    const domain = sourceDomain(source);
     const record = mockDomainRecord(domain, plan.fields);
     const stated = Object.values(record.values).filter((value): value is string => value !== null);
     return {
-      name: domainLabel(domain), domain, state: 'Complete',
+      name: sourceDisplayLabel(domain), domain, state: 'Complete',
       price: record.values.starting_price ?? record.values.price ?? stated[0],
       planDetails: record.values.free_trial ? `${record.values.free_trial} free trial` : stated[1],
       availability: record.values.availability ?? record.values.stock ?? undefined,
@@ -105,7 +107,7 @@ export function createMockExecution(controlPlane: StudioControlPlane, getSnapsho
         tone: completed ? (needsReview ? 'warning' : 'success') : 'info', badge: true, scenario: plan.scenario,
       };
       presentations.set(runId, presentationForPlan(plan));
-      runResults.set(runId, plan.sources.map((source) => mockDomainRecord(source.replace(/^https?:\/\//, '').split('/')[0], plan.fields)));
+      runResults.set(runId, plan.sources.map((source) => mockDomainRecord(sourceDomain(source), plan.fields)));
       controlPlane.addRun(run);
       emit(runId);
       return runId;
@@ -167,17 +169,17 @@ export function createMockExecution(controlPlane: StudioControlPlane, getSnapsho
     createMonitor: async (request: MonitorRequest) => {
       const identity = uniqueDatasetIdentity(request.workflowName, getSnapshot().auth.datasets.map((item) => item.id));
       const source = request.sources[0] || 'northwind-outdoors.example';
-      const domain = source.replace(/^https?:\/\//, '').split('/')[0];
+      const domain = sourceDomain(source);
       const records = [0, 1].map((_, index) => ({
         id: `baseline-${index + 1}`,
         values: Object.fromEntries(request.fields.map((field) => {
-          const key = field.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+          const key = normalizeFieldName(field);
           if (key === 'price' || key === 'starting_price') return [field, '€249'];
           if (key === 'availability' || key === 'stock' || key === 'status') return [field, 'In stock'];
           return [field, null];
         })),
         evidence: Object.fromEntries(request.fields.map((field) => {
-          const key = field.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
+          const key = normalizeFieldName(field);
           const known = ['price', 'starting_price', 'availability', 'stock', 'status'].includes(key);
           return [field, { sourceUrl: `https://${domain}`, quote: known ? 'Trailhead 2P Tent — €249 · In stock.' : 'Not stated · unknown' }];
         })),

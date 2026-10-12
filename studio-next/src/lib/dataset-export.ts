@@ -2,6 +2,7 @@
 
 import * as XLSX from 'xlsx';
 import type { DatasetRecord, WorkspaceDataset } from '@/lib/data';
+import { sourceDomain } from '@/lib/web/source-domain';
 
 export type DatasetExportFormat = 'csv' | 'xlsx' | 'json';
 
@@ -14,12 +15,7 @@ function rowsForExport(records: DatasetRecord[]) {
     const retainedSource = Object.entries(record.values).find(([field]) => field.toLowerCase() === 'source')?.[1];
     const evidenceSource = Object.values(record.evidence).find((item) => item.sourceUrl)?.sourceUrl ?? '';
     const rawSource = retainedSource || evidenceSource;
-    let source = rawSource;
-    try {
-      source = new URL(rawSource.includes('://') ? rawSource : `https://${rawSource}`).hostname.replace(/^www\./, '');
-    } catch {
-      source = rawSource;
-    }
+    const source = sourceDomain(rawSource);
     const values = Object.fromEntries(Object.entries(record.values)
       .filter(([field]) => field.toLowerCase() !== 'source'));
     const evidence = Object.entries(record.evidence)

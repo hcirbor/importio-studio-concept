@@ -43,7 +43,9 @@ import { RunSession } from './run-session';
 import { WorkflowScenarioReview } from './workflow-scenario-review';
 import { can, isNotificationChannel, useStudio, viewerTooltip, type DatasetRecord, type NotificationChannel } from '@/lib/data';
 import { uniqueDatasetIdentity } from '@/lib/dataset-slug';
-import { formatFieldLabel } from '@/lib/field-label';
+import { FIELD_TYPES, fieldTypeRecord, formatFieldLabel, inferFieldType, inferFieldTypes, isFieldType, normalizeFieldName, type FieldType } from '@/lib/workflow/fields';
+import { inferWorkflowTemplate, parsePromptSpecification } from '@/lib/workflow/prompt-parser';
+import { sourceDisplayLabel, sourceDomain } from '@/lib/web/source-domain';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -66,20 +68,7 @@ const inputMethods = [
 
 type InputMethod = (typeof inputMethods)[number][0];
 type ComposerTool = 'Sources' | 'Browser actions' | 'Fields' | 'Limits' | 'Rules' | 'Improve prompt';
-const fieldTypeOptions = ['text', 'number', 'currency', 'boolean', 'duration', 'url', 'date', 'status'] as const;
-type FieldType = (typeof fieldTypeOptions)[number];
 type PlanField = { id: string; name: string; type: FieldType };
-
-function isFieldType(value: string): value is FieldType {
-  return fieldTypeOptions.some((type) => type === value);
-}
-
-function fieldTypeRecord(entries: Array<readonly [string, FieldType]>) {
-  return entries.reduce<Record<string, FieldType>>((record, [name, type]) => {
-    record[name] = type;
-    return record;
-  }, {});
-}
 
 const workflowDraftKey = 'importio-studio-workflow-draft';
 
@@ -98,83 +87,6 @@ const workflowPromptExamples = visibleStarterKeys.map((key) => ({
   text: workflowTemplates[key].text,
 }));
 
-function normalizeFieldName(value: string) {
-  return value
-    .trim()
-    .replace(/^(?:(?:please\s+)?(?:return|extract|collect|get|include|show)\s+|(?:the|a|an|all|each|their|its|current)\s+)+/i, '')
-    .replace(/\s+(?:from|for|on|across|per)\b.*$/i, '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '');
-}
-
-function canonicalFieldName(value: string) {
-  const normalized = normalizeFieldName(value);
-  const aliases: Record<string, string> = {
-    pricing_url: 'pricing_url',
-    pricing_link: 'pricing_url',
-    starting_price: 'starting_price',
-    free_plan: 'free_plan',
-    free_trial: 'free_trial',
-    free_trial_length: 'free_trial',
-    trial_length: 'free_trial',
-    plan_details: 'plan_details',
-    company: 'company',
-    company_name: 'company',
-    product_name: 'product_name',
-    current_price: 'price',
-    price: 'price',
-    stock: 'availability',
-    availability: 'availability',
-    url: 'url',
-    rating: 'rating',
-    seller: 'seller',
-    map: 'map',
-  };
-  if (aliases[normalized]) return aliases[normalized];
-  if (!normalized || /(?:official_pricing_page|pricing_page|(?:one_)?record(?:_per)?|pagination|this_page|these_pages|products?_in_)/.test(normalized)) return '';
-  return normalized;
-}
-
-function fieldsFromPrompt(request: string) {
-  const candidates: string[][] = [];
-  const pattern = /\b(?:return|extract|collect)\b\s+([^.;!?]+)/gi;
-  for (const match of request.matchAll(pattern)) {
-    const phrase = match[1].trim();
-    const parts = phrase.split(/,|\band\b/i).map((part) => part.trim()).filter(Boolean);
-    const names = parts.map(canonicalFieldName).filter(Boolean);
-    const listLike = /,|\band\b/i.test(phrase);
-    if (names.length > 1 || (names.length === 1 && (!listLike || parts.length === 1))) candidates.push(names);
-  }
-  return candidates.sort((left, right) => right.length - left.length)[0] ?? [];
-}
-
-function parsePromptSpecification(request: string) {
-  const domains = Array.from(new Set(request.match(/\b(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}\b/gi)?.map((value) => value.toLowerCase()) ?? []));
-  return { domains, fields: Array.from(new Set(fieldsFromPrompt(request))) };
-}
-
-function inferWorkflowTemplate(request: string): WorkflowTemplateKey | null {
-  if (/\b(?:pricing|compare)\b/i.test(request)) return 'research';
-  if (/\b(?:catalogue|catalog|pagination)\b/i.test(request)) return 'collect';
-  if (/\b(?:watch|changes?)\b/i.test(request)) return 'monitor';
-  if (/\b(?:single|one|this)\s+(?:web\s+)?page\b/i.test(request)) return 'extract';
-  const domains = parsePromptSpecification(request).domains;
-  if (domains.length === 1 && (/\bpage\b/i.test(request) || /https?:\/\//i.test(request))) return 'extract';
-  return null;
-}
-
-function sourceLabelForDataset(domain: string) {
-  const host = domain.replace(/^https?:\/\//, '').split('/')[0].replace(/^www\./, '').toLowerCase();
-  const root = host.split('.')[0];
-  const knownNames: Record<string, string> = {
-    cloudharbor: 'CloudHarbor',
-    letterloop: 'Letterloop',
-    brightsend: 'BrightSend',
-  };
-  return knownNames[root] ?? root.split('-').filter(Boolean).map((part) => part.replace(/^./, (letter) => letter.toUpperCase())).join(' ');
-}
 
 type WorkflowDraft = {
   dirty?: boolean;
@@ -258,20 +170,6 @@ const templateFields: Record<WorkflowTemplateKey, string> = {
   monitor: 'price, availability',
 };
 
-function inferredFieldType(field: string) {
-  const normalized = field.toLowerCase().replaceAll(' ', '_');
-  if (/(?:^|_)(?:price|map)(?:_|$)/.test(normalized)) return 'currency';
-  if (/(?:^|_)(?:url|link)(?:_|$)/.test(normalized)) return 'url';
-  if (/(?:^|_)(?:stock|availability|status)(?:_|$)/.test(normalized)) return 'status';
-  if (/(?:^|_)(?:rating|count|quantity)(?:_|$)/.test(normalized)) return 'number';
-  if (/(?:^|_)(?:free_plan|available)(?:_|$)/.test(normalized)) return 'boolean';
-  if (/(?:^|_)(?:trial|duration|length)(?:_|$)/.test(normalized)) return 'duration';
-  return 'text';
-}
-
-function inferredFieldTypes(fields: string[]) {
-  return fieldTypeRecord(fields.map((field) => [field, inferredFieldType(field)]));
-}
 
 function parseCsvRows(text: string) {
   return text.replace(/\r/g, '').split('\n').filter((line) => line.trim()).map((line) => {
@@ -365,7 +263,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     ? (parsedInitialFields.length ? parsedInitialFields : templateFields[initialTemplate].split(',').map((field) => field.trim()))
     : [];
   const [fields, setFields] = useState(initialFieldNames.join(', '));
-  const [fieldTypes, setFieldTypes] = useState<Record<string, FieldType>>(() => inferredFieldTypes(initialFieldNames));
+  const [fieldTypes, setFieldTypes] = useState<Record<string, FieldType>>(() => inferFieldTypes(initialFieldNames));
   const [editingPlanFields, setEditingPlanFields] = useState(false);
   const [planFields, setPlanFields] = useState<PlanField[]>([]);
   const [access, setAccess] = useState('Approved public sources');
@@ -431,7 +329,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     markDraftDirty();
     setFields(value);
     const names = value.split(',').map((field) => normalizeFieldName(field)).filter(Boolean);
-    setFieldTypes((current) => fieldTypeRecord(names.map((name) => [name, current[name] ?? inferredFieldType(name)])));
+    setFieldTypes((current) => fieldTypeRecord(names.map((name) => [name, current[name] ?? inferFieldType(name)])));
   }
   function updatePrompt(value: string) {
     markDraftDirty();
@@ -441,7 +339,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     if (inferred) setSelected(inferred);
     if (parsed.domains.length) setSources(parsed.domains.map((domain) => `https://${domain}`).join('\n'));
     setFields(parsed.fields.join(', '));
-    setFieldTypes(inferredFieldTypes(parsed.fields));
+    setFieldTypes(inferFieldTypes(parsed.fields));
   }
   useEffect(() => {
     window.dispatchEvent(new CustomEvent('studio:workflow-title', { detail: prompt.trim() ? template.title : 'New workflow' }));
@@ -508,7 +406,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
             const restoredFields = draft.fields ?? templateFields[initialTemplate];
             const restoredFieldNames = restoredFields.split(',').map((field) => normalizeFieldName(field)).filter(Boolean);
             setFields(restoredFields);
-            setFieldTypes(draft.fieldTypes ?? inferredFieldTypes(restoredFieldNames));
+            setFieldTypes(draft.fieldTypes ?? inferFieldTypes(restoredFieldNames));
             setAccess(draft.access ?? 'Approved public sources');
             setDownloads(draft.downloads ?? 'Block downloads');
             setRegion(draft.region ?? 'Automatic');
@@ -566,7 +464,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
       ? (parsedResetFields.length ? parsedResetFields : templateFields[initialTemplate].split(',').map((field) => field.trim()))
       : [];
     setFields(resetFieldNames.join(', '));
-    setFieldTypes(inferredFieldTypes(resetFieldNames));
+    setFieldTypes(inferFieldTypes(resetFieldNames));
     setEditingPlanFields(false);
     setPlanFields([]);
     setAccess('Approved public sources');
@@ -628,7 +526,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     setPrompt(workflowTemplates[key].text);
     setSources(templateSources(key, auth.sources));
     setFields(templateFields[key]);
-    setFieldTypes(inferredFieldTypes(templateFields[key].split(',').map((field) => field.trim())));
+    setFieldTypes(inferFieldTypes(templateFields[key].split(',').map((field) => field.trim())));
     setEditingPlanFields(false);
     setPlanFields([]);
     setInputMethod('urls');
@@ -719,7 +617,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   const fieldDefinitions = useMemo(() => fieldNames.map((name, index) => ({
     id: `field-${index}`,
     name,
-    type: fieldTypes[name] ?? inferredFieldType(name),
+    type: fieldTypes[name] ?? inferFieldType(name),
   })), [fieldNames, fieldTypes]);
   const activeFieldRows = editingPlanFields ? planFields : fieldDefinitions;
   const normalizedActiveFieldNames = activeFieldRows.map((field) => normalizeFieldName(field.name));
@@ -750,16 +648,10 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     setFieldTypes(fieldTypeRecord(normalizedRows.map((field) => [field.name, field.type])));
     setEditingPlanFields(false);
   }
-  const sourceDomains = useMemo(() => sources.split('\n').map((source) => source.trim()).filter(Boolean).map((source) => {
-    try {
-      return new URL(source.includes('://') ? source : `https://${source}`).hostname;
-    } catch {
-      return source;
-    }
-  }), [sources]);
+  const sourceDomains = useMemo(() => sources.split('\n').map((source) => source.trim()).filter(Boolean).map(sourceDomain), [sources]);
   const suggestedWorkflowName = useMemo(() => {
     const requestedDomains = promptSpecification.domains.length ? promptSpecification.domains : sourceDomains;
-    const names = requestedDomains.map(sourceLabelForDataset).filter(Boolean);
+    const names = requestedDomains.map(sourceDisplayLabel).filter(Boolean);
     if (selected === 'research') return `Pricing · ${names.slice(0, 3).join(', ') || 'research'}`;
     if (selected === 'collect') return `${names[0] || 'Web'} catalogue`;
     if (selected === 'extract') return `${names[0] || 'Page'} extract`;
@@ -1007,7 +899,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
                             />
                             <Select value={field.type} onValueChange={(value) => { if (isFieldType(value)) syncPlanFieldRows(planFields.map((item) => item.id === field.id ? { ...item, type: value } : item)); }}>
                               <SelectTrigger className="plan-field-type" aria-label={`Field ${index + 1} type`}><SelectValue /></SelectTrigger>
-                              <SelectContent>{fieldTypeOptions.map((type) => <SelectItem value={type} key={type}>{type}</SelectItem>)}</SelectContent>
+                              <SelectContent>{FIELD_TYPES.map((type) => <SelectItem value={type} key={type}>{type}</SelectItem>)}</SelectContent>
                             </Select>
                             <Button variant="ghost" size="sm" className="plan-field-remove" aria-label={`Remove ${field.name || `field ${index + 1}`}`} onClick={() => syncPlanFieldRows(planFields.filter((item) => item.id !== field.id))}><X size={14} /></Button>
                           </div>

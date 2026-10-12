@@ -3,11 +3,12 @@
 import Link from 'next/link';
 import { Eyebrow } from '@/components/design-system';
 import { useStudio } from '@/lib/data';
-import { formatFieldLabel } from '@/lib/field-label';
+import { formatFieldLabel } from '@/lib/workflow/fields';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
 import { useState } from 'react';
 import { RelativeTime } from './relative-time';
+import { sourceDomain as domainFromSource } from '@/lib/web/source-domain';
 
 export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
   const auth = useStudio((snapshot) => ({
@@ -31,11 +32,7 @@ export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
     const evidenceSource = Object.values(record.evidence).find((item) => item.sourceUrl)?.sourceUrl;
     const source = retainedSource || evidenceSource || '';
     if (!source) return '—';
-    try {
-      return new URL(source.includes('://') ? source : `https://${source}`).hostname.replace(/^www\./, '');
-    } catch {
-      return source;
-    }
+    return domainFromSource(source);
   }
   function showEvidence(recordId: string, field: string) {
     const record = records.find((item) => item.id === recordId);

@@ -5,7 +5,8 @@ import { Badge, Button, Tabs, TabsList, TabsTrigger } from '@/components/design-
 import type { DatasetRecord } from '@/lib/data';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
-import { formatFieldLabel } from '@/lib/field-label';
+import { formatFieldLabel, normalizeFieldName } from '@/lib/workflow/fields';
+import { sourceDomain } from '@/lib/web/source-domain';
 
 const records = [
   {
@@ -34,12 +35,8 @@ const records = [
   },
 ];
 
-function normalizedField(field: string) {
-  return field.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-}
-
 function recordValue(record: (typeof records)[number], field: string) {
-  const key = normalizedField(field);
+  const key = normalizeFieldName(field);
   if (key === 'retailer' || key === 'seller' || key === 'company') return record.retailer;
   if (key === 'product' || key === 'product_name' || key === 'name') return record.product;
   if (key === 'price' || key === 'starting_price') return record.price;
@@ -54,7 +51,7 @@ export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io
   const [feedback, setFeedback] = useState('');
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const selectedRecord = records[selectedIndex];
-  const outputFields = (fields.length ? fields : ['retailer','product_name','price','availability']).filter((field) => normalizedField(field) !== 'source');
+  const outputFields = (fields.length ? fields : ['retailer','product_name','price','availability']).filter((field) => normalizeFieldName(field) !== 'source');
   const exportRecords: DatasetRecord[] = records.map((record) => ({
     id: record.retailer.toLowerCase().replace(/\W+/g, '-'),
     values: Object.fromEntries(outputFields.map((field) => [field, recordValue(record, field)])),
@@ -63,9 +60,9 @@ export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io
       return [field, { sourceUrl: record.sourceUrl, quote: value === null ? 'Not stated · unknown' : `${record.product} — ${record.price}${record.availability !== 'Unknown' ? ` · ${record.availability}` : ''}.` }];
     })),
   }));
-  const hasAvailability = outputFields.some((field) => ['availability','stock','status'].includes(normalizedField(field)));
+  const hasAvailability = outputFields.some((field) => ['availability','stock','status'].includes(normalizeFieldName(field)));
   const jsonRows = exportRecords.map((record, index) => ({
-    source: new URL(records[index].sourceUrl).hostname,
+    source: sourceDomain(records[index].sourceUrl),
     ...record.values,
   }));
 
@@ -124,7 +121,7 @@ export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io
                     className={selectedIndex === index ? 'selected' : ''}
                     key={record.retailer}
                   >
-                    <td><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, 'source', record.sourceUrl)}>{new URL(record.sourceUrl).hostname}</button></td>
+                    <td><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, 'source', record.sourceUrl)}>{sourceDomain(record.sourceUrl)}</button></td>
                     {outputFields.map((field) => {
                       const value = exportRecords[index].values[field];
                       return <td key={field}><button className="value-evidence-button" type="button" onClick={() => openEvidence(index, field, value)}>{value === null ? <><code>null</code><span className="unknown-value">Not stated · unknown</span></> : value}</button></td>;
@@ -137,7 +134,7 @@ export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io
           <aside className="field-evidence">
             <div>
               <span>FIELD EVIDENCE</span>
-              <strong>{new URL(selectedRecord.sourceUrl).hostname}</strong>
+              <strong>{sourceDomain(selectedRecord.sourceUrl)}</strong>
             </div>
             <blockquote>
               “{evidence?.quote ?? exportRecords[selectedIndex].evidence[outputFields[0]]?.quote ?? 'Not stated · unknown'}”

@@ -1,11 +1,9 @@
 import type { DatasetRecord } from '@/lib/data/StudioDataSource';
+import { normalizeFieldName } from '@/lib/workflow/fields';
+import { sourceDisplayLabel } from '@/lib/web/source-domain';
 
 function hashDomain(domain: string) {
   return Array.from(domain).reduce((hash, character) => ((hash << 5) - hash + character.charCodeAt(0)) | 0, 0) >>> 0;
-}
-
-export function domainLabel(domain: string) {
-  return domain.split('.')[0].split('-').map((part) => part.charAt(0).toUpperCase() + part.slice(1)).join(' ');
 }
 
 export function mockDomainRecord(domain: string, fields: string[]): DatasetRecord {
@@ -14,13 +12,13 @@ export function mockDomainRecord(domain: string, fields: string[]): DatasetRecor
   const trial = [7, 14, 30][seed % 3];
   const plan = ['Starter', 'Essentials', 'Growth'][seed % 3];
   const stock = ['In stock', 'Low stock', 'Out of stock'][seed % 3];
-  const label = domainLabel(domain);
+  const label = sourceDisplayLabel(domain);
   const quote = `${plan} — $${price}/month. Try free for ${trial} days.`;
   const sourceUrl = `https://${domain}/pricing`;
   const values: Record<string, string | null> = {};
   const evidence: DatasetRecord['evidence'] = {};
   fields.forEach((field) => {
-    const key = field.toLowerCase().replace(/\s+/g, '_');
+    const key = normalizeFieldName(field);
     let value: string | null = null;
     if (key === 'starting_price' || key === 'price') value = `$${price} / month`;
     else if (key === 'free_trial' || key === 'trial' || key === 'free_trial_length') value = `${trial} days`;
