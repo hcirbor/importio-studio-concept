@@ -65,6 +65,7 @@ Naming: CiteOtter's `review` is an automated evidence check. Studio's human inbo
 | 2R | **Code review + cleanup** | P3R | Written review (duplication, components over ~300 lines, `any`, dead code, per-template special cases, text-matching logic); then one cleanup with no visual changes; quality baseline reduced | Yes, demo | `cleanup-1` | Review report saved in `docs/reviews/`; baseline violations reduced; 0 visual differences |
 | 3 | Status labels | P4 | Capabilities map + StatusTag; off on demo | Yes, demo (labels off) | `status-tags` | 0 differences with labels off; labelled states tested |
 | 3B | **Feature parity with the HTML concept** | P4B | Restore features lost in the React port (see "Parity gaps"), on mock data, with status labels where the engine can't support them yet | Yes, demo | `parity-1` | Every gap is either restored or recorded as an intentional removal; journey tests added for each restored flow |
+| 4A | **Engine contract** | P4A | Define and test the production engine contract against mock implementations only | No | `engine-contract` | The contract covers phases 7–10 and the production engine path is confirmed before live feature work begins |
 | 4 | Protected live host + server | P5 | Server build; access gate; allowlisted `/api/engine/*` proxy; health and Extract smoke test | Yes, live preview | `live-gateway` | Gate blocks anonymous access; `/healthz` OK; bounded Extract smoke test passes (provider path works); no credential reaches the browser |
 | 5 | Extract, live | P6 | Live ExecutionEngine for "Extract from a page" | Live preview | `live-extract` | Supported public HTTPS pages run end to end: plan → run → evidence → dataset → export; blocked/unavailable pages show a clear state |
 | 5R | **Human engineering review** | — | An engineer reviews the CiteOtter translation, the `/api/engine/*` server, the access gate and credential handling. Findings fixed in a follow-up prompt | No | `live-extract-reviewed` | Named reviewer signs off; blocking findings fixed. No wider access to the live preview before this |
@@ -121,9 +122,10 @@ Recommended: **A now, B later.** The chosen option: **A, using the public reposi
 ## Decisions needed before Phase 4
 
 - [ ] **Repository home:** move `hcirbor/importio-studio-concept` into the Import.io company GitHub organisation before live integration, or keep it in its current owner through the preview?
-- [ ] **Live preview host** that can run a Next.js server **behind an access gate** (VPN, IAP or SSO). Not chatgpt.site, not public, not CiteOtter's repo.
+- [ ] **Live preview host** that can run a Next.js server **behind an access gate** (VPN, IAP or SSO). The likely host is the same platform as CiteOtter staging, with Studio running as its own service behind staff sign-in. Not chatgpt.site, not public, not CiteOtter's repo.
 - [ ] **CiteOtter staging credential** (shared Basic auth), who issues it while the engineer is away, and where it's stored server-side.
-- [ ] **Who pays** for Amber model, Import.io MCP and SearXNG usage on staging.
+- [x] **Amber staging cost:** Amber is an internal model; staging usage needs no sign-off.
+- [ ] **Production engine path confirmed before phases 7–10.**
 - [ ] **His manager or the CTO is told,** and a company owner is named for any CiteOtter change.
 - [ ] **Phase 5R reviewer named** (an engineer who signs off the live integration).
 
