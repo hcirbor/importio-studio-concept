@@ -1,7 +1,9 @@
 'use client';
 
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/design-system';
+
+const sectionListClass = 'inline-flex min-h-10 items-center gap-1 rounded-control bg-background p-1';
+const sectionLinkClass = 'inline-flex min-h-8 items-center justify-center rounded-[var(--io-radius-sm)] px-3 text-sm font-medium text-muted transition-colors data-[state=active]:bg-surface data-[state=active]:text-link data-[state=active]:shadow-sm disabled:opacity-50';
 
 export type SectionTab = {
   value: string;
@@ -29,22 +31,32 @@ export function SectionTabs({
   const router = useRouter();
   const searchParams = useSearchParams();
 
-  function changeTab(nextValue: string) {
+  function hrefForTab(nextValue: string) {
     const next = new URLSearchParams(searchParams.toString());
     if (nextValue === fallback) next.delete(param);
     else next.set(param, nextValue);
     if (param === 'tab' && nextValue !== 'companies') next.delete('view');
     if (param === 'type' && nextValue !== 'enrichment') next.delete('create');
     const query = next.toString();
-    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    return query ? `${pathname}?${query}` : pathname;
   }
 
   return (
-    <Tabs value={value} onValueChange={changeTab} className="workspace-section-tabs">
-      <TabsList aria-label="Page sections">
-        {tabs.map((tab) => <TabsTrigger value={tab.value} key={tab.value}>{tab.label}</TabsTrigger>)}
-      </TabsList>
-      {tabs.map((tab) => <TabsContent value={tab.value} forceMount hidden key={`${tab.value}-panel`} />)}
-    </Tabs>
+    <nav className="workspace-section-tabs" aria-label="Page sections">
+      <div className={sectionListClass}>
+        {tabs.map((tab) => (
+          <button
+            type="button"
+            aria-current={tab.value === value ? 'page' : undefined}
+            data-state={tab.value === value ? 'active' : 'inactive'}
+            className={sectionLinkClass}
+            onClick={() => router.replace(hrefForTab(tab.value), { scroll: false })}
+            key={tab.value}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+    </nav>
   );
 }

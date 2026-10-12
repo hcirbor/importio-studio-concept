@@ -11,6 +11,10 @@ const viewports = [
 const routes = [
   { name: 'search', path: '/search' },
   { name: 'runs', path: '/runs' },
+  { name: 'datasets', path: '/datasets' },
+  { name: 'dataset-detail', path: '/datasets/outdoor-catalogue' },
+  { name: 'monitors', path: '/monitors' },
+  { name: 'review', path: '/review' },
   { name: 'usage', path: '/usage' },
   { name: 'developers', path: '/developers' },
   { name: 'settings', path: '/settings' },
