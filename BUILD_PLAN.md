@@ -116,3 +116,4 @@ Rows are added by receipt commits after each phase.
 | Date | Phase | Tag | App SHA | Published? | Deploy evidence | Notes |
 |---|---|---|---|---|---|---|
 | 2026-10-12 | — | — | — | — | — | Demo at 9.7. CiteOtter mapped read-only. Plan revision 3. |
+| 2026-10-12 | Phase 0 — Safety net | `demo-9.7` | `f9c3512` | Yes — already live | Live/local `page-68238ff096eb45be.js`; SHA-256 `9e0186ee5e8795730215240d22cf6895cbef24a1e2895b6b5ba97be398cedbcf` matched | No Phase 0 deploy. Inventory: 27 application files, 51 ignored local artefacts, 0 unsure. |
