@@ -83,26 +83,74 @@ type Capability = { status: CapabilityStatus; note?: string; limit?: number };
 export type CapabilityMap = Readonly<Record<string, Capability>>;
 
 export type WorkflowRequest = { prompt: string; sources: string[]; fields: string[] };
-export type WorkflowPlan = WorkflowRequest & { name: string; queries: number };
+export type WorkflowPlan = WorkflowRequest & {
+  name: string;
+  queries: number;
+  scenario?: WorkspaceRun['scenario'];
+  recordCount?: number;
+  completed?: boolean;
+  needsReview?: boolean;
+};
 type ValidationResult = { valid: boolean; messages: string[] };
-export type RunEvent = { runId: string; state: WorkspaceRun['state']; outcome: WorkspaceRun['outcome'] };
-export type SearchResult = { title: string; url: string; detail?: string };
+export type RunWorkerState = 'Running' | 'Complete' | 'Needs input' | 'Failed';
+export type RunWorker = {
+  name: string;
+  domain: string;
+  state: RunWorkerState;
+  price?: string;
+  planDetails?: string;
+  availability?: string;
+};
+export type RunPresentation = {
+  title: string;
+  kind: NonNullable<WorkspaceRun['scenario']>;
+  completed: boolean;
+  workers: RunWorker[];
+};
+export type RunEvent = {
+  runId: string;
+  state: WorkspaceRun['state'];
+  outcome: WorkspaceRun['outcome'];
+  presentation: RunPresentation;
+  decisionState?: 'Running' | 'Complete';
+};
+type SearchResult = { domain: string; title: string; url: string; description: string };
+export type MonitorRequest = Omit<WorkspaceMonitor, 'id' | 'baselineDataset'> & {
+  runId?: string;
+  workflowName: string;
+  sources: string[];
+};
+type EnrichmentRequest = { enrichmentId: string };
+
+type QualificationVerdict = 'Supported' | 'Unresolved' | 'Not supported';
+export type MockFixtures = {
+  searchResults: SearchResult[];
+  candidates: { name: string; domain: string; detail: string }[];
+  qualificationRows: { id: string; name: string; verdicts: QualificationVerdict[] }[];
+  readyCandidateIds: string[];
+  pipelines: { name: string; detail: string; version: string; lastRun: string; schedule: string; status: string; tone: 'success' | 'warning'; href?: string }[];
+  memoryRows: { id: string; label: string; runId: string; retention: string; status: string; tone: 'success' | 'warning'; href: string }[];
+  groups: { name: string; items: string; status: string; tone: 'success' | 'warning' }[];
+  usageRows: { id: string; values: string[] }[];
+  usageTrend: { runs: number[]; dates: string[] };
+  webhooks: { id: string; url: string; events: string; health: 'Healthy' | 'Validating' }[];
+  mcpSetups: { id: string; label: string; title: string; setup: string }[];
+  recentItems: { label: string; href: string; kind: 'run' | 'pipeline' | 'dataset' }[];
+};
 
 export interface ExecutionEngine {
   suggest(request: WorkflowRequest): WorkflowPlan;
-  plan(request: WorkflowRequest): WorkflowPlan;
-  validate(plan: WorkflowPlan): ValidationResult;
-  startRun(run: WorkspaceRun): void;
-  getRun(runId: string): WorkspaceRun | undefined;
-  cancelRun(runId: string): void;
+  plan(request: WorkflowRequest): Promise<WorkflowPlan>;
+  validate(plan: WorkflowPlan): Promise<ValidationResult>;
+  startRun(plan: WorkflowPlan): Promise<string>;
+  getRun(runId: string): Promise<WorkspaceRun | undefined>;
+  cancelRun(runId: string): Promise<void>;
   subscribeRunEvents(runId: string, listener: (event: RunEvent) => void): () => void;
-  evidence(datasetId: string): DatasetRecord[];
-  search(query: string): SearchResult[];
-  domainLabel(domain: string): string;
-  recordForDomain(domain: string, fields: string[]): DatasetRecord;
-  recordsForDomains(domains: string[], fields: string[]): DatasetRecord[];
-  startEnrichment(enrichment: WorkspaceEnrichment): void;
-  createMonitor(monitor: WorkspaceMonitor): void;
+  resolveRunDecision(runId: string): Promise<void>;
+  evidence(datasetId: string): Promise<DatasetRecord[]>;
+  search(query: string): Promise<SearchResult[]>;
+  startEnrichment(request: EnrichmentRequest): Promise<void>;
+  createMonitor(request: MonitorRequest): Promise<{ dataset: WorkspaceDataset; monitor: WorkspaceMonitor }>;
 }
 
 export interface StudioControlPlane {
@@ -170,6 +218,7 @@ export type StudioSnapshot = {
   execution: ExecutionEngine;
   controlPlane: StudioControlPlane;
   capabilities: CapabilityMap;
+  fixtures: MockFixtures;
 };
 
 export interface StudioDataSource {

@@ -57,6 +57,13 @@ if (regressions.length) {
   process.exit(1);
 }
 
+const allowedTotal = baseline.issues.reduce((sum, issue) => sum + issue.count, 0);
+const actualTotal = [...actual.values()].reduce((sum, issue) => sum + issue.count, 0);
+if (allowedTotal > actualTotal) {
+  process.stderr.write(`Quality baseline must be lowered to ${actualTotal}.\n`);
+  process.exit(1);
+}
+
 function sourceFiles(directory) {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = resolve(directory, entry.name);
@@ -70,7 +77,7 @@ const largest = sourceFiles(componentRoot)
   .map((file) => ({ file: relative(cwd, file), lines: readFileSync(file, 'utf8').split('\n').length }))
   .sort((a, b) => b.lines - a.lines)
   .slice(0, 10);
-const totals = [...actual.values()].reduce((sum, issue) => sum + issue.count, 0);
+const totals = actualTotal;
 const strict = JSON.parse(readFileSync(resolve(cwd, 'tsconfig.json'), 'utf8')).compilerOptions?.strict === true;
 
 if (!strict) {

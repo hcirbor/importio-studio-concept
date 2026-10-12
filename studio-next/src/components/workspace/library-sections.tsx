@@ -16,38 +16,6 @@ import {
 } from '@/components/design-system';
 import { Feedback, PageHead, Status, TablePanel, type TableRow } from './shared';
 
-const memoryRows: TableRow[] = [
-  {
-    id: 'competitor-price-review',
-    cells: [
-      'Competitor price review',
-      'run_7f3a',
-      'Saved until 5 Nov 2026',
-      <Status key="status" tone="warning">Completed · Partial</Status>,
-      <Button key="action" variant="ghost" size="sm" asChild>
-        <Link href="/build?template=compare&input=prior">Use in new workflow</Link>
-      </Button>,
-    ],
-  },
-  {
-    id: 'supplier-market-scan',
-    cells: [
-      'Supplier market scan',
-      'run_supplier_2b81',
-      'Saved until 18 Nov 2026',
-      <Status key="status">Completed · Succeeded</Status>,
-      <Button key="action" variant="ghost" size="sm" asChild>
-        <Link href="/build?template=discover&input=prior">Use in new workflow</Link>
-      </Button>,
-    ],
-  },
-];
-
-const groupFixtures = [
-  { name: 'EU supplier discovery', items: '8 items', status: 'Completed · Partial', tone: 'warning' as const },
-  { name: 'SaaS pricing sample', items: '10 items', status: 'Completed · Succeeded', tone: 'success' as const },
-];
-
 function uniqueEnrichmentSlug(name: string, existingIds: string[]) {
   const base = datasetSlug(name);
   if (!existingIds.includes(base)) return base;
@@ -80,6 +48,11 @@ function fieldKey(label: string, index: number) {
 }
 
 export function SavedRunsSection({ showHeader = true }: { showHeader?: boolean }) {
+  const fixtures = useStudio((snapshot) => snapshot.fixtures);
+  const memoryRows: TableRow[] = fixtures.memoryRows.map((row) => ({
+    id: row.id,
+    cells: [row.label, row.runId, row.retention, <Status key="status" tone={row.tone}>{row.status}</Status>, <Button key="action" variant="ghost" size="sm" asChild><Link href={row.href}>Use in new workflow</Link></Button>],
+  }));
   return (
     <>
       {showHeader ? <PageHead group="Operate" title="Saved runs" description="Saved runs available as labelled prior research." /> : null}
@@ -94,6 +67,7 @@ export function SavedRunsSection({ showHeader = true }: { showHeader?: boolean }
 }
 
 export function BatchesSection({ showHeader = true }: { showHeader?: boolean }) {
+  const groupFixtures = useStudio((snapshot) => snapshot.fixtures.groups);
   const [message, setMessage] = useState<string>();
   const rows: TableRow[] = groupFixtures.map((group) => ({
     id: group.name,

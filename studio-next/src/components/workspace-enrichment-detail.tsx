@@ -1,51 +1,22 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Eyebrow } from '@/components/design-system';
-import { useStudio, type DatasetRecord, type EnrichmentCell } from '@/lib/data';
+import { useStudio, type DatasetRecord } from '@/lib/data';
 import { formatFieldLabel } from '@/lib/field-label';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
 
-function sourceUrl(values: Record<string, string>) {
-  const raw = Object.entries(values).find(([field]) => /(?:website|domain|url|source)/i.test(field))?.[1] ?? '';
-  return raw && !raw.includes('://') ? `https://${raw}` : raw;
-}
-
-function enrichedValue(field: string, rowIndex: number, values: Record<string, string>): EnrichmentCell {
-  const source = sourceUrl(values);
-  const names = ['Industrial tools', 'Business software', 'Outdoor equipment', 'Wholesale distribution', 'Retail'];
-  const locations = ['Birmingham, UK', 'Amsterdam, Netherlands', 'Rotterdam, Netherlands', 'Lyon, France', 'Innsbruck, Austria'];
-  const value = field === 'category' ? names[rowIndex % names.length] : locations[rowIndex % locations.length];
-  const subject = Object.values(values)[0] || `Row ${rowIndex + 1}`;
-  return {
-    value,
-    verdict: 'Supported',
-    evidence: {
-      sourceUrl: source || `https://source-${rowIndex + 1}.example`,
-      quote: field === 'category'
-        ? `${subject} describes its business as ${value.toLowerCase()}.`
-        : `${subject} lists ${value} as its main office.`,
-    },
-  };
-}
-
 export function WorkspaceEnrichmentDetail({ enrichmentId }: { enrichmentId: string }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const { auth, execution } = useStudio((snapshot) => snapshot);
   const enrichment = auth.enrichments.find((item) => item.id === enrichmentId);
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
-  const [running, setRunning] = useState(false);
-  const timerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!enrichment) return;
     document.title = `${enrichment.name} · Import.io Studio`;
   }, [enrichment]);
-
-  useEffect(() => () => {
-    if (timerRef.current) window.clearTimeout(timerRef.current);
-  }, []);
 
   const exportRecords = useMemo<DatasetRecord[]>(() => enrichment?.rows.map((row) => ({
     id: row.id,
@@ -71,32 +42,7 @@ export function WorkspaceEnrichmentDetail({ enrichmentId }: { enrichmentId: stri
   const runHref = enrichment.runId && (staticRunIds.includes(enrichment.runId) ? `/runs/${enrichment.runId}` : `/runs/run_7f3a?run=${encodeURIComponent(enrichment.runId)}`);
 
   function runEnrichment() {
-    const runId = `run_${Math.random().toString(36).slice(2, 8)}`;
-    setRunning(true);
-    auth.updateEnrichment(activeEnrichment.id, { state: 'Running', runId });
-    auth.addRun({
-      id: runId,
-      when: 'Running now',
-      createdAt: Date.now(),
-      pipeline: activeEnrichment.name,
-      coverage: `0 / ${activeEnrichment.rowCount} rows`,
-      records: '0',
-      queries: activeEnrichment.rowCount,
-      state: 'Running',
-      outcome: 'Running',
-      tone: 'info',
-      badge: true,
-      scenario: 'extract',
-    });
-    timerRef.current = window.setTimeout(() => {
-      const rows = activeEnrichment.rows.map((row, rowIndex) => ({
-        ...row,
-        enriched: Object.fromEntries(activeEnrichment.enrichedFields.map((field) => [field, enrichedValue(field, rowIndex, row.values)])),
-      }));
-      auth.updateEnrichment(activeEnrichment.id, { rows, state: 'Completed', outcome: 'Succeeded', runId });
-      auth.updateRun(runId, { coverage: `${activeEnrichment.rowCount} / ${activeEnrichment.rowCount} rows`, records: String(activeEnrichment.rowCount), state: 'Completed', outcome: 'Succeeded', tone: 'success', when: 'Just now' });
-      setRunning(false);
-    }, 1200);
+    void execution.startEnrichment({ enrichmentId: activeEnrichment.id });
   }
 
   function openEvidence(rowIndex: number, field: string) {
@@ -129,7 +75,7 @@ export function WorkspaceEnrichmentDetail({ enrichmentId }: { enrichmentId: stri
           <div><dt>Run</dt><dd>{enrichment.runId && runHref ? <Link className="text-link" href={runHref}>{enrichment.runId} →</Link> : 'Not run yet'}</dd></div>
         </dl>
       </section>
-      {enrichment.state === 'Validated' && enrichment.outcome === 'Ready' ? <section className="panel enrichment-ready-panel"><div><Eyebrow>Validated CSV</Eyebrow><h2>Ready to enrich {enrichment.rowCount} {enrichment.rowCount === 1 ? 'row' : 'rows'}.</h2><p>The demo will visit each row’s source and retain evidence for the enriched values.</p></div><Button variant="primary" onClick={runEnrichment} disabled={running}>{running ? 'Running enrichment…' : 'Run enrichment'}</Button></section> : null}
+      {enrichment.state === 'Validated' && enrichment.outcome === 'Ready' ? <section className="panel enrichment-ready-panel"><div><Eyebrow>Validated CSV</Eyebrow><h2>Ready to enrich {enrichment.rowCount} {enrichment.rowCount === 1 ? 'row' : 'rows'}.</h2><p>The demo will visit each row’s source and retain evidence for the enriched values.</p></div><Button variant="primary" onClick={runEnrichment}>Run enrichment</Button></section> : null}
       {enrichment.state === 'Running' ? <p className="review-feedback" role="status">Running enrichment · checking sources and retaining evidence…</p> : null}
       {enrichment.outcome === 'Partial' ? <div className="review-warning enrichment-review-warning"><span>{reviewRows.length} preview {reviewRows.length === 1 ? 'row needs' : 'rows need'} review: {reviewRows.map((row) => Object.values(row.values)[0]).join(', ')}.</span><Link className="text-link" href="/review">Open Review →</Link></div> : null}
       <section className="panel dataset-detail-table">

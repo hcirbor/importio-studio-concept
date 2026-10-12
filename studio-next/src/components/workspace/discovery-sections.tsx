@@ -9,71 +9,18 @@ import { useStudio } from '@/lib/data';
 
 const initialSearchQuery = 'Trailhead 2P Tent price Europe';
 
-const searchResults = [
-  {
-    domain: 'northwind-outdoors.example',
-    url: 'https://northwind-outdoors.example/tents/trailhead-2p',
-    title: 'Trailhead 2P Tent — Northwind Outdoors',
-    description: 'Product page with current EUR price, stock status and delivery guidance.',
-  },
-  {
-    domain: 'summit-supply.example',
-    url: 'https://summit-supply.example/camping/trailhead-two-person',
-    title: 'Trailhead Two-Person Tent — Summit Supply',
-    description: 'Retail listing with price, low-stock notice and product specifications.',
-  },
-  {
-    domain: 'trail-shop.example',
-    url: 'https://trail-shop.example/search?q=trailhead',
-    title: 'Trailhead 2 Person — Trail Shop',
-    description: 'Product detail page with price and availability requiring review.',
-  },
-];
-
-const candidates = [
-  { name: 'Northwind Trade', domain: 'northwind.example', detail: 'Outdoor equipment supplier · Rotterdam' },
-  { name: 'Summit Supply Europe', domain: 'summit.example', detail: 'Wholesale distributor · Lyon' },
-  { name: 'Alpine Trade', domain: 'alpine.example', detail: 'Outdoor catalogue · Innsbruck' },
-];
-
-const qualificationRows: TableRow[] = [
-  {
-    id: 'northwind-trade',
-    cells: [
-      'Northwind Trade',
-      <Status key="eu">Supported</Status>,
-      <Status key="wholesale">Supported</Status>,
-      <Status key="contact">Supported</Status>,
-    ],
-  },
-  {
-    id: 'summit-supply-europe',
-    cells: [
-      'Summit Supply Europe',
-      <Status key="eu">Supported</Status>,
-      <Status key="wholesale">Supported</Status>,
-      <Status key="contact" tone="warning">Unresolved</Status>,
-    ],
-  },
-  {
-    id: 'alpine-trade',
-    cells: [
-      'Alpine Trade',
-      <Status key="eu">Supported</Status>,
-      <Status key="wholesale" tone="danger">Not supported</Status>,
-      <Status key="contact" tone="warning">Unresolved</Status>,
-    ],
-  },
-];
-
-const readyCandidateIds = new Set(['northwind-trade', 'summit-supply-europe']);
-
 export function SearchSection({ showHeader = true }: { showHeader?: boolean }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const { auth, execution, fixtures } = useStudio((snapshot) => snapshot);
   const router = useRouter();
   const [query, setQuery] = useState(initialSearchQuery);
   const [limit, setLimit] = useState('3');
   const [searchedQuery, setSearchedQuery] = useState(initialSearchQuery);
+  const [searchResults, setSearchResults] = useState(fixtures.searchResults);
+
+  async function runSearch() {
+    setSearchedQuery(query);
+    setSearchResults(await execution.search(query));
+  }
 
   const feedback = searchedQuery !== initialSearchQuery
     ? `Showing ranked demo sources for “${searchedQuery}”.`
@@ -96,7 +43,7 @@ export function SearchSection({ showHeader = true }: { showHeader?: boolean }) {
           ]}
         />
         <Input defaultValue="English" aria-label="Language" />
-        <Button variant="primary" onClick={() => setSearchedQuery(query)}>Search</Button>
+        <Button variant="primary" onClick={() => void runSearch()}>Search</Button>
       </section>
       <Feedback tone="info">{feedback}</Feedback>
       <section className="search-results">
@@ -123,6 +70,7 @@ export function SearchSection({ showHeader = true }: { showHeader?: boolean }) {
 }
 
 export function CandidatesSection({ showHeader = true }: { showHeader?: boolean }) {
+  const candidates = useStudio((snapshot) => snapshot.fixtures.candidates);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [entityType, setEntityType] = useState('Supplier');
@@ -272,13 +220,20 @@ export function CandidatesSection({ showHeader = true }: { showHeader?: boolean 
 export function QualifySection({
   showHeader = true,
   onBack,
-  selectedCandidates = candidates.map((candidate) => candidate.name),
+  selectedCandidates,
 }: {
   showHeader?: boolean;
   onBack?: () => void;
   selectedCandidates?: string[];
 }) {
-  const selectedRows = qualificationRows.filter((row) => selectedCandidates.includes(String(row.cells[0])));
+  const fixtures = useStudio((snapshot) => snapshot.fixtures);
+  const selectedNames = selectedCandidates ?? fixtures.candidates.map((candidate) => candidate.name);
+  const qualificationRows: TableRow[] = fixtures.qualificationRows.map((row) => ({
+    id: row.id,
+    cells: [row.name, ...row.verdicts.map((verdict, index) => <Status key={`${row.id}-${index}`} tone={verdict === 'Unresolved' ? 'warning' : verdict === 'Not supported' ? 'danger' : 'success'}>{verdict}</Status>)],
+  }));
+  const readyCandidateIds = new Set(fixtures.readyCandidateIds);
+  const selectedRows = qualificationRows.filter((row) => selectedNames.includes(String(row.cells[0])));
   const readyRows = selectedRows.filter((row) => readyCandidateIds.has(row.id));
   const candidateParam = readyRows.map((row) => row.id).join(',');
 

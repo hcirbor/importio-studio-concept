@@ -36,7 +36,3 @@ export function mockDomainRecord(domain: string, fields: string[]): DatasetRecor
   });
   return { id: domain.replace(/[^a-z0-9]+/gi, '-'), values, evidence };
 }
-
-export function mockDomainRecords(domains: string[], fields: string[]) {
-  return domains.map((domain) => mockDomainRecord(domain, fields));
-}

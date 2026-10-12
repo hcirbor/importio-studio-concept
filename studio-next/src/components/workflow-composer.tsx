@@ -73,17 +73,6 @@ const fieldTypeOptions: FieldType[] = ['text', 'number', 'currency', 'boolean', 
 
 const workflowDraftKey = 'importio-studio-workflow-draft';
 
-function uniqueRunId(existingIds: Set<string>) {
-  let id = '';
-  do {
-    const random = typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID().replaceAll('-', '').slice(0, 6)
-      : Math.random().toString(36).slice(2, 8).padEnd(6, '0');
-    id = `run_${random}`;
-  } while (existingIds.has(id));
-  return id;
-}
-
 function recordCountForScenario(scenario: WorkflowTemplateKey) {
   if (scenario === 'extract') return 1;
   if (scenario === 'monitor') return 2;
@@ -286,7 +275,7 @@ export function WorkflowComposer() {
 }
 
 function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt }: { initialTemplate: WorkflowTemplateKey; initialInput: InputMethod; initialPrompt: string }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const { auth, execution } = useStudio((snapshot) => snapshot);
   const router = useRouter();
   const mayRun = can(auth.session, 'run');
   const initialWorkspaceSources = useRef(auth.sources);
@@ -792,40 +781,30 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
       : `run_${selected}`;
   const reviewedRecordCount = promptSpecification.domains.length || recordCountForScenario(selected);
 
-  function startRun() {
-    const nextRunId = uniqueRunId(new Set(auth.runs.map((run) => run.id)));
+  async function workflowPlan() {
+    const planned = await execution.plan({ prompt, sources: sourceDomains, fields: fieldNames });
     const completed = selected !== 'research' || promptSpecification.domains.length > 0;
     const needsReview = selected === 'compare' && promptSpecification.domains.length === 0;
+    return { ...planned, name: effectiveWorkflowName, queries: estimateQueries, scenario: selected, recordCount: reviewedRecordCount, completed, needsReview };
+  }
+
+  async function reviewPlan() {
+    const planned = await workflowPlan();
+    if ((await execution.validate(planned)).valid) setStage(1);
+  }
+
+  async function startRun() {
+    const planned = await workflowPlan();
+    if (!(await execution.validate(planned)).valid) return;
     setSavedDatasetId('');
     setSavedDatasetTitle('');
-    auth.addRun({
-      id: nextRunId,
-      when: completed ? 'Just now' : 'Running now',
-      createdAt: Date.now(),
-      pipeline: effectiveWorkflowName,
-      coverage: completed ? `${sourceCount} / ${sourceCount} sources` : `2 / ${sourceCount} sources`,
-      records: completed ? String(reviewedRecordCount) : '2',
-      queries: estimateQueries,
-      state: completed ? 'Completed' : 'Running',
-      outcome: completed ? (needsReview ? 'Partial' : 'Succeeded') : 'Running',
-      tone: completed ? (needsReview ? 'warning' : 'success') : 'info',
-      badge: true,
-      scenario: selected,
-    });
+    const nextRunId = await execution.startRun(planned);
     setRunId(nextRunId);
     setStage(2);
   }
 
   function resolveResearchRun() {
     setResearchResolved(true);
-    auth.updateRun(runId, {
-      when: 'Just now',
-      coverage: `${sourceCount} / ${sourceCount} sources`,
-      records: String(reviewedRecordCount),
-      state: 'Completed',
-      outcome: 'Succeeded',
-      tone: 'success',
-    });
   }
 
   function saveDataset(records?: DatasetRecord[], savedFields?: string[]) {
@@ -852,47 +831,14 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     setSavedDatasetTitle(dataset.title);
   }
 
-  function createMonitor() {
-    const baselineTitle = effectiveWorkflowName;
-    const dataset = uniqueDatasetIdentity(baselineTitle, auth.datasets.map((item) => item.id));
+  async function createMonitor() {
     const monitorAlertRule = monitorAlertWhen === 'Price falls below' ? `Price falls below ${monitorThreshold}` : monitorAlertWhen;
-    const baselineSource = sourceDomains[0] || 'northwind-outdoors.example';
-    const baselineRecords: DatasetRecord[] = [0, 1].map((index) => ({
-      id: `baseline-${index + 1}`,
-      values: Object.fromEntries(fieldNames.map((field) => {
-        const key = normalizeFieldName(field);
-        if (key === 'price' || key === 'starting_price') return [field, '€249'];
-        if (key === 'availability' || key === 'stock' || key === 'status') return [field, 'In stock'];
-        return [field, null];
-      })),
-      evidence: Object.fromEntries(fieldNames.map((field) => {
-        const key = normalizeFieldName(field);
-        const known = ['price','starting_price','availability','stock','status'].includes(key);
-        return [field, { sourceUrl: `https://${baselineSource}`, quote: known ? 'Trailhead 2P Tent — €249 · In stock.' : 'Not stated · unknown' }];
-      })),
-    }));
-    auth.addDataset({
-      id: dataset.id,
-      version: 'DATASET · V1',
-      title: dataset.title,
-      detail: `2 records · ${fieldCount} ${fieldCount === 1 ? 'field' : 'fields'} · fully validated`,
-      status: 'Validated',
-      tone: 'success',
-      href: `/datasets/${dataset.id}`,
-      recordCount: 2,
-      fields: fieldNames,
-      lastUpdated: 'Just now',
-      updatedAt: Date.now(),
-      unresolvedCount: 0,
-      sourceWorkflow: effectiveWorkflowName,
-      sourceRunId: runId,
-      records: baselineRecords,
-    });
-    auth.addMonitor({
-      id: `monitor-${runId}`,
+    const { dataset } = await execution.createMonitor({
       name: 'Trailhead price and availability',
       detail: `${monitorAlertRule} · ${monitorNotifyVia}`,
-      baselineDataset: dataset.title,
+      workflowName: effectiveWorkflowName,
+      sources: sourceDomains,
+      runId,
       schedule: monitorSchedule,
       lastChange: 'Not checked yet',
       status: 'Scheduled',
@@ -1003,7 +949,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
                 <p>{estimate}</p>
               </div>
               <div className="stage-actions">
-                <Button variant="primary" disabled={!mayRun || Boolean(fieldValidationMessage)} title={!mayRun ? viewerTooltip : undefined} onClick={startRun}>Approve and run →</Button>
+                <Button variant="primary" disabled={!mayRun || Boolean(fieldValidationMessage)} title={!mayRun ? viewerTooltip : undefined} onClick={() => void startRun()}>Approve and run →</Button>
                 <Button variant="secondary" onClick={() => { setEditingPlanFields(false); setStage(0); }}>Back to describe</Button>
               </div>
             </aside>
@@ -1078,6 +1024,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
             customFields={fieldNames}
             datasetName={savedDatasetTitle || effectiveWorkflowName}
             savedDatasetId={savedDatasetId}
+            runId={runId}
           />
 
           <Dialog open={monitorDialogOpen} onOpenChange={setMonitorDialogOpen}>
@@ -1117,7 +1064,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
               </div>
               <DialogFooter>
                 <Button variant="secondary" onClick={() => setMonitorDialogOpen(false)}>Cancel</Button>
-                <Button variant="primary" disabled={!monitorFields.length || (monitorAlertWhen === 'Price falls below' && !monitorThreshold.trim())} onClick={createMonitor}>Create monitor</Button>
+                <Button variant="primary" disabled={!monitorFields.length || (monitorAlertWhen === 'Price falls below' && !monitorThreshold.trim())} onClick={() => void createMonitor()}>Create monitor</Button>
               </DialogFooter>
             </DialogContent>
           </Dialog>
@@ -1145,7 +1092,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
             <TabsList><TabsTrigger value="prompt">Full prompt</TabsTrigger><TabsTrigger value="guided">Guided setup</TabsTrigger></TabsList>
           </Tabs>
           <div className={mode === 'prompt' ? 'composer prompt-mode' : 'composer guided-mode'}>
-            {mode === 'prompt' ? <div className="prompt-field"><textarea value={prompt} onFocus={() => setDemoStopped(true)} onChange={(event) => updatePrompt(event.target.value)} aria-label="Workflow request" />{prompt ? null : <div className={demoStopped ? 'prompt-ghost stopped' : 'prompt-ghost'} aria-hidden="true">{typedExample}<i /></div>}</div> : <div className="guided-composer"><section className="input-method-panel"><strong>How will you provide inputs?</strong><div className="input-methods" role="tablist" aria-label="Input method">{inputMethods.map(([key,label]) => <Button variant="secondary" size="sm" role="tab" aria-selected={inputMethod === key} className={inputMethod === key ? 'input-method-button active' : 'input-method-button'} onClick={() => chooseInputMethod(key)} key={key}>{label}</Button>)}</div><p>{inputMethod === 'urls' ? `${sourceCount} valid inputs · 0 duplicates · 0 invalid` : inputMethod === 'csv' ? csvRows.length ? `${csvRows.length} CSV rows ready · ${new Set(sources.split('\n').filter(Boolean)).size} unique inputs · column ${csvColumn}` : 'Choose a CSV to detect its columns and preview the rows' : guidedSourceLabel}</p></section><div className="guided-input-detail">{guidedInputDetail}</div><label className="guided-field"><strong>What do you want to know?</strong><textarea value={prompt} onFocus={() => setDemoStopped(true)} onChange={(event) => updatePrompt(event.target.value)} aria-label="Guided workflow request" /></label><div className="guided-plan-action"><Button variant="primary" disabled={!prompt.trim()} onClick={() => setStage(1)}>Plan workflow →</Button></div></div>}
+            {mode === 'prompt' ? <div className="prompt-field"><textarea value={prompt} onFocus={() => setDemoStopped(true)} onChange={(event) => updatePrompt(event.target.value)} aria-label="Workflow request" />{prompt ? null : <div className={demoStopped ? 'prompt-ghost stopped' : 'prompt-ghost'} aria-hidden="true">{typedExample}<i /></div>}</div> : <div className="guided-composer"><section className="input-method-panel"><strong>How will you provide inputs?</strong><div className="input-methods" role="tablist" aria-label="Input method">{inputMethods.map(([key,label]) => <Button variant="secondary" size="sm" role="tab" aria-selected={inputMethod === key} className={inputMethod === key ? 'input-method-button active' : 'input-method-button'} onClick={() => chooseInputMethod(key)} key={key}>{label}</Button>)}</div><p>{inputMethod === 'urls' ? `${sourceCount} valid inputs · 0 duplicates · 0 invalid` : inputMethod === 'csv' ? csvRows.length ? `${csvRows.length} CSV rows ready · ${new Set(sources.split('\n').filter(Boolean)).size} unique inputs · column ${csvColumn}` : 'Choose a CSV to detect its columns and preview the rows' : guidedSourceLabel}</p></section><div className="guided-input-detail">{guidedInputDetail}</div><label className="guided-field"><strong>What do you want to know?</strong><textarea value={prompt} onFocus={() => setDemoStopped(true)} onChange={(event) => updatePrompt(event.target.value)} aria-label="Guided workflow request" /></label><div className="guided-plan-action"><Button variant="primary" disabled={!prompt.trim()} onClick={() => void reviewPlan()}>Plan workflow →</Button></div></div>}
             {mode === 'prompt' ? <div className="composer-tools"><div className="composer-tool-list">
               {([
                 ['Sources', Globe2],
@@ -1155,7 +1102,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
                 ['Rules', FileText],
                 ['Improve prompt', Sparkles],
               ] as const).map(([tool, Icon]) => <Button variant="ghost" size="sm" className={`${activeTool === tool ? 'active ' : ''}${tool === 'Improve prompt' ? 'improve-tool' : ''}`.trim()} aria-label={tool} title={tool} aria-expanded={activeTool === tool} aria-controls="workflow-tool-panel" onClick={() => toggleTool(tool)} key={tool}><Icon size={16} /><span>{tool}</span></Button>)}
-            </div><div className="composer-submit">{prompt.trim() ? <span className="keyboard-hint">⌘↵ to plan</span> : null}<Button variant="primary" className="send" aria-label="Plan workflow" title={prompt.trim() ? 'Plan workflow' : 'Say what to find'} disabled={!prompt.trim()} onClick={() => setStage(1)}><ArrowUp size={17} /></Button></div></div> : null}
+            </div><div className="composer-submit">{prompt.trim() ? <span className="keyboard-hint">⌘↵ to plan</span> : null}<Button variant="primary" className="send" aria-label="Plan workflow" title={prompt.trim() ? 'Plan workflow' : 'Say what to find'} disabled={!prompt.trim()} onClick={() => void reviewPlan()}><ArrowUp size={17} /></Button></div></div> : null}
             {mode === 'prompt' && activeTool ? <section className="composer-tool-panel" id="workflow-tool-panel" aria-labelledby="workflow-tool-title">
               <header><div><h2 id="workflow-tool-title">{activeTool}</h2><p>{activeTool === 'Sources' ? 'Add public HTTPS URLs or domains, one per line.' : activeTool === 'Browser actions' ? 'Choose how Studio may navigate the public web.' : activeTool === 'Fields' ? 'Make the expected output explicit.' : activeTool === 'Limits' ? 'Bound browser work before the plan is approved.' : activeTool === 'Rules' ? 'Set evidence and missing-data behavior.' : 'Review the proposed rewrite before changing your draft.'}</p></div><Button variant="ghost" size="icon" aria-label={`Close ${activeTool}`} onClick={() => setActiveTool(null)}><X size={16} /></Button></header>
               {activeTool === 'Sources' ? <div className="source-editor"><div className="source-preview-chips" aria-label={`${sourceCount} configured sources`}>{sources.split('\n').map((source) => source.trim()).filter(Boolean).map((source, index) => <span key={`${source}-${index}`}>{source.replace(/^https?:\/\//, '')}<button type="button" aria-label={`Remove ${source}`} onClick={() => { markDraftDirty(); setSources((current) => current.split('\n').map((item) => item.trim()).filter((item) => item && item !== source).join('\n')); if (auth.sources.includes(source)) auth.removeSource(source); }}><X size={12} /></button></span>)}</div><label className="tool-field tool-field-wide"><span>Sources</span><Textarea value={sources} onChange={(event) => updateSetting(setSources, event.target.value)} aria-label="Sources" /></label></div> : null}

@@ -30,39 +30,9 @@ import { SectionTabs, useSectionTab } from './section-tabs';
 import { can, useStudio, viewerTooltip } from '@/lib/data';
 import { isTimestampToday, RelativeTime, useCurrentTime } from '../relative-time';
 
-const pipelines = [
-  {
-    name: 'Competitor prices',
-    detail: '3 sources · 5 fields',
-    version: 'v4',
-    lastRun: '2 min ago',
-    schedule: 'On demand',
-    status: 'Needs review',
-    tone: 'warning' as Tone,
-    href: '/pipelines/competitor-prices',
-  },
-  {
-    name: 'Outdoor catalogue',
-    detail: '12 categories · 8 fields',
-    version: 'v7',
-    lastRun: '1 hr ago',
-    schedule: 'Daily',
-    status: 'Healthy',
-    tone: 'success' as Tone,
-  },
-  {
-    name: 'Qualified suppliers',
-    detail: 'EU region · 9 fields',
-    version: 'v2',
-    lastRun: 'Yesterday',
-    schedule: 'Weekly',
-    status: 'Healthy',
-    tone: 'success' as Tone,
-  },
-];
-
 export function PipelinesSection() {
   const auth = useStudio((snapshot) => snapshot.auth);
+  const pipelines = useStudio((snapshot) => snapshot.fixtures.pipelines);
   const { pipelineVersion, pipelineStatus } = useStudio((snapshot) => snapshot.humanReview);
   const mayRun = can(auth.session, 'run');
   const [query, setQuery] = useState('');
@@ -309,7 +279,8 @@ export function DatasetsSection() {
 }
 
 export function MonitorsSection() {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const { auth, execution, fixtures } = useStudio((snapshot) => snapshot);
+  const pipelines = fixtures.pipelines;
   const mayCreateMonitor = can(auth.session, 'create_monitor');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [pipeline, setPipeline] = useState('Competitor prices');
@@ -327,12 +298,12 @@ export function MonitorsSection() {
 
   const alertRule = alertWhen === 'Price falls below' ? `Price falls below ${priceThreshold}` : alertWhen;
 
-  function createMonitor() {
-    auth.addMonitor({
-      id: `monitor-${Date.now()}`,
+  async function createMonitor() {
+    await execution.createMonitor({
       name: `${pipeline} monitor`,
       detail: `${alertRule} · ${notifyVia}`,
-      baselineDataset: pipeline,
+      workflowName: pipeline,
+      sources: [],
       schedule,
       lastChange: 'Not checked yet',
       status: 'Scheduled',
@@ -389,7 +360,7 @@ export function MonitorsSection() {
           </div>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button variant="primary" disabled={!mayCreateMonitor || watchedFields.length === 0} title={!mayCreateMonitor ? viewerTooltip : undefined} onClick={createMonitor}>Create monitor</Button>
+            <Button variant="primary" disabled={!mayCreateMonitor || watchedFields.length === 0} title={!mayCreateMonitor ? viewerTooltip : undefined} onClick={() => void createMonitor()}>Create monitor</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -8,6 +8,7 @@ function git(args: string[]) {
 
 const commit = process.env.GITHUB_SHA ?? git(['rev-parse', 'HEAD']);
 const exactTags = process.env.STUDIO_BUILD_TAG ?? git(['tag', '--points-at', commit]).split('\n').find(Boolean);
+const dirty = git(['status', '--porcelain']).length > 0;
 
 const nextConfig: NextConfig = {
   output: 'export',
@@ -18,6 +19,7 @@ const nextConfig: NextConfig = {
   env: {
     STUDIO_BUILD_COMMIT: commit,
     ...(exactTags ? { STUDIO_BUILD_TAG: exactTags } : {}),
+    ...(dirty ? { STUDIO_BUILD_DIRTY: 'true' } : {}),
   },
   turbopack: {
     root: path.resolve(process.cwd(), '../..'),

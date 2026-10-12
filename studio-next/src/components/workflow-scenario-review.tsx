@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@/components/design-system';
 import { useStudio, type DatasetRecord } from '@/lib/data';
 import { formatFieldLabel } from '@/lib/field-label';
@@ -171,6 +171,7 @@ export function WorkflowScenarioReview({
   customFields = [],
   datasetName,
   savedDatasetId = '',
+  runId,
 }: {
   scenario: WorkflowTemplateKey;
   researchResolved?: boolean;
@@ -181,10 +182,17 @@ export function WorkflowScenarioReview({
   customFields?: string[];
   datasetName: string;
   savedDatasetId?: string;
+  runId?: string;
 }) {
   const execution = useStudio((snapshot) => snapshot.execution);
   const [feedback, setFeedback] = useState('');
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
+  const [engineRecords, setEngineRecords] = useState<DatasetRecord[]>([]);
+
+  useEffect(() => {
+    if (!runId || !customDomains.length) return;
+    void execution.evidence(runId).then(setEngineRecords);
+  }, [customDomains.length, execution, runId]);
 
   if (scenario === 'compare') {
     return <DatasetReview fields={customFields} onSaved={onSaved} workspaceName={workspaceName} datasetName={datasetName} savedDatasetId={savedDatasetId} />;
@@ -193,7 +201,7 @@ export function WorkflowScenarioReview({
   const baseFixture = scenario === 'research' ? researchFixture(researchResolved) : reviewFixtures[scenario] ?? reviewFixtures.collect!;
   const savedFields = (customFields.length ? customFields : baseFixture.headings.filter((heading) => !['Evidence', 'Source'].includes(heading)))
     .filter((field) => normalizedField(field) !== 'source');
-  const customRecords = customDomains.length ? execution.recordsForDomains(customDomains, savedFields) : [];
+  const customRecords = customDomains.length ? engineRecords : [];
   const datasetRecords: DatasetRecord[] = customRecords.length ? customRecords : baseFixture.rows.map((row, rowIndex) => {
     const source = fixtureSource(scenario, row);
     const values = Object.fromEntries(savedFields.map((field) => {

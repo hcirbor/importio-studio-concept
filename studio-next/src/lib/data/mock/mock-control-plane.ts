@@ -18,6 +18,7 @@ import type {
 } from '@/lib/data/StudioDataSource';
 import { mockCapabilities } from '@/lib/data/mock/mock-capabilities';
 import { createMockExecution } from '@/lib/data/mock/mock-execution';
+import { mockFixtures } from '@/lib/data/mock/mock-fixtures';
 
 type AuthState = {
   session: Session | null;
@@ -355,7 +356,7 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       restoreReviewItem: this.restoreReviewItem,
       promotePipeline: this.promotePipeline,
     };
-    return { auth, humanReview, execution: this.execution, controlPlane: this.controlPlane, capabilities: this.capabilities };
+    return { auth, humanReview, execution: this.execution, controlPlane: this.controlPlane, capabilities: this.capabilities, fixtures: mockFixtures };
   }
 
   signIn = (method: SignInMethod) => {

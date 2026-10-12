@@ -15,44 +15,14 @@ import {
   type TableRow,
 } from './shared';
 
-type WebhookEndpoint = {
-  id: string;
-  url: string;
-  events: string;
-  health: 'Healthy' | 'Validating';
-};
-
 const curlExample = `curl -X POST https://api.import.io/v1/tasks \\
   -H 'Authorization: Bearer $IMPORTIO_API_KEY' \\
   -H 'Content-Type: application/json' \\
   -d '{"workflow":"compare","sources":[...]}'`;
 
-const mcpSetups = [
-  { id: 'claude', label: 'Claude', title: 'Claude connector setup', setup: 'Customize → Connectors → Add custom connector → https://mcp.import.io/mcp' },
-  { id: 'claude-code', label: 'Claude Code', title: 'Claude Code setup command', setup: 'claude mcp add --transport http importio https://mcp.import.io/mcp' },
-  { id: 'chatgpt', label: 'ChatGPT', title: 'ChatGPT connector setup', setup: 'Settings → Apps → Advanced settings → Developer mode → Create (Business/Enterprise/Edu)' },
-  { id: 'cursor', label: 'Cursor', title: '~/.cursor/mcp.json', setup: `{\n  "mcpServers": {\n    "importio": {\n      "url": "https://mcp.import.io/mcp"\n    }\n  }\n}` },
-  { id: 'vs-code', label: 'VS Code', title: 'VS Code MCP configuration', setup: `{\n  "servers": {\n    "importio": {\n      "type": "http",\n      "url": "https://mcp.import.io/mcp"\n    }\n  }\n}` },
-  { id: 'codex', label: 'Codex', title: 'Codex setup commands', setup: `codex mcp add importio --url https://mcp.import.io/mcp\ncodex mcp login importio` },
-] as const;
-
-const initialWebhookEndpoints: WebhookEndpoint[] = [
-  {
-    id: 'primary-data-endpoint',
-    url: 'https://data.example.com/importio',
-    events: 'Run completed · Monitor changed',
-    health: 'Healthy',
-  },
-];
-
-const usageRows: TableRow[] = [
-  { id: 'outdoor-catalogue', cells: ['Outdoor catalogue', '742', '81,412', '246 min', '$5.19'] },
-  { id: 'competitor-prices', cells: ['Competitor prices', '422', '8,996', '130 min', '$2.95'] },
-  { id: 'qualified-suppliers', cells: ['Qualified suppliers', '120', '2,204', '42 min', '$0.84'] },
-];
-
 export function DevelopersSection({ showHeader = true }: { showHeader?: boolean }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const { auth, fixtures } = useStudio((snapshot) => snapshot);
+  const mcpSetups = fixtures.mcpSetups;
   const [message, setMessage] = useState('');
   const [connectionChecked, setConnectionChecked] = useState(false);
 
@@ -136,14 +106,14 @@ export function DevelopersSection({ showHeader = true }: { showHeader?: boolean 
 }
 
 export function WebhooksSection({ showHeader = true }: { showHeader?: boolean }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const { auth, fixtures } = useStudio((snapshot) => snapshot);
   const mayManageWebhooks = can(auth.session, 'manage_webhooks');
   const [endpoint, setEndpoint] = useState('https://api.example.com/importio/events');
   const [eventName, setEventName] = useState('Run completed');
   const [secret, setSecret] = useState('Generated after save');
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-  const [endpoints, setEndpoints] = useState(initialWebhookEndpoints);
+  const [endpoints, setEndpoints] = useState(fixtures.webhooks);
 
   function addWebhook() {
     try {
@@ -228,8 +198,10 @@ export function WebhooksSection({ showHeader = true }: { showHeader?: boolean })
 }
 
 export function UsageSection() {
-  const recentRuns = [32, 41, 36, 58, 44, 49, 34];
-  const recentDates = ['Oct 3', 'Oct 4', 'Oct 5', 'Oct 6', 'Oct 7', 'Oct 8', 'Oct 9'];
+  const fixtures = useStudio((snapshot) => snapshot.fixtures);
+  const recentRuns = fixtures.usageTrend.runs;
+  const recentDates = fixtures.usageTrend.dates;
+  const usageRows: TableRow[] = fixtures.usageRows.map((row) => ({ id: row.id, cells: row.values }));
   return (
     <>
       <PageHead

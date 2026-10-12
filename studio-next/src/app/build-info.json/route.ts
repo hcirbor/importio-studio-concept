@@ -5,6 +5,7 @@ export function GET() {
   return Response.json({
     commit: process.env.STUDIO_BUILD_COMMIT,
     ...(tag ? { tag } : {}),
+    ...(process.env.STUDIO_BUILD_DIRTY === 'true' ? { dirty: true } : {}),
     builtAt: new Date().toISOString(),
     source: 'mock',
   });

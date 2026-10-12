@@ -57,6 +57,9 @@ jobs:
       - name: Build
         run: npm --prefix "Import Studio/studio-next" run build
 
+      - name: Unit tests
+        run: npm --prefix "Import Studio/studio-next" run test:unit
+
       - name: End-to-end tests
         run: npm --prefix "Import Studio/studio-next" run test:e2e
 
