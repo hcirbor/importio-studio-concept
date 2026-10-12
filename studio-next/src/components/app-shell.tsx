@@ -81,7 +81,7 @@ function parentBreadcrumbHref(pathname: string) {
 
 function Breadcrumbs({ pathname }: { pathname: string }) {
   const searchParams = useSearchParams();
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const datasets = useStudio((snapshot) => snapshot.auth.datasets);
   const [liveBuildTitle, setLiveBuildTitle] = useState<string | null>(null);
   useEffect(() => {
     function updateBuildTitle(event: Event) {
@@ -93,7 +93,7 @@ function Breadcrumbs({ pathname }: { pathname: string }) {
   }, []);
   const [parent, defaultCurrent, documentPageTitle] = pageTitle(pathname, searchParams);
   const datasetPageTitle = pathname.startsWith('/datasets/')
-    ? auth.datasets.find((dataset) => dataset.id === pathname.split('/').at(-1))?.title
+    ? datasets.find((dataset) => dataset.id === pathname.split('/').at(-1))?.title
     : undefined;
   const current = pathname === '/build'
     ? liveBuildTitle ?? 'New workflow'
@@ -126,8 +126,13 @@ function Breadcrumbs({ pathname }: { pathname: string }) {
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const auth = useStudio((snapshot) => snapshot.auth);
-  const { reviewCount } = useStudio((snapshot) => snapshot.humanReview);
+  const auth = useStudio((snapshot) => ({
+    ready: snapshot.auth.ready,
+    session: snapshot.auth.session,
+    runs: snapshot.auth.runs,
+    currentWorkspace: snapshot.auth.currentWorkspace,
+  }));
+  const reviewCount = useStudio((snapshot) => snapshot.humanReview.reviewCount);
   const isAuthRoute = pathname === '/login' || pathname === '/signup';
   const [navOpen, setNavOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -246,7 +251,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {navOpen ? <Button variant="ghost" className="nav-scrim" aria-label="Close navigation" onClick={() => setNavOpen(false)} /> : null}
       <aside ref={sidebarRef} onScroll={handleSidebarScroll} className={navOpen ? 'sidebar mobile-open' : 'sidebar'}>
         <RailTooltip enabled={rail} label="Import.io Studio"><Link href="/" className="brand" aria-label="Import.io Studio home" onClick={handleSidebarNavigation}>
-          <BrandMark className="brand-mark" title="" />
+          <BrandMark className="brand-mark" title="" aria-hidden="true" />
           <span className="brand-name">import.io</span>
         </Link></RailTooltip>
         <WorkspaceSwitcher collapsed={rail} />
@@ -261,7 +266,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 const className = `${active ? 'nav-item active' : 'nav-item'}${item.label === 'Usage' ? ' usage-nav' : ''}`;
                 const count = item.label === 'Review' ? reviewCount : item.label === 'Runs' ? runsBadge : 0;
                 const tooltip = count > 0 ? `${item.label} · ${count} ${count === 1 ? 'item' : 'items'}` : item.label;
-                return <RailTooltip enabled={rail} label={tooltip} key={item.href}><Link href={item.href} aria-label={tooltip} onClick={item.href === '/build' ? handleNewWorkflow : handleSidebarNavigation} className={className}><Icon /><span>{item.label}</span>{item.label === 'Review' && reviewCount > 0 ? <em>{reviewCount}</em> : item.label === 'Runs' && runsBadge > 0 ? <em>{runsBadge}</em> : null}{item.label === 'Usage' ? <span className="nav-usage-meter" role="progressbar" aria-label="Monthly usage: 36% of the spend alert" aria-valuemin={0} aria-valuemax={100} aria-valuenow={36}><i /></span> : null}</Link></RailTooltip>;
+                const accessibleLabel = count > 0 ? `${item.label} ${count}` : item.label;
+                return <RailTooltip enabled={rail} label={tooltip} key={item.href}><Link href={item.href} aria-label={accessibleLabel} onClick={item.href === '/build' ? handleNewWorkflow : handleSidebarNavigation} className={className}><Icon /><span>{item.label}</span>{item.label === 'Review' && reviewCount > 0 ? <em>{reviewCount}</em> : item.label === 'Runs' && runsBadge > 0 ? <em>{runsBadge}</em> : null}{item.label === 'Usage' ? <span className="nav-usage-meter" role="progressbar" aria-label="Monthly usage: 36% of the spend alert" aria-valuemin={0} aria-valuemax={100} aria-valuenow={36}><i /></span> : null}</Link></RailTooltip>;
               })}
             </section>
           ))}

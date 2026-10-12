@@ -19,13 +19,31 @@ export type RunDetailData = {
   actionLabel?: string;
 };
 
+function detailStatus(state: WorkspaceRun['state']): RunDetailData['status'] {
+  if (state === 'Completed') return 'completed';
+  if (state === 'Failed') return 'failed';
+  return 'running';
+}
+
+function researchStatus(state: 'Running' | 'Complete'): 'running' | 'complete' {
+  return state === 'Complete' ? 'complete' : 'running';
+}
+
 export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
-  const { auth, execution } = useStudio((snapshot) => snapshot);
+  const runs = useStudio((snapshot) => snapshot.auth.runs);
+  const execution = useStudio((snapshot) => snapshot.execution);
   const searchParams = useSearchParams();
   const currentId = searchParams.get('run') ?? id;
-  const [engineRun, setEngineRun] = useState<WorkspaceRun>();
-  const workspaceRun = engineRun ?? auth.runs.find((item) => item.id === currentId);
-  useEffect(() => { void execution.getRun(currentId).then(setEngineRun); }, [currentId, execution, auth.runs]);
+  const [engineResult, setEngineResult] = useState<{ id: string; run?: WorkspaceRun }>();
+  const engineRun = engineResult?.id === currentId ? engineResult.run : undefined;
+  const workspaceRun = engineRun ?? runs.find((item) => item.id === currentId);
+  useEffect(() => {
+    let active = true;
+    void execution.getRun(currentId).then((nextRun) => {
+      if (active) setEngineResult({ id: currentId, run: nextRun });
+    });
+    return () => { active = false; };
+  }, [currentId, execution]);
   const [researchState, setResearchState] = useState<'idle' | 'running' | 'complete'>('idle');
   const isResearch = currentId === 'run_batch_91af';
   const researchResolved = researchState === 'complete';
@@ -33,7 +51,7 @@ export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
   const workspaceDetail: RunDetailData | null = workspaceRun ? {
     title: workspaceRun.pipeline,
     description: `${workspaceRun.state} run · ${workspaceRun.coverage} · ${workspaceRun.records} ${workspaceRun.records === '1' ? 'record' : 'records'}`,
-    status: workspaceRun.state.toLowerCase() as RunDetailData['status'],
+    status: detailStatus(workspaceRun.state),
     badge: `${workspaceRun.state} · ${workspaceRun.outcome}`,
     tone: workspaceRun.tone,
     metrics: [sourceTotal, workspaceRun.state === 'Completed' ? sourceTotal : workspaceRun.records, ['Partial','Blocked'].includes(workspaceRun.outcome) ? '1' : '0', workspaceRun.records],
@@ -59,14 +77,6 @@ export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
           metrics: ['3', '2', '0', '2'],
         }
     : baseDisplayRun;
-  const scenarioKey = workspaceRun?.scenario === 'research'
-    ? 'run_batch_91af'
-    : workspaceRun?.scenario === 'compare'
-      ? 'run_7f3a'
-      : workspaceRun?.scenario
-        ? `run_${workspaceRun.scenario}`
-        : undefined;
-
   return (
     <div className="page">
       <Link href="/runs" className="back-link">← Runs</Link>
@@ -82,10 +92,8 @@ export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
       </section>
       <RunSession
         runId={currentId}
-        scenarioKey={scenarioKey}
-        researchResolved={researchResolved}
         onResearchResolved={() => setResearchState('complete')}
-        onResearchStateChange={(state) => setResearchState(state.toLowerCase() as 'running' | 'complete')}
+        onResearchStateChange={(state) => setResearchState(researchStatus(state))}
       />
     </div>
   );

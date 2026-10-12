@@ -32,8 +32,19 @@ function PipelineFilter() {
 }
 
 export function ReviewInbox() {
-  const auth = useStudio((snapshot) => snapshot.auth);
-  const { hasReviewItem, reviewCount, pipelineVersion, acceptReviewItem, restoreReviewItem } = useStudio((snapshot) => snapshot.humanReview);
+  const auth = useStudio((snapshot) => ({
+    session: snapshot.auth.session,
+    currentUser: snapshot.auth.currentUser,
+    updateDatasetValue: snapshot.auth.updateDatasetValue,
+    setDatasetReviewState: snapshot.auth.setDatasetReviewState,
+  }));
+  const { hasReviewItem, reviewCount, pipelineVersion, acceptReviewItem, restoreReviewItem } = useStudio((snapshot) => ({
+    hasReviewItem: snapshot.humanReview.hasReviewItem,
+    reviewCount: snapshot.humanReview.reviewCount,
+    pipelineVersion: snapshot.humanReview.pipelineVersion,
+    acceptReviewItem: snapshot.humanReview.acceptReviewItem,
+    restoreReviewItem: snapshot.humanReview.restoreReviewItem,
+  }));
   const mayReview = can(auth.session, 'review');
   const [editing, setEditing] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);

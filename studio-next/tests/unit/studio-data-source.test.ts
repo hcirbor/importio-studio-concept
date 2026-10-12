@@ -1,4 +1,7 @@
+import { createElement } from 'react';
+import TestRenderer, { act } from 'react-test-renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { StudioDataProvider, useStudio } from '@/lib/data';
 import { createMockStudioDataSource } from '@/lib/data/mock/mock-control-plane';
 import type { StudioDataSource } from '@/lib/data/StudioDataSource';
 
@@ -88,6 +91,37 @@ describe('mock Studio data source', () => {
     expect(notifications).toBe(0);
   });
 
+  it('scopes recent pipelines to the workspace and updates review status', () => {
+    const source = signedInSource();
+    expect(source.getSnapshot().recentPipelines[0]?.status).toBe('Needs review');
+    source.controlPlane.acceptReviewItem();
+    expect(source.getSnapshot().recentPipelines[0]?.status).toBe('Healthy');
+    source.controlPlane.switchWorkspace('northwind');
+    expect(source.getSnapshot().recentPipelines).toEqual([]);
+  });
+
+  it('does not re-render a narrow consumer after an unrelated mutation', async () => {
+    const source = signedInSource();
+    let renders = 0;
+    function SourceCount() {
+      renders += 1;
+      const sourceCount = useStudio((snapshot) => snapshot.auth.sources.length);
+      return createElement('span', null, sourceCount);
+    }
+
+    let renderer: TestRenderer.ReactTestRenderer | undefined;
+    await act(async () => {
+      renderer = TestRenderer.create(createElement(StudioDataProvider, { source }, createElement(SourceCount)));
+    });
+    expect(renders).toBe(1);
+
+    await act(async () => {
+      source.controlPlane.addRun({ id: 'run_unrelated', when: 'Just now', pipeline: 'Unrelated', coverage: '1 / 1 sources', records: '1', queries: 1, state: 'Completed', outcome: 'Succeeded', tone: 'success' });
+    });
+    expect(renders).toBe(1);
+    renderer?.unmount();
+  });
+
   it('round-trips persisted state and accepts the legacy review shape', () => {
     const first = signedInSource();
     first.controlPlane.addSource('https://persisted.example');
@@ -101,6 +135,25 @@ describe('mock Studio data source', () => {
     const legacy = initialize();
     expect(legacy.getSnapshot().humanReview.hasReviewItem).toBe(true);
     expect(legacy.getSnapshot().humanReview.pipelineVersion).toBe(8);
+  });
+
+  it('decodes invalid persisted values and falls back to seeded data', () => {
+    storage.setItem('importio-studio-demo-auth', JSON.stringify({
+      session: { user: { id: 'jordan', name: 'Jordan Davis', email: 'jordan@example.com' }, workspaceId: 'studio', role: 'Owner' },
+      workspaces: [{ id: 42 }],
+      sourcesByWorkspace: { studio: ['https://valid.example', 42] },
+      runsByWorkspace: { studio: [{ id: 'broken' }] },
+      demoRole: 'Superuser',
+    }));
+    storage.setItem('importio-studio-review-state', JSON.stringify({ studio: { hasReviewItem: 'yes', pipelineVersion: 'five' } }));
+
+    const source = initialize();
+    const snapshot = source.getSnapshot();
+    expect(snapshot.auth.currentWorkspace?.name).toBe('Import.io Studio');
+    expect(snapshot.auth.sources).toEqual([]);
+    expect(snapshot.auth.runs[0]?.id).toBe('run_batch_91af');
+    expect(snapshot.auth.currentRole).toBe('Owner');
+    expect(snapshot.humanReview.pipelineVersion).toBe(4);
   });
 
   it('emits mock run events in order and cancellation ends progression', async () => {

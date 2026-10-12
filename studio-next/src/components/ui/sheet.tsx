@@ -4,12 +4,10 @@ import * as React from 'react';
 import * as SheetPrimitive from '@radix-ui/react-dialog';
 
 export const Sheet = SheetPrimitive.Root;
-export const SheetTrigger = SheetPrimitive.Trigger;
 export const SheetClose = SheetPrimitive.Close;
 export const SheetTitle = SheetPrimitive.Title;
-export const SheetDescription = SheetPrimitive.Description;
 
-export const SheetOverlay = React.forwardRef<
+const SheetOverlay = React.forwardRef<
   React.ComponentRef<typeof SheetPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>
 >(({ className = '', ...props }, ref) => (
@@ -42,4 +40,3 @@ export const SheetContent = React.forwardRef<
   </SheetPrimitive.Portal>
 ));
 SheetContent.displayName = SheetPrimitive.Content.displayName;
-

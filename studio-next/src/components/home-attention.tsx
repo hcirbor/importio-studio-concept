@@ -5,7 +5,7 @@ import { Badge } from '@/components/design-system';
 import { useStudio } from '@/lib/data';
 
 export function HomeAttention() {
-  const { hasReviewItem } = useStudio((snapshot) => snapshot.humanReview);
+  const hasReviewItem = useStudio((snapshot) => snapshot.humanReview.hasReviewItem);
   return (
     <article className="panel attention-panel">
       <div className="section-head">

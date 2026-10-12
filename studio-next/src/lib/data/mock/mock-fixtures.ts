@@ -53,4 +53,12 @@ export const mockFixtures: MockFixtures = {
     { label: 'Dataset · Competitor prices', href: '/datasets/competitor-prices', kind: 'dataset' },
     { label: 'Dataset · Outdoor catalogue', href: '/datasets?type=dataset', kind: 'dataset' },
   ],
+  homePipelinesByWorkspace: {
+    studio: [
+      { name: 'Competitor prices', status: 'Needs review', records: '3', tone: 'warning', href: '/pipelines/competitor-prices', reviewLinked: true },
+      { name: 'Outdoor catalogue', status: 'Completed', records: '1,284', tone: 'success', href: '/pipelines' },
+      { name: 'MAP watch', status: 'Healthy', records: '9,316', tone: 'success', href: '/monitors' },
+    ],
+    northwind: [],
+  },
 };

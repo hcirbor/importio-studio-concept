@@ -28,7 +28,7 @@ function MicrosoftIcon() {
 }
 
 export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const signIn = useStudio((snapshot) => snapshot.auth.signIn);
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get('next') || '/';
@@ -38,8 +38,8 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
   const [inboxState, setInboxState] = useState<'idle' | 'checking' | 'ready'>('idle');
   const [emailError, setEmailError] = useState('');
 
-  function finish(method: Parameters<typeof auth.signIn>[0]) {
-    auth.signIn(method);
+  function finish(method: Parameters<typeof signIn>[0]) {
+    signIn(method);
     router.replace(next);
   }
 

@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/design-system';
 import { useStudio, type DatasetRecord } from '@/lib/data';
-import { formatFieldLabel } from '@/lib/field-label';
+import { formatFieldLabel, matchingFieldNames, normalizeFieldName } from '@/lib/workflow/fields';
+import { sourceDomain } from '@/lib/web/source-domain';
 import { DatasetReview } from './dataset-review';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
@@ -129,21 +130,9 @@ function evidenceForCell(scenario: WorkflowTemplateKey, fixture: ReviewFixture, 
   };
 }
 
-function normalizedField(value: string) {
-  return value.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
-}
-
 function fixtureHeadingForField(field: string, headings: string[]) {
-  const aliases: Record<string, string[]> = {
-    product_name: ['product_name', 'product'],
-    availability: ['availability', 'stock', 'status'],
-    stock: ['stock', 'availability', 'status'],
-    pricing_url: ['pricing_url', 'url'],
-    url: ['url', 'pricing_url'],
-    plan_details: ['plan_details', 'plan'],
-  };
-  const wanted = aliases[normalizedField(field)] ?? [normalizedField(field)];
-  return headings.findIndex((heading) => wanted.includes(normalizedField(heading)));
+  const wanted = matchingFieldNames(field);
+  return headings.findIndex((heading) => wanted.includes(normalizeFieldName(heading)));
 }
 
 function fixtureSource(scenario: WorkflowTemplateKey, row: Array<string | null>) {
@@ -155,7 +144,7 @@ function fixtureSource(scenario: WorkflowTemplateKey, row: Array<string | null>)
 function sourceFromRecord(record: DatasetRecord) {
   const sourceUrl = Object.values(record.evidence).find((item) => item.sourceUrl)?.sourceUrl ?? '';
   try {
-    return new URL(sourceUrl).hostname.replace(/^www\./, '');
+    return sourceDomain(sourceUrl);
   } catch {
     return sourceUrl;
   }
@@ -187,11 +176,16 @@ export function WorkflowScenarioReview({
   const execution = useStudio((snapshot) => snapshot.execution);
   const [feedback, setFeedback] = useState('');
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
-  const [engineRecords, setEngineRecords] = useState<DatasetRecord[]>([]);
+  const [engineResult, setEngineResult] = useState<{ runId: string; records: DatasetRecord[] }>();
+  const engineRecords = engineResult && engineResult.runId === runId ? engineResult.records : [];
 
   useEffect(() => {
     if (!runId || !customDomains.length) return;
-    void execution.evidence(runId).then(setEngineRecords);
+    let active = true;
+    void execution.evidence(runId).then((records) => {
+      if (active) setEngineResult({ runId, records });
+    });
+    return () => { active = false; };
   }, [customDomains.length, execution, runId]);
 
   if (scenario === 'compare') {
@@ -200,13 +194,13 @@ export function WorkflowScenarioReview({
 
   const baseFixture = scenario === 'research' ? researchFixture(researchResolved) : reviewFixtures[scenario] ?? reviewFixtures.collect!;
   const savedFields = (customFields.length ? customFields : baseFixture.headings.filter((heading) => !['Evidence', 'Source'].includes(heading)))
-    .filter((field) => normalizedField(field) !== 'source');
+    .filter((field) => normalizeFieldName(field) !== 'source');
   const customRecords = customDomains.length ? engineRecords : [];
   const datasetRecords: DatasetRecord[] = customRecords.length ? customRecords : baseFixture.rows.map((row, rowIndex) => {
     const source = fixtureSource(scenario, row);
     const values = Object.fromEntries(savedFields.map((field) => {
       if (scenario === 'monitor') {
-        const key = normalizedField(field);
+        const key = normalizeFieldName(field);
         if (key === 'price') return [field, '€249'];
         if (key === 'availability' || key === 'stock' || key === 'status') return [field, 'In stock'];
       }

@@ -1,7 +1,9 @@
 import { datasetDisplayName } from '@/lib/dataset-slug';
+import { isRole } from '@/lib/data/StudioDataSource';
 import type {
   AuthInterface,
   AuthUser,
+  DatasetRecord,
   Member,
   Role,
   Session,
@@ -35,6 +37,85 @@ type AuthState = {
 
 type WorkspaceReviewState = { hasReviewItem: boolean; pipelineVersion: number };
 type ReviewStateMap = Record<string, WorkspaceReviewState>;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function isString(value: unknown): value is string {
+  return typeof value === 'string';
+}
+
+function isAuthUser(value: unknown): value is AuthUser {
+  return isRecord(value) && isString(value.id) && isString(value.name) && isString(value.email);
+}
+
+function isSession(value: unknown): value is Session {
+  return isRecord(value) && isAuthUser(value.user) && isString(value.workspaceId) && isRole(value.role);
+}
+
+function isWorkspace(value: unknown): value is Workspace {
+  return isRecord(value) && isString(value.id) && isString(value.name) && isString(value.subtitle) && isRole(value.role)
+    && (value.empty === undefined || typeof value.empty === 'boolean');
+}
+
+function isMember(value: unknown): value is Member {
+  return isRecord(value) && isString(value.id) && isString(value.name) && isString(value.email) && isRole(value.role)
+    && isString(value.lastActive) && (value.status === undefined || value.status === 'Invited');
+}
+
+function isWorkspaceRun(value: unknown): value is WorkspaceRun {
+  return isRecord(value) && isString(value.id) && isString(value.when) && isString(value.pipeline)
+    && isString(value.coverage) && isString(value.records) && typeof value.queries === 'number'
+    && ['Running', 'Completed', 'Failed'].includes(String(value.state))
+    && ['Running', 'Succeeded', 'Partial', 'Blocked'].includes(String(value.outcome))
+    && ['info', 'success', 'warning', 'danger'].includes(String(value.tone))
+    && (value.createdAt === undefined || typeof value.createdAt === 'number');
+}
+
+function isDatasetRecord(value: unknown): value is DatasetRecord {
+  if (!isRecord(value) || !isString(value.id) || !isRecord(value.values) || !isRecord(value.evidence)) return false;
+  return Object.values(value.values).every((item) => item === null || isString(item))
+    && Object.values(value.evidence).every((item) => isRecord(item) && isString(item.sourceUrl) && isString(item.quote));
+}
+
+function isWorkspaceDataset(value: unknown): value is WorkspaceDataset {
+  return isRecord(value) && isString(value.id) && isString(value.version) && isString(value.title) && isString(value.detail)
+    && ['Validated', 'Needs review', 'Partial'].includes(String(value.status))
+    && ['success', 'warning'].includes(String(value.tone))
+    && (value.fields === undefined || (Array.isArray(value.fields) && value.fields.every(isString)))
+    && (value.records === undefined || (Array.isArray(value.records) && value.records.every(isDatasetRecord)));
+}
+
+function isWorkspaceApiKey(value: unknown): value is WorkspaceApiKey {
+  return isRecord(value) && isString(value.id) && isString(value.name) && isString(value.display) && isString(value.createdBy)
+    && (value.access === undefined || value.access === 'Full' || value.access === 'Read-only');
+}
+
+function isWorkspaceMonitor(value: unknown): value is WorkspaceMonitor {
+  return isRecord(value) && isString(value.id) && isString(value.name) && isString(value.detail)
+    && isString(value.baselineDataset) && isString(value.schedule) && isString(value.lastChange)
+    && ['Healthy', 'Paused', 'Scheduled'].includes(String(value.status))
+    && ['success', 'warning', 'info'].includes(String(value.tone))
+    && Array.isArray(value.fields) && value.fields.every(isString) && isString(value.alertRule);
+}
+
+function isWorkspaceEnrichment(value: unknown): value is WorkspaceEnrichment {
+  return isRecord(value) && isString(value.id) && isString(value.name) && typeof value.rowCount === 'number'
+    && ['Validated', 'Running', 'Completed'].includes(String(value.state))
+    && ['Ready', 'Succeeded', 'Partial'].includes(String(value.outcome)) && isString(value.sourceFile)
+    && Array.isArray(value.inputFields) && value.inputFields.every(isString)
+    && Array.isArray(value.enrichedFields) && value.enrichedFields.every(isString) && Array.isArray(value.rows);
+}
+
+function decodeWorkspaceMap<T>(value: unknown, fallback: Record<string, T[]>, isItem: (item: unknown) => item is T) {
+  if (!isRecord(value)) return fallback;
+  const result: Record<string, T[]> = { ...fallback };
+  for (const [workspaceId, items] of Object.entries(value)) {
+    if (Array.isArray(items) && items.every(isItem)) result[workspaceId] = items;
+  }
+  return result;
+}
 
 const jordan: AuthUser = { id: 'jordan', name: 'Jordan Davis', email: 'jordan@example.com' };
 const seededWorkspaces: Workspace[] = [
@@ -248,6 +329,40 @@ const initialState = (): AuthState => ({
     sourcesByWorkspace: seededSources,
 });
 
+function decodeAuthState(value: unknown): AuthState {
+  const fallback = initialState();
+  if (!isRecord(value)) return fallback;
+  const session = value.session === null || isSession(value.session) ? value.session : fallback.session;
+  const workspaces = Array.isArray(value.workspaces) && value.workspaces.every(isWorkspace) ? value.workspaces : fallback.workspaces;
+  const demoRole = isRole(value.demoRole) ? value.demoRole : undefined;
+  return {
+    session,
+    workspaces,
+    membersByWorkspace: decodeWorkspaceMap(value.membersByWorkspace, fallback.membersByWorkspace, isMember),
+    runsByWorkspace: normalizeRuns(decodeWorkspaceMap(value.runsByWorkspace, fallback.runsByWorkspace, isWorkspaceRun)),
+    datasetsByWorkspace: normalizeDatasets(decodeWorkspaceMap(value.datasetsByWorkspace, fallback.datasetsByWorkspace, isWorkspaceDataset)),
+    apiKeysByWorkspace: decodeWorkspaceMap(value.apiKeysByWorkspace, fallback.apiKeysByWorkspace, isWorkspaceApiKey),
+    monitorsByWorkspace: decodeWorkspaceMap(value.monitorsByWorkspace, fallback.monitorsByWorkspace, isWorkspaceMonitor),
+    enrichmentsByWorkspace: decodeWorkspaceMap(value.enrichmentsByWorkspace, fallback.enrichmentsByWorkspace, isWorkspaceEnrichment),
+    sourcesByWorkspace: decodeWorkspaceMap(value.sourcesByWorkspace, fallback.sourcesByWorkspace, isString),
+    demoRole,
+  };
+}
+
+function isWorkspaceReviewState(value: unknown): value is WorkspaceReviewState {
+  return isRecord(value) && typeof value.hasReviewItem === 'boolean' && typeof value.pipelineVersion === 'number';
+}
+
+function decodeReviewState(value: unknown): ReviewStateMap {
+  if (isWorkspaceReviewState(value)) return { ...seededReviewState, studio: value };
+  if (!isRecord(value)) return seededReviewState;
+  const result: ReviewStateMap = { ...seededReviewState };
+  for (const [workspaceId, review] of Object.entries(value)) {
+    if (isWorkspaceReviewState(review)) result[workspaceId] = review;
+  }
+  return result;
+}
+
 class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
   readonly source = 'mock' as const;
   readonly capabilities = mockCapabilities;
@@ -269,28 +384,13 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       const stored = window.localStorage.getItem(storageKey);
       if (stored) {
         try {
-          const parsed = JSON.parse(stored) as Partial<AuthState>;
-          this.state = {
-            session: parsed.session ?? null,
-            workspaces: parsed.workspaces ?? seededWorkspaces,
-            membersByWorkspace: { ...seededMembers, ...parsed.membersByWorkspace },
-            runsByWorkspace: { ...seededRuns, ...normalizeRuns(parsed.runsByWorkspace) },
-            datasetsByWorkspace: { ...seededDatasets, ...normalizeDatasets(parsed.datasetsByWorkspace) },
-            apiKeysByWorkspace: { ...seededApiKeys, ...parsed.apiKeysByWorkspace },
-            monitorsByWorkspace: { ...seededMonitors, ...parsed.monitorsByWorkspace },
-            enrichmentsByWorkspace: { ...seededEnrichments, ...parsed.enrichmentsByWorkspace },
-            sourcesByWorkspace: { ...seededSources, ...parsed.sourcesByWorkspace },
-            demoRole: parsed.demoRole,
-          };
+          this.state = decodeAuthState(JSON.parse(stored));
         } catch { window.localStorage.removeItem(storageKey); }
       }
       const storedReview = window.localStorage.getItem(reviewStateKey);
       if (storedReview) {
         try {
-          const parsed = JSON.parse(storedReview) as ReviewStateMap | WorkspaceReviewState;
-          this.reviewState = 'hasReviewItem' in parsed
-            ? { ...seededReviewState, studio: parsed as WorkspaceReviewState }
-            : { ...seededReviewState, ...parsed };
+          this.reviewState = decodeReviewState(JSON.parse(storedReview));
         } catch { window.localStorage.removeItem(reviewStateKey); }
       }
       this.ready = true;
@@ -356,7 +456,10 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       restoreReviewItem: this.restoreReviewItem,
       promotePipeline: this.promotePipeline,
     };
-    return { auth, humanReview, execution: this.execution, controlPlane: this.controlPlane, capabilities: this.capabilities, fixtures: mockFixtures };
+    const recentPipelines = (mockFixtures.homePipelinesByWorkspace[session?.workspaceId ?? ''] ?? []).map((pipeline) => pipeline.reviewLinked
+      ? { ...pipeline, status: currentReview.hasReviewItem ? 'Needs review' : 'Healthy', tone: currentReview.hasReviewItem ? 'warning' as const : 'success' as const }
+      : pipeline);
+    return { auth, humanReview, execution: this.execution, controlPlane: this.controlPlane, capabilities: this.capabilities, fixtures: mockFixtures, recentPipelines };
   }
 
   signIn = (method: SignInMethod) => {
@@ -449,24 +552,28 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     return { ok: true };
   };
 
-  private updateWorkspaceCollection<T>(key: 'runsByWorkspace' | 'datasetsByWorkspace' | 'apiKeysByWorkspace' | 'monitorsByWorkspace' | 'enrichmentsByWorkspace' | 'sourcesByWorkspace', updater: (items: T[]) => T[]) {
+  private updateWorkspaceCollection<T>(
+    read: (state: AuthState) => Record<string, T[]>,
+    write: (state: AuthState, collections: Record<string, T[]>) => AuthState,
+    updater: (items: T[]) => T[],
+  ) {
     this.commit((current) => {
       if (!current.session) return current;
       const workspaceId = current.session.workspaceId;
-      const collections = current[key] as Record<string, T[]>;
+      const collections = read(current);
       const nextItems = updater(collections[workspaceId] ?? []);
+      const next = write(current, { ...collections, [workspaceId]: nextItems });
       return {
-        ...current,
-        [key]: { ...collections, [workspaceId]: nextItems },
+        ...next,
         workspaces: current.workspaces.map((workspace) => workspace.id === workspaceId ? { ...workspace, empty: false } : workspace),
-      } as AuthState;
+      };
     });
   }
 
-  addRun = (run: WorkspaceRun) => this.updateWorkspaceCollection<WorkspaceRun>('runsByWorkspace', (runs) => [run, ...runs.filter((item) => item.id !== run.id)]);
-  updateRun = (id: string, updates: Partial<WorkspaceRun>) => this.updateWorkspaceCollection<WorkspaceRun>('runsByWorkspace', (runs) => runs.map((run) => run.id === id ? { ...run, ...updates } : run));
-  addDataset = (dataset: WorkspaceDataset) => this.updateWorkspaceCollection<WorkspaceDataset>('datasetsByWorkspace', (datasets) => [dataset, ...datasets.filter((item) => item.id !== dataset.id)]);
-  updateDatasetValue = (datasetId: string, recordId: string, field: string, value: string, reviewedBy?: string, note?: string) => this.updateWorkspaceCollection<WorkspaceDataset>('datasetsByWorkspace', (datasets) => datasets.map((dataset) => dataset.id !== datasetId ? dataset : {
+  addRun = (run: WorkspaceRun) => this.updateWorkspaceCollection((state) => state.runsByWorkspace, (state, runsByWorkspace) => ({ ...state, runsByWorkspace }), (runs) => [run, ...runs.filter((item) => item.id !== run.id)]);
+  updateRun = (id: string, updates: Partial<WorkspaceRun>) => this.updateWorkspaceCollection((state) => state.runsByWorkspace, (state, runsByWorkspace) => ({ ...state, runsByWorkspace }), (runs) => runs.map((run) => run.id === id ? { ...run, ...updates } : run));
+  addDataset = (dataset: WorkspaceDataset) => this.updateWorkspaceCollection((state) => state.datasetsByWorkspace, (state, datasetsByWorkspace) => ({ ...state, datasetsByWorkspace }), (datasets) => [dataset, ...datasets.filter((item) => item.id !== dataset.id)]);
+  updateDatasetValue = (datasetId: string, recordId: string, field: string, value: string, reviewedBy?: string, note?: string) => this.updateWorkspaceCollection((state) => state.datasetsByWorkspace, (state, datasetsByWorkspace) => ({ ...state, datasetsByWorkspace }), (datasets) => datasets.map((dataset) => dataset.id !== datasetId ? dataset : {
     ...dataset,
     lastUpdated: 'Just now',
     updatedAt: Date.now(),
@@ -486,7 +593,7 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       };
     }),
   }));
-  setDatasetReviewState = (datasetId: string, unresolvedCount: number) => this.updateWorkspaceCollection<WorkspaceDataset>('datasetsByWorkspace', (datasets) => datasets.map((dataset) => {
+  setDatasetReviewState = (datasetId: string, unresolvedCount: number) => this.updateWorkspaceCollection((state) => state.datasetsByWorkspace, (state, datasetsByWorkspace) => ({ ...state, datasetsByWorkspace }), (datasets) => datasets.map((dataset) => {
     if (dataset.id !== datasetId) return dataset;
     const status = unresolvedCount > 0 ? 'Needs review' as const : 'Validated' as const;
     const tone = unresolvedCount > 0 ? 'warning' as const : 'success' as const;
@@ -502,13 +609,13 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       updatedAt: Date.now(),
     };
   }));
-  createApiKey = (key: WorkspaceApiKey) => this.updateWorkspaceCollection<WorkspaceApiKey>('apiKeysByWorkspace', (keys) => [...keys, key]);
-  revokeApiKey = (id: string) => this.updateWorkspaceCollection<WorkspaceApiKey>('apiKeysByWorkspace', (keys) => keys.filter((key) => key.id !== id));
-  addMonitor = (monitor: WorkspaceMonitor) => this.updateWorkspaceCollection<WorkspaceMonitor>('monitorsByWorkspace', (monitors) => [monitor, ...monitors.filter((item) => item.id !== monitor.id)]);
-  addEnrichment = (enrichment: WorkspaceEnrichment) => this.updateWorkspaceCollection<WorkspaceEnrichment>('enrichmentsByWorkspace', (enrichments) => [enrichment, ...enrichments.filter((item) => item.id !== enrichment.id)]);
-  updateEnrichment = (id: string, updates: Partial<WorkspaceEnrichment>) => this.updateWorkspaceCollection<WorkspaceEnrichment>('enrichmentsByWorkspace', (enrichments) => enrichments.map((enrichment) => enrichment.id === id ? { ...enrichment, ...updates } : enrichment));
-  addSource = (source: string) => this.updateWorkspaceCollection<string>('sourcesByWorkspace', (sources) => sources.includes(source) ? sources : [...sources, source]);
-  removeSource = (source: string) => this.updateWorkspaceCollection<string>('sourcesByWorkspace', (sources) => sources.filter((item) => item !== source));
+  createApiKey = (key: WorkspaceApiKey) => this.updateWorkspaceCollection((state) => state.apiKeysByWorkspace, (state, apiKeysByWorkspace) => ({ ...state, apiKeysByWorkspace }), (keys) => [...keys, key]);
+  revokeApiKey = (id: string) => this.updateWorkspaceCollection((state) => state.apiKeysByWorkspace, (state, apiKeysByWorkspace) => ({ ...state, apiKeysByWorkspace }), (keys) => keys.filter((key) => key.id !== id));
+  addMonitor = (monitor: WorkspaceMonitor) => this.updateWorkspaceCollection((state) => state.monitorsByWorkspace, (state, monitorsByWorkspace) => ({ ...state, monitorsByWorkspace }), (monitors) => [monitor, ...monitors.filter((item) => item.id !== monitor.id)]);
+  addEnrichment = (enrichment: WorkspaceEnrichment) => this.updateWorkspaceCollection((state) => state.enrichmentsByWorkspace, (state, enrichmentsByWorkspace) => ({ ...state, enrichmentsByWorkspace }), (enrichments) => [enrichment, ...enrichments.filter((item) => item.id !== enrichment.id)]);
+  updateEnrichment = (id: string, updates: Partial<WorkspaceEnrichment>) => this.updateWorkspaceCollection((state) => state.enrichmentsByWorkspace, (state, enrichmentsByWorkspace) => ({ ...state, enrichmentsByWorkspace }), (enrichments) => enrichments.map((enrichment) => enrichment.id === id ? { ...enrichment, ...updates } : enrichment));
+  addSource = (source: string) => this.updateWorkspaceCollection((state) => state.sourcesByWorkspace, (state, sourcesByWorkspace) => ({ ...state, sourcesByWorkspace }), (sources) => sources.includes(source) ? sources : [...sources, source]);
+  removeSource = (source: string) => this.updateWorkspaceCollection((state) => state.sourcesByWorkspace, (state, sourcesByWorkspace) => ({ ...state, sourcesByWorkspace }), (sources) => sources.filter((item) => item !== source));
 
   private updateCurrentReview(updates: Partial<WorkspaceReviewState>) {
     const workspaceId = this.state.session?.workspaceId ?? 'studio';

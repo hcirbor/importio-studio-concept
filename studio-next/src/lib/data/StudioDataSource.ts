@@ -1,4 +1,9 @@
-export type Role = 'Owner' | 'Admin' | 'Editor' | 'Viewer';
+export const ROLE_VALUES = ['Owner', 'Admin', 'Editor', 'Viewer'] as const;
+export type Role = (typeof ROLE_VALUES)[number];
+
+export function isRole(value: unknown): value is Role {
+  return typeof value === 'string' && ROLE_VALUES.some((role) => role === value);
+}
 export type PermissionAction = 'run' | 'review' | 'promote' | 'create_monitor' | 'create_dataset' | 'manage_members' | 'assign_owner' | 'manage_api_keys' | 'manage_webhooks' | 'manage_billing' | 'delete_workspace';
 
 export type AuthUser = { id: string; name: string; email: string };
@@ -55,8 +60,13 @@ export type WorkspaceMonitor = {
   tone: 'success' | 'warning' | 'info';
   fields: string[];
   alertRule: string;
-  notifyVia?: 'Email' | 'Slack' | 'Webhook';
+  notifyVia?: NotificationChannel;
 };
+const NOTIFICATION_CHANNELS = ['Email', 'Slack', 'Webhook'] as const;
+export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
+export function isNotificationChannel(value: unknown): value is NotificationChannel {
+  return typeof value === 'string' && NOTIFICATION_CHANNELS.some((channel) => channel === value);
+}
 type EnrichmentVerdict = 'Supported' | 'Not stated' | 'Conflicting';
 export type EnrichmentCell = { value: string | null; verdict: EnrichmentVerdict; evidence: DatasetEvidence };
 type EnrichmentRow = { id: string; values: Record<string, string>; enriched: Record<string, EnrichmentCell> };
@@ -123,6 +133,13 @@ export type MonitorRequest = Omit<WorkspaceMonitor, 'id' | 'baselineDataset'> & 
 type EnrichmentRequest = { enrichmentId: string };
 
 type QualificationVerdict = 'Supported' | 'Unresolved' | 'Not supported';
+type RecentPipeline = {
+  name: string;
+  status: string;
+  records: string;
+  tone: 'success' | 'warning';
+  href: string;
+};
 export type MockFixtures = {
   searchResults: SearchResult[];
   candidates: { name: string; domain: string; detail: string }[];
@@ -136,6 +153,7 @@ export type MockFixtures = {
   webhooks: { id: string; url: string; events: string; health: 'Healthy' | 'Validating' }[];
   mcpSetups: { id: string; label: string; title: string; setup: string }[];
   recentItems: { label: string; href: string; kind: 'run' | 'pipeline' | 'dataset' }[];
+  homePipelinesByWorkspace: Record<string, Array<RecentPipeline & { reviewLinked?: boolean }>>;
 };
 
 export interface ExecutionEngine {
@@ -219,6 +237,7 @@ export type StudioSnapshot = {
   controlPlane: StudioControlPlane;
   capabilities: CapabilityMap;
   fixtures: MockFixtures;
+  recentPipelines: RecentPipeline[];
 };
 
 export interface StudioDataSource {

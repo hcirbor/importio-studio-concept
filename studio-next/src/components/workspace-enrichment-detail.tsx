@@ -4,12 +4,16 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { Badge, Button, Eyebrow } from '@/components/design-system';
 import { useStudio, type DatasetRecord } from '@/lib/data';
-import { formatFieldLabel } from '@/lib/field-label';
+import { formatFieldLabel } from '@/lib/workflow/fields';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
 
 export function WorkspaceEnrichmentDetail({ enrichmentId }: { enrichmentId: string }) {
-  const { auth, execution } = useStudio((snapshot) => snapshot);
+  const auth = useStudio((snapshot) => ({
+    enrichments: snapshot.auth.enrichments,
+    currentWorkspace: snapshot.auth.currentWorkspace,
+  }));
+  const execution = useStudio((snapshot) => snapshot.execution);
   const enrichment = auth.enrichments.find((item) => item.id === enrichmentId);
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
 

@@ -8,7 +8,7 @@ export function datasetSlug(name: string) {
     .replace(/^-+|-+$/g, '') || 'dataset';
 }
 
-export function uniqueDatasetSlug(name: string, existingIds: string[]) {
+function uniqueDatasetSlug(name: string, existingIds: string[]) {
   const base = datasetSlug(name);
   const used = new Set(existingIds);
   if (!used.has(base)) return base;

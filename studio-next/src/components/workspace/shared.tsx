@@ -155,7 +155,7 @@ export function TablePanel({
   return (
     <section className="panel table-panel">
       {title ? <PanelHead title={title} meta={meta} action={action} /> : null}
-      <div className="table-scroll">
+      <div className="table-scroll" role="region" aria-label={title ? `${title} table` : 'Data table'} tabIndex={0}>
         <table className="data-table compact-table">
           <thead>
             <tr>

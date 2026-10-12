@@ -24,10 +24,15 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { type Role, useStudio } from '@/lib/data';
+import { isRole, ROLE_VALUES, useStudio } from '@/lib/data';
 
 export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const auth = useStudio((snapshot) => ({
+    currentWorkspace: snapshot.auth.currentWorkspace,
+    workspaces: snapshot.auth.workspaces,
+    switchWorkspace: snapshot.auth.switchWorkspace,
+    createWorkspace: snapshot.auth.createWorkspace,
+  }));
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -60,7 +65,7 @@ export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }
       <Tooltip><TooltipTrigger asChild><Button
         variant="ghost"
         className={collapsed ? 'workspace-card workspace-card-collapsed' : 'workspace-card'}
-        aria-label={`Switch workspace · ${workspace?.name ?? 'Import.io Studio'}`}
+        aria-label={`${workspace?.name.slice(0, 1) ?? 'I'} ${workspace?.name ?? 'Import.io Studio'} ${workspace?.subtitle ?? 'Demo workspace'} · Switch workspace`}
         onClick={() => setOpen(true)}
       >
         <span className="workspace-icon">{workspace?.name.slice(0, 1) ?? 'I'}</span>
@@ -116,7 +121,12 @@ export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }
 }
 
 export function UserMenu({ compact = false, rail = false }: { compact?: boolean; rail?: boolean }) {
-  const auth = useStudio((snapshot) => snapshot.auth);
+  const auth = useStudio((snapshot) => ({
+    currentUser: snapshot.auth.currentUser,
+    currentRole: snapshot.auth.currentRole,
+    signOut: snapshot.auth.signOut,
+    setDemoRole: snapshot.auth.setDemoRole,
+  }));
   const router = useRouter();
   const user = auth.currentUser;
   const initials = user?.name
@@ -137,7 +147,7 @@ export function UserMenu({ compact = false, rail = false }: { compact?: boolean;
         <button
           type="button"
           className={compact || rail ? `avatar user-menu-trigger${rail ? ' sidebar-user-avatar' : ''}` : 'profile user-menu-trigger'}
-          aria-label="Open user menu"
+          aria-label={`${initials} ${user?.name ?? ''} ${auth.currentRole ?? ''} · Open user menu`}
         >
           {compact || rail ? initials : (
             <>
@@ -160,8 +170,8 @@ export function UserMenu({ compact = false, rail = false }: { compact?: boolean;
         <DropdownMenuItem onSelect={() => router.push('/settings')}>Profile</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="user-menu-section-label">View as <span>(demo only)</span></DropdownMenuLabel>
-        <DropdownMenuRadioGroup value={auth.currentRole ?? undefined} onValueChange={(value) => auth.setDemoRole(value as Role)}>
-          {(['Owner', 'Admin', 'Editor', 'Viewer'] as Role[]).map((role) => (
+        <DropdownMenuRadioGroup value={auth.currentRole ?? undefined} onValueChange={(value) => { if (isRole(value)) auth.setDemoRole(value); }}>
+          {ROLE_VALUES.map((role) => (
             <DropdownMenuRadioItem key={role} value={role}>{role}</DropdownMenuRadioItem>
           ))}
         </DropdownMenuRadioGroup>

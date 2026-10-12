@@ -70,7 +70,7 @@ export function CommandPalette() {
 
   return (
     <>
-      <Button variant="secondary" className="command-trigger" onClick={() => setOpen(true)} aria-label="Open command palette">
+      <Button variant="secondary" className="command-trigger" onClick={() => setOpen(true)} aria-label="⌘K · Open command palette">
         <Search aria-hidden="true" />
         <kbd>⌘K</kbd>
       </Button>
