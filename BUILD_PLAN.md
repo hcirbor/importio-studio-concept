@@ -1,6 +1,6 @@
 # Studio × CiteOtter — Build plan
 
-Owner: Rob Richardson · Started: 12 Oct 2026 · Revision 4 · Status: Phase 1
+Owner: Rob Richardson · Started: 12 Oct 2026 · Revision 4 · Status: Phase 1 complete
 
 Repository root: `Import Studio/` · Application root: `studio-next/` (run all npm commands there)
 
@@ -147,3 +147,4 @@ Rows are added by receipt commits after each phase.
 |---|---|---|---|---|---|---|
 | 2026-10-12 | — | — | — | — | — | Demo at 9.7. CiteOtter mapped read-only. Plan revision 3. |
 | 2026-10-12 | Phase 0 — Safety net | `demo-9.7` | `f9c3512` | Yes — already live | Live/local `page-68238ff096eb45be.js`; SHA-256 `9e0186ee5e8795730215240d22cf6895cbef24a1e2895b6b5ba97be398cedbcf` matched | No Phase 0 deploy. Inventory: 27 application files, 51 ignored local artefacts, 0 unsure. |
+| 2026-10-12 | Phase 1 — Behaviour tests + quality gates | `tests-baseline` | `7ab494c` | No — not deployed | CI [38272849924](https://github.com/hcirbor/importio-studio-concept/actions/runs/38272849924) passed on `5709b98` | 34 Playwright tests, including 16 exact visual baselines on macOS and Linux. Quality baseline: 19 tracked issues, 0 regressions. CI follow-ups: `5efddcf`, `5709b98`. |
