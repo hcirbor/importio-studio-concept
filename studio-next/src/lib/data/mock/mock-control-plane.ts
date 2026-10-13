@@ -119,7 +119,7 @@ function decodeWorkspaceMap<T>(value: unknown, fallback: Record<string, T[]>, is
 
 const jordan: AuthUser = { id: 'jordan', name: 'Jordan Davis', email: 'jordan@example.com' };
 const seededWorkspaces: Workspace[] = [
-  { id: 'studio', name: 'Import.io Studio', subtitle: 'Demo workspace', role: 'Owner' },
+  { id: 'studio', name: 'Demo workspace', subtitle: 'Owner workspace', role: 'Owner' },
   { id: 'northwind', name: 'Northwind Pricing', subtitle: 'Editor', role: 'Editor', empty: true },
 ];
 const seededMembers: Record<string, Member[]> = {
@@ -455,6 +455,7 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       acceptReviewItem: this.acceptReviewItem,
       restoreReviewItem: this.restoreReviewItem,
       promotePipeline: this.promotePipeline,
+      rollbackPipeline: this.rollbackPipeline,
     };
     const recentPipelines = (mockFixtures.homePipelinesByWorkspace[session?.workspaceId ?? ''] ?? []).map((pipeline) => pipeline.reviewLinked
       ? { ...pipeline, status: currentReview.hasReviewItem ? 'Needs review' : 'Healthy', tone: currentReview.hasReviewItem ? 'warning' as const : 'success' as const }
@@ -632,6 +633,7 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
   acceptReviewItem = () => this.updateCurrentReview({ hasReviewItem: false });
   restoreReviewItem = () => this.updateCurrentReview({ hasReviewItem: true });
   promotePipeline = () => this.updateCurrentReview({ pipelineVersion: 5 });
+  rollbackPipeline = () => this.updateCurrentReview({ pipelineVersion: 4 });
 
   readonly auth = {
     getSession: () => this.snapshot.auth.session,
@@ -663,6 +665,7 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     acceptReviewItem: this.acceptReviewItem,
     restoreReviewItem: this.restoreReviewItem,
     promotePipeline: this.promotePipeline,
+    rollbackPipeline: this.rollbackPipeline,
   };
 
   readonly execution = createMockExecution(this.controlPlane, this.getSnapshot);

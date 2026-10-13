@@ -111,6 +111,9 @@ export const CAPABILITY_IDS = [
   'monitor-rules',
   'monitor-channels',
   'cost-estimates',
+  'capture-screenshot',
+  'capture-html',
+  'capture-recording',
 ] as const;
 export type CapabilityId = (typeof CAPABILITY_IDS)[number];
 export type CapabilityMap = Readonly<Record<CapabilityId, Capability>>;
@@ -217,6 +220,7 @@ export interface StudioControlPlane {
   acceptReviewItem(): void;
   restoreReviewItem(): void;
   promotePipeline(): void;
+  rollbackPipeline(): void;
 }
 
 interface StudioAuth {
@@ -252,6 +256,7 @@ type HumanReviewSnapshot = {
   acceptReviewItem(): void;
   restoreReviewItem(): void;
   promotePipeline(): void;
+  rollbackPipeline(): void;
 };
 export type StudioSnapshot = {
   auth: AuthInterface;

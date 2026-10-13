@@ -13,6 +13,7 @@ export const workspaceSectionSlugs = [
   'webhooks',
   'usage',
   'settings',
+  'try',
 ] as const;
 
 export type WorkspaceSectionSlug = (typeof workspaceSectionSlugs)[number];
@@ -32,6 +33,7 @@ export const workspaceSectionTitles: Record<WorkspaceSectionSlug, string> = {
   webhooks: 'Webhooks',
   usage: 'Usage',
   settings: 'Settings',
+  try: 'Quick try',
 };
 
 export function isWorkspaceSectionSlug(value: string): value is WorkspaceSectionSlug {

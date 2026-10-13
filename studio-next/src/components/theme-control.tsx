@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { Moon, Sun } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/design-system';
 
 type Theme = 'light' | 'dark';
@@ -23,7 +24,9 @@ export function ThemeControl() {
   }
 
   return <Select value={theme} onValueChange={(value) => update(value as Theme)}>
-    <SelectTrigger className="theme-control" aria-label="Theme"><SelectValue /></SelectTrigger>
+    <SelectTrigger className="theme-control" aria-label={`Theme: ${theme}`} title={`Theme: ${theme}`}>
+      {theme === 'light' ? <Sun size={16} aria-hidden="true" /> : <Moon size={16} aria-hidden="true" />}<SelectValue className="sr-only" />
+    </SelectTrigger>
     <SelectContent className="theme-menu" align="end" sideOffset={6}><SelectItem value="light">Light</SelectItem><SelectItem value="dark">Dark</SelectItem></SelectContent>
   </Select>;
 }

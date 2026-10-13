@@ -25,9 +25,10 @@ const initialDestinations = [
 
 export function PipelineDetail() {
   const session = useStudio((snapshot) => snapshot.auth.session);
-  const { version, promotePipeline } = useStudio((snapshot) => ({
+  const { version, promotePipeline, rollbackPipeline } = useStudio((snapshot) => ({
     version: snapshot.humanReview.pipelineVersion,
     promotePipeline: snapshot.humanReview.promotePipeline,
+    rollbackPipeline: snapshot.humanReview.rollbackPipeline,
   }));
   const mayPromote = can(session, 'promote');
   const [message, setMessage] = useState('');
@@ -35,12 +36,14 @@ export function PipelineDetail() {
   const [hasUnreviewedRegression, setHasUnreviewedRegression] = useState(true);
   const [destinations, setDestinations] = useState(initialDestinations);
   const [aperturePublished, setAperturePublished] = useState(false);
+  const [repairApproved, setRepairApproved] = useState(false);
   const toggleDestination = (name: string) => {
     setDestinations((current) => current.map((item) => item.name === name ? { ...item, connected: true, status: item.connected ? item.status : 'Connected · Ready', action: 'Configure' } : item));
     setMessage(`${name} ${name === 'Webhook' ? 'configuration opened' : 'connected for this demo session'}.`);
   };
   return <div className="page"><header className="page-head"><Link href="/pipelines" className="text-link">← Pipelines</Link><Eyebrow style={{marginTop:20}}>Pipeline</Eyebrow><h1>Competitor prices</h1><p>Saved pipeline · version {version} · reusable through schedule, API or MCP.</p></header>
     {message ? <p className="inline-feedback success" role="status">{message}</p> : null}
+    <section className="panel repair-panel" id="repair"><div className="section-head"><div><Eyebrow>Pipeline repair</Eyebrow><h2>Product cards changed</h2><p>Price moved into a new offer block; availability is now a labelled badge.</p></div><Badge tone={repairApproved ? 'success' : 'warning'}>{repairApproved ? `Active · v${version}` : 'Needs attention'}</Badge></div><div className="repair-evidence"><article><small>Before · v4</small><strong>.product-card .price</strong><p>€249.00 · In stock</p><Link className="text-link" href="/runs/run_7f3a?worker=northwind&step=1">View evidence →</Link></article><article><small>After · proposed v5</small><strong>[data-offer] .amount</strong><p>€249.00 · Availability badge: In stock</p><Link className="text-link" href="/runs/run_7f3a?worker=northwind&step=2">View evidence →</Link></article></div><div className="page-action-row"><span>{repairApproved ? 'Repair approved. The previous version remains available.' : 'A tested repair is ready to create the next version.'}</span>{repairApproved ? <Button variant="secondary" onClick={() => { rollbackPipeline(); setRepairApproved(false); setMessage('Rolled back to v4.'); }}>Roll back to v4</Button> : <Button variant="primary" disabled={!mayPromote} onClick={() => { promotePipeline(); setRepairApproved(true); setMessage('Repair approved. Version 5 created and activated.'); }}>Approve repair (creates v5)</Button>}</div></section>
     <div className="definition-grid"><section className="panel"><div className="section-head"><h2>Pipeline definition</h2><Badge tone="success">Active · v{version}</Badge></div><dl className="detail-list"><div><dt>Objective</dt><dd>Compare Trailhead 2P pricing and availability</dd></div><div><dt>Sources</dt><dd>3 approved domains</dd></div><div><dt>Schema</dt><dd>5 fields · version {version}</dd></div><div><dt>Success rule</dt><dd>≥ 90% sources, evidence required</dd></div><div><dt>Cost cap</dt><dd>$0.25 per run</dd></div></dl></section><aside className="panel"><div className="section-head"><h2>Operate</h2><Eyebrow>Last run · 2 min ago</Eyebrow></div><div className="button-grid"><Button variant="secondary" asChild><Link href="/build?template=compare">Edit pipeline</Link></Button><Button variant="secondary" disabled={!mayPromote} title={!mayPromote ? viewerTooltip : undefined} onClick={() => setPromoteOpen(true)}>Promote v5</Button><Button variant="primary" disabled={!mayPromote} title={!mayPromote ? viewerTooltip : undefined} asChild={mayPromote}>{mayPromote ? <Link href="/runs/run_7f3a">Run now</Link> : 'Run now'}</Button><Button variant="secondary" asChild><Link href="/monitors">Configure monitor</Link></Button><Button variant="secondary" disabled={!mayPromote} title={!mayPromote ? viewerTooltip : undefined} onClick={() => setMessage('Schedule saved: daily at 14:00 UTC.')}>Schedule</Button><Button variant="secondary" asChild><Link href="/developers">API / MCP setup</Link></Button></div></aside></div>
     <Dialog open={promoteOpen} onOpenChange={setPromoteOpen}>
       <DialogContent className="promote-dialog">

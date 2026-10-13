@@ -93,7 +93,7 @@ Already carried over under new names: Memories → Runs › Saved · Groups → 
 | Medium | Enrichment retries | "Retry N failed" rows on partial enrichments |
 | Medium | Settings | Notifications and Audit log sections |
 | Medium | Qualification follow-through | "Save qualified candidates" → dataset; "Extend search" |
-| Decide | Managed handoff | "Hand to Import.io experts" in Review and Datasets (code exists but isn't shown). Restore it, or record it as an intentional removal (no contact-sales CTAs) |
+| Removed | Managed handoff | Intentionally removed in Phase 3B: "Hand to Import.io experts" conflicts with the no-contact-sales rule and has no live-engine support. No replacement contact or sales CTA is provided. |
 | Low | Quick try | `#try` single-page Extract preview with "Save to workspace" |
 | Low | Usage | "Download JSON", usage by pipeline |
 | Low | Runs | "Load older" pagination |
@@ -120,6 +120,8 @@ Studio depends on `"@importio/design-system": "file:../../Import.io design syste
 Recommended: **A now, B later.** The chosen option: **A, using the public repository configured by `DESIGN_SYSTEM_REPOSITORY` (fallback: `hcirbor/importio-design-system`) at a pinned commit; no token required.**
 
 ## Decisions needed before Phase 4
+
+Phase 3B keeps automatic decision-to-`Partial` completion deferred to Phase 4A/5; the mock parity work does not define or claim that live-engine behavior.
 
 - [ ] **Repository home:** move `hcirbor/importio-studio-concept` into the Import.io company GitHub organisation before live integration, or keep it in its current owner through the preview?
 - [ ] **Live preview host** that can run a Next.js server **behind an access gate** (VPN, IAP or SSO). The likely host is the same platform as CiteOtter staging, with Studio running as its own service behind staff sign-in. Not chatgpt.site, not public, not CiteOtter's repo.

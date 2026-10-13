@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Activity, Braces, CheckSquare2, Database, Home,
-  Layers3, MonitorDot, PanelLeft, Plus, Search, Settings, Table2,
+  Layers3, MonitorDot, PanelLeft, Plus, Search, Settings, Table2, Zap,
 } from 'lucide-react';
 import { ThemeControl } from './theme-control';
 import { CommandPalette } from './command-palette';
@@ -19,6 +19,7 @@ const groups = [
   { label: 'Build', items: [
     { href: '/build', label: 'New workflow', icon: Plus },
     { href: '/search', label: 'Search', icon: Search },
+    { href: '/try', label: 'Quick try', icon: Zap },
   ] },
   { label: 'Operate', items: [
     { href: '/pipelines', label: 'Pipelines', icon: Layers3 },
@@ -252,7 +253,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside ref={sidebarRef} onScroll={handleSidebarScroll} className={navOpen ? 'sidebar mobile-open' : 'sidebar'}>
         <RailTooltip enabled={rail} label="Import.io Studio"><Link href="/" className="brand" aria-label="Import.io Studio home" onClick={handleSidebarNavigation}>
           <BrandMark className="brand-mark" title="" aria-hidden="true" />
-          <span className="brand-name">import.io</span>
+          <span className="brand-name"><b>import.io</b><small>Studio</small></span>
         </Link></RailTooltip>
         <WorkspaceSwitcher collapsed={rail} />
         <nav aria-label="Primary navigation">
@@ -283,7 +284,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Button variant="ghost" className="nav-toggle" aria-label={desktopNavigation ? (sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation') : (navOpen ? 'Close navigation' : 'Open navigation')} onClick={toggleNavigation}><PanelLeft /></Button>
             <Suspense fallback={<div className="breadcrumbs"><span>Build</span><i>/</i><strong>Workflow</strong></div>}><Breadcrumbs pathname={pathname} /></Suspense>
           </div>
-          <div className="top-actions"><CommandPalette /><span className="demo-chip">INTERACTIVE DEMO</span><span className="ready-chip"><i /> API &amp; database ready</span><ThemeControl /><UserMenu compact /></div>
+          <div className="top-actions"><CommandPalette /><span className="demo-chip">INTERACTIVE DEMO</span><ThemeControl /><UserMenu compact /></div>
         </header>
         <main id="main">{auth.currentWorkspace?.empty && !['/build','/settings','/developers','/usage'].includes(pathname)
           ? <section className="empty-workspace"><span className="eyebrow">{auth.currentWorkspace.name}</span><h1>Nothing here yet</h1><p>This workspace is ready for its first workflow.</p><Button asChild><Link href="/build">Create a workflow</Link></Button></section>

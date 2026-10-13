@@ -17,6 +17,14 @@ export function RunSession({ runId, onResearchResolved, onResearchStateChange }:
 
   useEffect(() => { researchCallbacks.current = { onResearchResolved, onResearchStateChange }; }, [onResearchResolved, onResearchStateChange]);
   useEffect(() => execution.subscribeRunEvents(runId, (event) => { setScenario(event.presentation); if (event.decisionState) researchCallbacks.current.onResearchStateChange?.(event.decisionState); if (event.decisionState === 'Complete') researchCallbacks.current.onResearchResolved?.(); }), [execution, runId]);
+  useEffect(() => {
+    const resolveInput = () => {
+      const waitingIndex = scenario.workers.findIndex((worker) => worker.state === 'Needs input');
+      if (waitingIndex >= 0) { setWorkerIndex(waitingIndex); setStep(1); setPlaying(false); }
+    };
+    window.addEventListener('studio:resolve-run-input', resolveInput);
+    return () => window.removeEventListener('studio:resolve-run-input', resolveInput);
+  }, [scenario.workers, setPlaying, setStep, setWorkerIndex]);
 
   function recordCookieDecision() { setStep(2); setPlaying(false); void execution.resolveRunDecision(runId); }
 

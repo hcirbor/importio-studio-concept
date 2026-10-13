@@ -16,6 +16,9 @@ export const citeOtterCapabilities: CapabilityMap = Object.freeze({
   'monitor-rules': { status: 'coming-soon', note: "Price thresholds aren't available yet. Monitors alert on any change." },
   'monitor-channels': { status: 'coming-soon', note: "Email and Slack alerts aren't available yet." },
   'cost-estimates': { status: 'coming-soon', note: "Live cost isn't available yet. Usage is shown instead." },
+  'capture-screenshot': { status: 'preview', note: 'Screenshot artefacts are available for retained captures.' },
+  'capture-html': { status: 'preview', note: 'HTML snapshots are available for retained captures.' },
+  'capture-recording': { status: 'coming-soon', note: "Full run recordings aren't available yet." },
 });
 
 export const mockCapabilities = process.env.NEXT_PUBLIC_CAPABILITY_PROFILE === 'citeotter'

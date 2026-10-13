@@ -10,7 +10,9 @@ a { text-decoration: none; }
 .sidebar { position: sticky; top: 0; height: 100vh; overflow-y: auto; overflow-anchor: none; display: flex; flex-direction: column; border-right: 1px solid var(--io-color-border); background: var(--io-color-surface); padding: 0 14px 14px; }
 .brand { height: 72px; min-height: 72px; flex: 0 0 72px; display: flex; align-items: center; gap: 8px; color: var(--io-color-foreground); }
 .brand-mark { width: 22px; flex: 0 0 auto; }
-.brand-name { font-size: 26px; font-weight: 750; line-height: 1; letter-spacing: -.075em; }
+.brand-name { display: flex; align-items: baseline; gap: 7px; line-height: 1; }
+.brand-name b { font-size: 24px; font-weight: 750; letter-spacing: -.075em; }
+.brand-name small { font: 600 11px var(--io-font-mono); letter-spacing: .02em; color: var(--io-color-muted); text-transform: uppercase; }
 .workspace-card { flex: 0 0 auto; display: flex; align-items: center; gap: 12px; width: 100%; padding: 14px; border: 1px solid var(--io-color-border); border-radius: 10px; background: var(--io-color-background); text-align: left; }
 .workspace-icon { width: 36px; height: 36px; display: grid; place-items: center; border: 1px solid var(--io-color-border); border-radius: 7px; background: var(--io-color-selected); color: var(--io-color-link); }
 .workspace-card strong, .workspace-card small, .profile strong, .profile small { display: block; }
@@ -454,7 +456,7 @@ main { min-width: 0; padding: 38px 34px 64px; }
 .nav-item { min-height: 36px; padding: 0 12px; }
 .topbar { background: var(--io-color-background); backdrop-filter: none; }
 .top-actions { gap: 16px; }
-.theme-control { width: 104px !important; min-height: 36px !important; padding-inline: 12px !important; }
+.theme-control { width: 42px !important; min-height: 36px !important; padding-inline: 10px !important; }
 main { padding: 30px 32px 64px; }
 .page { width: min(1480px, 100%); }
 
@@ -744,7 +746,7 @@ main { padding: 30px 32px 64px; }
   .templates, .templates-closed { grid-row: 2; }
 }
 
-/* Restored Studio Beta interactions, expressed with the current design tokens. */
+/* Restored Studio interactions, expressed with the current design tokens. */
 .command-trigger { min-height: 32px; gap: 6px; padding-inline: 8px; border-color: var(--io-color-border); color: var(--io-color-subtle); }
 .command-trigger svg { width: 15px; height: 15px; }
 .command-trigger kbd { padding: 0; border: 0; background: transparent; color: var(--io-color-subtle); font: 9.5px var(--io-font-mono); }
@@ -1029,8 +1031,38 @@ main { padding: 30px 32px 64px; }
 .alert-dialog-title { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.025em; }
 .alert-dialog-description { margin: 0; color: var(--io-color-muted); font-size: 14px; line-height: 1.5; }
 .alert-dialog-footer { display: flex; justify-content: flex-end; gap: 8px; }
+.capture-actions, .run-control-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.run-control-row { justify-content: flex-end; margin: -8px 0 12px; }
+.run-input-notice, .run-context-banner, .run-sticky-actions { display: flex; align-items: center; justify-content: space-between; gap: 18px; border: 1px solid var(--io-color-warning); border-radius: 8px; background: color-mix(in srgb, var(--io-color-warning) 8%, var(--io-color-surface)); padding: 12px 14px; margin-bottom: 10px; }
+.run-input-notice span, .run-context-banner span, .run-sticky-actions span { display: grid; gap: 3px; }
+.run-input-notice small, .run-context-banner small, .run-sticky-actions small { color: var(--io-color-muted); }
+.worker-tabs button.needs-input { border-color: var(--io-color-warning); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--io-color-warning) 30%, transparent); }
+.run-sticky-actions { position: sticky; bottom: 14px; z-index: 12; margin: 18px 0 0; border-color: var(--io-color-border); background: color-mix(in srgb, var(--io-color-surface) 94%, transparent); box-shadow: 0 10px 32px rgb(0 0 0 / 12%); backdrop-filter: blur(12px); }
+.run-sticky-actions.warning { border-color: var(--io-color-warning); }
+.api-code { overflow-x: auto; padding: 16px; border-radius: 8px; background: var(--io-color-background); color: var(--io-color-foreground); }
+.domain-queue { margin-bottom: 14px; }
+.domain-queue-row, .monitor-event-row { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 18px; padding: 14px 0; border: 0; border-top: 1px solid var(--io-color-border); background: transparent; color: inherit; text-align: left; }
+.domain-queue-row span:first-child, .monitor-event-row span:first-child { display: grid; gap: 4px; }
+.domain-queue-row small, .monitor-event-row small { color: var(--io-color-muted); }
+.repair-panel { margin-bottom: 18px; scroll-margin-top: 92px; }
+.repair-panel .section-head { align-items: flex-start; }
+.repair-evidence { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 16px 0; }
+.repair-evidence article { display: grid; gap: 7px; padding: 16px; border: 1px solid var(--io-color-border); border-radius: 8px; background: var(--io-color-background); }
+.repair-evidence small { color: var(--io-color-muted); font: 11px var(--io-font-mono); text-transform: uppercase; }
+.monitor-events { margin: 18px 0; }
+.monitor-event-row { cursor: pointer; }
+.monitor-event-row:hover { background: var(--io-color-selected); }
+.monitor-event-detail { margin-top: 8px; padding: 16px; border: 1px solid var(--io-color-border); border-radius: 8px; background: var(--io-color-background); }
+.quick-try { display: grid; gap: 12px; }
+.quick-try > label { font: 11px var(--io-font-mono); color: var(--io-color-muted); }
+.quick-try-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; }
+.quick-preview { margin-top: 8px; padding-top: 18px; border-top: 1px solid var(--io-color-border); }
+.load-older-row { display: flex; justify-content: center; margin-top: 14px; }
 @media (max-width: 600px) {
   .export-format-grid { grid-template-columns: 1fr; }
   .dataset-detail-head { align-items: stretch; flex-direction: column; }
   .enrichment-ready-panel, .enrichment-review-warning { align-items: stretch; flex-direction: column; }
+  .repair-evidence, .quick-try-form { grid-template-columns: 1fr; }
+  .run-input-notice, .run-context-banner, .run-sticky-actions { align-items: stretch; flex-direction: column; }
+  .domain-queue-row, .monitor-event-row { grid-template-columns: 1fr; gap: 8px; }
 }

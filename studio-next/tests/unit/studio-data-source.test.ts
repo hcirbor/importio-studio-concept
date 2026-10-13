@@ -71,6 +71,7 @@ describe('mock Studio data source', () => {
     ['acceptReviewItem', (source) => source.controlPlane.acceptReviewItem()],
     ['restoreReviewItem', (source) => source.controlPlane.restoreReviewItem()],
     ['promotePipeline', (source) => source.controlPlane.promotePipeline()],
+    ['rollbackPipeline', (source) => source.controlPlane.rollbackPipeline()],
   ];
 
   it.each(mutations)('%s notifies subscribers exactly once', (_name, mutate) => {
@@ -149,7 +150,7 @@ describe('mock Studio data source', () => {
 
     const source = initialize();
     const snapshot = source.getSnapshot();
-    expect(snapshot.auth.currentWorkspace?.name).toBe('Import.io Studio');
+    expect(snapshot.auth.currentWorkspace?.name).toBe('Demo workspace');
     expect(snapshot.auth.sources).toEqual([]);
     expect(snapshot.auth.runs[0]?.id).toBe('run_batch_91af');
     expect(snapshot.auth.currentRole).toBe('Owner');

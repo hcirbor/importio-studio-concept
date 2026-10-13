@@ -207,8 +207,8 @@ export function ReviewInbox() {
             <p>The product page exposes a price but no supported availability statement. Keep the field unknown or enter a reviewed value.</p>
             <dl className="detail-list" style={{ marginTop: 18, border: '1px solid var(--io-color-border)', borderRadius: 8 }}>
               <div><dt>Pipeline</dt><dd><Link href="/pipelines/competitor-prices" className="text-link">Competitor prices · v{pipelineVersion} →</Link></dd></div>
-              <div><dt>Source</dt><dd><Link href="/runs/run_7f3a" className="text-link">trail-shop.example →</Link></dd></div>
-              <div><dt>Evidence</dt><dd><Link href="/runs/run_7f3a?worker=trail-shop&step=2" className="text-link">Price supported · availability absent →</Link></dd></div>
+              <div><dt>Source</dt><dd><Link href="/runs/run_7f3a?from=review" className="text-link">trail-shop.example →</Link></dd></div>
+              <div><dt>Evidence</dt><dd><Link href="/runs/run_7f3a?worker=trail-shop&step=2&from=review" className="text-link">Price supported · availability absent →</Link></dd></div>
             </dl>
             {editing ? (
               <div className="review-value-entry">

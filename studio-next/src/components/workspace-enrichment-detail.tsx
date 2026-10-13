@@ -12,10 +12,12 @@ export function WorkspaceEnrichmentDetail({ enrichmentId }: { enrichmentId: stri
   const auth = useStudio((snapshot) => ({
     enrichments: snapshot.auth.enrichments,
     currentWorkspace: snapshot.auth.currentWorkspace,
+    updateEnrichment: snapshot.auth.updateEnrichment,
   }));
   const execution = useStudio((snapshot) => snapshot.execution);
   const enrichment = auth.enrichments.find((item) => item.id === enrichmentId);
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
+  const [retried, setRetried] = useState(false);
 
   useEffect(() => {
     if (!enrichment) return;
@@ -81,7 +83,8 @@ export function WorkspaceEnrichmentDetail({ enrichmentId }: { enrichmentId: stri
       </section>
       {enrichment.state === 'Validated' && enrichment.outcome === 'Ready' ? <section className="panel enrichment-ready-panel"><div><Eyebrow>Validated CSV</Eyebrow><h2>Ready to enrich {enrichment.rowCount} {enrichment.rowCount === 1 ? 'row' : 'rows'}.</h2><p>The demo will visit each row’s source and retain evidence for the enriched values.</p></div><Button variant="primary" onClick={runEnrichment}>Run enrichment</Button></section> : null}
       {enrichment.state === 'Running' ? <p className="review-feedback" role="status">Running enrichment · checking sources and retaining evidence…</p> : null}
-      {enrichment.outcome === 'Partial' ? <div className="review-warning enrichment-review-warning"><span>{reviewRows.length} preview {reviewRows.length === 1 ? 'row needs' : 'rows need'} review: {reviewRows.map((row) => Object.values(row.values)[0]).join(', ')}.</span><Link className="text-link" href="/review">Open Review →</Link></div> : null}
+      {enrichment.outcome === 'Partial' && !retried ? <div className="review-warning enrichment-review-warning"><span>{reviewRows.length} preview {reviewRows.length === 1 ? 'row needs' : 'rows need'} review: {reviewRows.map((row) => Object.values(row.values)[0]).join(', ')}.</span><div><Button variant="secondary" onClick={() => { setRetried(true); auth.updateEnrichment(enrichment.id, { outcome: 'Succeeded' }); }}>Retry {reviewRows.length} failed</Button> <Link className="text-link" href="/review">Open Review →</Link></div></div> : null}
+      {retried ? <p className="review-feedback" role="status">Retry complete · failed rows were checked again.</p> : null}
       <section className="panel dataset-detail-table">
         <div className="table-scroll">
           <table className="data-table enrichment-table">
