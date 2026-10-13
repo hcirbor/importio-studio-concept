@@ -38,6 +38,11 @@ Read BUILD_PLAN.md first. Work only on what the prompt asks.
 - Roll back committed work with `git revert`. Compare old versions with `git worktree add`.
 - If a task fails with uncommitted changes, stop and report. Discard nothing.
 
+## Review gate
+- Never merge a PR unless Rob's latest message explicitly approves merging that PR at a named head SHA.
+- If the head differs from the approved SHA, stop and report.
+- "Fix and push" never implies merge.
+
 ## Starting a phase (new thread)
 
 1. Read AGENTS.md and BUILD_PLAN.md in full. The Log table is the source of truth for what's done.
