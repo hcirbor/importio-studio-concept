@@ -5,7 +5,29 @@ import { useSyncExternalStoreWithSelector } from 'use-sync-external-store/shim/w
 import type { CapabilityId, PermissionAction, Role, StudioDataSource, StudioSnapshot } from '@/lib/data/StudioDataSource';
 import { createMockStudioDataSource } from '@/lib/data/mock/mock-control-plane';
 
-export * from '@/lib/data/StudioDataSource';
+export {
+  isNotificationChannel,
+  isRole,
+  pipelineVersionForRepair,
+  ROLE_VALUES,
+} from '@/lib/data/StudioDataSource';
+export type {
+  CapabilityId,
+  DatasetRecord,
+  Member,
+  NotificationChannel,
+  PermissionAction,
+  Role,
+  RunPresentation,
+  RunWorker,
+  RunWorkerState,
+  StudioDataSource,
+  StudioSnapshot,
+  WorkspaceApiKey,
+  WorkspaceDataset,
+  WorkspaceEnrichment,
+  WorkspaceRun,
+} from '@/lib/data/StudioDataSource';
 
 export const viewerTooltip = "Viewers can't run workflows. Ask an Admin for Editor access.";
 

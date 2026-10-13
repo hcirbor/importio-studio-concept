@@ -258,7 +258,9 @@ export type MockFixtures = {
   homePipelinesByWorkspace: Record<string, Array<RecentPipeline & { reviewLinked?: boolean }>>;
 };
 
-export interface ExecutionEngine {
+// Presentation adapter retained for the mock UI. Live adapters implement the
+// domain ExecutionEngine in execution-contract.ts and translate it here.
+export interface StudioExecutionFacade {
   suggest(request: WorkflowRequest): WorkflowPlan;
   plan(request: WorkflowRequest): Promise<WorkflowPlan>;
   validate(plan: WorkflowPlan): Promise<ValidationResult>;
@@ -341,7 +343,7 @@ export function pipelineVersionForRepair(repair: PipelineRepair | undefined, fal
 export type StudioSnapshot = {
   auth: AuthInterface;
   humanReview: HumanReviewSnapshot;
-  execution: ExecutionEngine;
+  execution: StudioExecutionFacade;
   controlPlane: StudioControlPlane;
   capabilities: CapabilityMap;
   fixtures: MockFixtures;
@@ -355,7 +357,7 @@ export type StudioSnapshot = {
 export interface StudioDataSource {
   readonly source: 'mock';
   readonly auth: StudioAuth;
-  readonly execution: ExecutionEngine;
+  readonly execution: StudioExecutionFacade;
   readonly controlPlane: StudioControlPlane;
   readonly capabilities: CapabilityMap;
   initialize(): void;

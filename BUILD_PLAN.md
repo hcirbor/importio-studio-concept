@@ -131,17 +131,27 @@ Studio depends on `"@importio/design-system": "file:../../Import.io design syste
 
 Recommended: **A now, B later.** The chosen option: **A, using the public repository configured by `DESIGN_SYSTEM_REPOSITORY` (fallback: `hcirbor/importio-design-system`) at a pinned commit; no token required.**
 
+## Phase 4 host
+
+The host decision is open.
+
+- **Option A (original):** Studio runs as its own service on the Kapeta/Storm Hetzner staging Kubernetes cluster, next to CiteOtter. This needs a `kapeta-cloud-infra` PR, a private registry repository, DNS, a SealedSecret and the repositories moved into the `kapetacom` organisation. It is blocked on approvals while the CiteOtter owner is away.
+- **Option B (CEO request, 13 Oct 2026):** Host on a company account the team controls. The preferred candidate is Google Cloud Run + IAP; Cloudflare Workers + Access remains an alternative. Limit Google sign-in to `neuralogics.com`, use the provider's default URL without DNS, and store the CiteOtter credential as a host secret. Moving to Option A later remains possible.
+- **Either way:** Studio reaches CiteOtter over public HTTPS, has no direct database access, and keeps the CiteOtter credential as a server-held host secret. Internal-model cost is already resolved. Phase 5R human engineering review is required before wider access.
+
+**Decision: unresolved.**
+
 ## Decisions needed before Phase 4
 
 Phase 3B keeps automatic decision-to-`Partial` completion deferred to Phase 4A/5; the mock parity work does not define or claim that live-engine behavior.
 
-- [ ] **Repository home:** move `hcirbor/importio-studio-concept` into the Import.io company GitHub organisation before live integration, or keep it in its current owner through the preview?
-- [ ] **Live preview host** that can run a Next.js server **behind an access gate** (VPN, IAP or SSO). The likely host is the same platform as CiteOtter staging, with Studio running as its own service behind staff sign-in. Not chatgpt.site, not public, not CiteOtter's repo.
-- [ ] **CiteOtter staging credential** (shared Basic auth), who issues it while the engineer is away, and where it's stored server-side.
+- [ ] **Chosen host/company account:** choose Option A or Option B above and identify the company-owned account.
+- [ ] **CiteOtter credential issuer:** name who issues the shared Basic-auth credential; store it only as a server-side host secret.
+- [ ] **Repository move/ownership:** decide whether `hcirbor/importio-studio-concept` and CiteOtter-related infrastructure repositories move into the `kapetacom` organisation, and identify their owner.
 - [x] **Amber staging cost:** Amber is an internal model; staging usage needs no sign-off.
-- [ ] **Production engine path confirmed before phases 7–10.**
-- [ ] **His manager or the CTO is told,** and a company owner is named for any CiteOtter change.
-- [ ] **Phase 5R reviewer named** (an engineer who signs off the live integration).
+- [ ] **Named company owner for any CiteOtter change:** required before any separate CiteOtter branch or PR; initial integration remains read-only.
+- [ ] **Confirmed production engine path:** confirm the hosted Studio → `/api/engine/*` → public HTTPS CiteOtter route before phases 7–10.
+- [ ] **Named Phase 5R reviewer:** an engineer must sign off the live integration before wider access.
 
 ## Rollback (non-destructive only)
 
