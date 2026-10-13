@@ -1,7 +1,9 @@
-import { checkUpstreamReadiness } from '@/lib/server/gateway';
+import { createReadinessChecker } from '@/lib/server/gateway';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+
+const checkUpstreamReadiness = createReadinessChecker();
 
 export async function GET(): Promise<Response> {
   const ready = await checkUpstreamReadiness();

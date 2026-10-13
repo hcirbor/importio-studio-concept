@@ -62,58 +62,77 @@ function isPublicHttpsSource(value: string): boolean {
   }
 }
 
-function numberAt(body: JsonObject, camel: string, snake: string): number | undefined {
-  const limits = typeof body.limits === 'object' && body.limits !== null ? body.limits as JsonObject : {};
-  const value = limits[camel] ?? body[snake] ?? body[camel];
-  return typeof value === 'number' ? value : undefined;
-}
-
 function sourceEntries(body: JsonObject): Array<{ path: string; value: string }> {
   const entries: Array<{ path: string; value: string }> = [];
-  if (typeof body.source === 'string') entries.push({ path: 'source', value: body.source });
-  if (typeof body.url === 'string') entries.push({ path: 'url', value: body.url });
   if (Array.isArray(body.sources)) {
     body.sources.forEach((value, index) => {
       if (typeof value === 'string') entries.push({ path: `sources.${index}`, value });
     });
   }
-  const sourceField = typeof body.sourceField === 'string' ? body.sourceField : body.source_field;
-  if (typeof sourceField === 'string' && Array.isArray(body.rows)) {
-    body.rows.forEach((row, index) => {
-      if (typeof row !== 'object' || row === null) return;
-      const values = (row as JsonObject).values;
-      if (typeof values !== 'object' || values === null) return;
-      const value = (values as JsonObject)[sourceField];
-      if (typeof value === 'string') entries.push({ path: `rows.${index}.values.${sourceField}`, value });
-    });
-  }
   return entries;
+}
+
+const LIMIT_RANGES = {
+  max_pages: { defaultMax: 3, agentMax: 6 },
+  max_steps: { defaultMax: 30, agentMax: 40 },
+  max_records: { defaultMax: 10, agentMax: 10 },
+  timeout_seconds: { defaultMax: 300, agentMax: 300 },
+} as const;
+
+function isObject(value: unknown): value is JsonObject {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 export function validateGatewayLimits(body: JsonObject): LimitFailure[] {
   const failures: LimitFailure[] = [];
   const workflow = typeof body.workflow === 'string' ? body.workflow : '';
-  const maxPagesAllowed = workflow === 'agent' || workflow === 'research' ? 6 : 3;
+  const maxPagesAllowed = workflow === 'agent' ? 6 : 3;
   const sources = sourceEntries(body);
-  const maxPages = numberAt(body, 'maxPages', 'max_pages');
-  const maxRecords = numberAt(body, 'maxRecords', 'max_records');
-  const recordCount = Array.isArray(body.records)
-    ? body.records.length
-    : Array.isArray(body.rows) ? body.rows.length : 0;
+
+  if (body.sources !== undefined && !Array.isArray(body.sources)) {
+    failures.push({ path: 'sources', message: 'sources must be an array.' });
+  } else if (Array.isArray(body.sources) && body.sources.some((source) => typeof source !== 'string')) {
+    failures.push({ path: 'sources', message: 'Every source must be a string.' });
+  }
+
+  for (const alias of ['source', 'url', 'sourceField', 'source_field', 'notify']) {
+    if (Object.hasOwn(body, alias)) {
+      failures.push({ path: alias, message: `${alias} is not a CiteOtter task contract field.` });
+    }
+  }
+  for (const key of Object.keys(body)) {
+    if (key !== 'limits' && (/(?:limit)/i.test(key) || /^(?:max|timeout)/i.test(key))) {
+      failures.push({ path: key, message: `${key} is not a recognised CiteOtter limit field.` });
+    }
+  }
+
+  const limits = body.limits;
+  if (limits !== undefined && !isObject(limits)) {
+    failures.push({ path: 'limits', message: 'limits must be an object.' });
+  } else if (isObject(limits)) {
+    for (const [key, value] of Object.entries(limits)) {
+      const range = LIMIT_RANGES[key as keyof typeof LIMIT_RANGES];
+      if (!range) {
+        failures.push({ path: `limits.${key}`, message: `${key} is not a recognised CiteOtter limit field.` });
+        continue;
+      }
+      const maximum = workflow === 'agent' ? range.agentMax : range.defaultMax;
+      if (typeof value !== 'number' || !Number.isInteger(value) || value < 1 || value > maximum) {
+        failures.push({ path: `limits.${key}`, message: `${key} must be an integer from 1 to ${maximum}.` });
+      }
+    }
+  }
 
   for (const source of sources) {
     if (!isPublicHttpsSource(source.value)) {
       failures.push({ path: source.path, message: 'Sources must be public HTTPS URLs.' });
     }
   }
-  if (sources.length > maxPagesAllowed || (maxPages !== undefined && (!Number.isInteger(maxPages) || maxPages < 1 || maxPages > maxPagesAllowed))) {
-    failures.push({ path: 'limits.maxPages', message: `This workflow supports at most ${maxPagesAllowed} pages.` });
+  if (sources.length > maxPagesAllowed) {
+    failures.push({ path: 'sources', message: `This workflow supports at most ${maxPagesAllowed} sources.` });
   }
-  if (recordCount > 10 || (maxRecords !== undefined && (!Number.isInteger(maxRecords) || maxRecords < 1 || maxRecords > 10))) {
-    failures.push({ path: 'limits.maxRecords', message: 'This workflow supports at most 10 records.' });
-  }
-  if (body.notify !== undefined && body.notify !== 'none' && body.notify !== 'on_change') {
-    failures.push({ path: 'notify', message: 'Notification must be none or on_change.' });
+  if (isObject(limits) && typeof limits.max_pages === 'number' && limits.max_pages < sources.length) {
+    failures.push({ path: 'limits.max_pages', message: 'max_pages must cover every source.' });
   }
   return failures;
 }

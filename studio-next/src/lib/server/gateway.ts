@@ -12,31 +12,35 @@ type RouteRule = {
   method: string;
   pattern: RegExp;
   upstreamPath: (match: RegExpMatchArray) => string;
+  idGroups?: readonly number[];
+  query?: readonly ('limit' | 'cursor')[];
+  responseKind?: 'json' | 'export';
   validatesLimits?: boolean;
 };
 
 const ROUTES: readonly RouteRule[] = [
-  { method: 'GET', pattern: /^tasks$/, upstreamPath: () => '/v1/tasks' },
+  { method: 'GET', pattern: /^tasks$/, upstreamPath: () => '/v1/tasks', query: ['limit', 'cursor'] },
   { method: 'POST', pattern: /^tasks$/, upstreamPath: () => '/v1/tasks', validatesLimits: true },
   { method: 'POST', pattern: /^tasks\/validate$/, upstreamPath: () => '/v1/tasks/validate', validatesLimits: true },
-  { method: 'GET', pattern: /^tasks\/([^/]+)$/, upstreamPath: (match) => `/v1/tasks/${encodeURIComponent(match[1] ?? '')}` },
-  { method: 'DELETE', pattern: /^tasks\/([^/]+)$/, upstreamPath: (match) => `/v1/tasks/${encodeURIComponent(match[1] ?? '')}` },
-  { method: 'GET', pattern: /^tasks\/([^/]+)\/events$/, upstreamPath: (match) => `/v1/tasks/${encodeURIComponent(match[1] ?? '')}/events` },
-  { method: 'POST', pattern: /^tasks\/([^/]+)\/cancel$/, upstreamPath: (match) => `/v1/tasks/${encodeURIComponent(match[1] ?? '')}/cancel` },
+  { method: 'GET', pattern: /^tasks\/([^/]+)$/, upstreamPath: (match) => `/v1/tasks/${match[1] ?? ''}`, idGroups: [1] },
+  { method: 'GET', pattern: /^tasks\/([^/]+)\/events$/, upstreamPath: (match) => `/v1/tasks/${match[1] ?? ''}/events`, idGroups: [1], query: ['limit', 'cursor'] },
+  { method: 'POST', pattern: /^tasks\/([^/]+)\/cancel$/, upstreamPath: (match) => `/v1/tasks/${match[1] ?? ''}/cancel`, idGroups: [1] },
   { method: 'POST', pattern: /^search$/, upstreamPath: () => '/v1/search', validatesLimits: true },
-  { method: 'GET', pattern: /^enrichments$/, upstreamPath: () => '/v1/enrichments' },
+  { method: 'GET', pattern: /^enrichments$/, upstreamPath: () => '/v1/enrichments', query: ['limit', 'cursor'] },
   { method: 'POST', pattern: /^enrichments$/, upstreamPath: () => '/v1/enrichments', validatesLimits: true },
-  { method: 'GET', pattern: /^enrichments\/([^/]+)$/, upstreamPath: (match) => `/v1/enrichments/${encodeURIComponent(match[1] ?? '')}` },
-  { method: 'GET', pattern: /^enrichments\/([^/]+)\/export$/, upstreamPath: (match) => `/v1/enrichments/${encodeURIComponent(match[1] ?? '')}/export` },
-  { method: 'GET', pattern: /^monitors$/, upstreamPath: () => '/v1/monitors' },
+  { method: 'GET', pattern: /^enrichments\/([^/]+)$/, upstreamPath: (match) => `/v1/enrichments/${match[1] ?? ''}`, idGroups: [1] },
+  { method: 'GET', pattern: /^enrichments\/([^/]+)\/export$/, upstreamPath: (match) => `/v1/enrichments/${match[1] ?? ''}/export`, idGroups: [1], responseKind: 'export' },
+  { method: 'GET', pattern: /^monitors$/, upstreamPath: () => '/v1/monitors', query: ['limit', 'cursor'] },
   { method: 'POST', pattern: /^monitors$/, upstreamPath: () => '/v1/monitors', validatesLimits: true },
   { method: 'POST', pattern: /^monitors\/validate$/, upstreamPath: () => '/v1/monitors/validate', validatesLimits: true },
-  { method: 'GET', pattern: /^monitors\/([^/]+)$/, upstreamPath: (match) => `/v1/monitors/${encodeURIComponent(match[1] ?? '')}` },
-  { method: 'DELETE', pattern: /^monitors\/([^/]+)$/, upstreamPath: (match) => `/v1/monitors/${encodeURIComponent(match[1] ?? '')}` },
-  { method: 'POST', pattern: /^monitors\/([^/]+)\/state$/, upstreamPath: (match) => `/v1/monitors/${encodeURIComponent(match[1] ?? '')}/state`, validatesLimits: true },
-  { method: 'GET', pattern: /^monitors\/([^/]+)\/events$/, upstreamPath: (match) => `/v1/monitors/${encodeURIComponent(match[1] ?? '')}/events` },
+  { method: 'GET', pattern: /^monitors\/([^/]+)$/, upstreamPath: (match) => `/v1/monitors/${match[1] ?? ''}`, idGroups: [1] },
+  { method: 'DELETE', pattern: /^monitors\/([^/]+)$/, upstreamPath: (match) => `/v1/monitors/${match[1] ?? ''}`, idGroups: [1] },
+  { method: 'POST', pattern: /^monitors\/([^/]+)\/state$/, upstreamPath: (match) => `/v1/monitors/${match[1] ?? ''}/state`, idGroups: [1], validatesLimits: true },
+  { method: 'GET', pattern: /^monitors\/([^/]+)\/events$/, upstreamPath: (match) => `/v1/monitors/${match[1] ?? ''}/events`, idGroups: [1], query: ['limit', 'cursor'] },
   { method: 'GET', pattern: /^usage$/, upstreamPath: () => '/v1/usage' },
 ];
+
+const SAFE_ID = /^[A-Za-z0-9_-]{1,128}$/;
 
 export type GatewayDependencies = {
   config?: GatewayConfig;
@@ -45,7 +49,10 @@ export type GatewayDependencies = {
 };
 
 function jsonFailure(status: number, failure: ExecutionFailure): Response {
-  return Response.json({ error: failure }, { status });
+  return new Response(JSON.stringify({ error: failure }), {
+    status,
+    headers: { 'content-type': 'application/json', 'x-content-type-options': 'nosniff' },
+  });
 }
 
 function failure(code: ExecutionFailureCode, message: string, retryable: boolean, path?: string): ExecutionFailure {
@@ -57,9 +64,28 @@ function findRoute(method: string, segments: readonly string[]): { rule: RouteRu
   for (const rule of ROUTES) {
     if (rule.method !== method) continue;
     const match = path.match(rule.pattern);
-    if (match) return { rule, match };
+    if (match && (rule.idGroups ?? []).every((group) => SAFE_ID.test(match[group] ?? ''))) return { rule, match };
   }
   return null;
+}
+
+function allowedQuery(request: Request, names: RouteRule['query']): URLSearchParams | Response {
+  const incoming = new URL(request.url).searchParams;
+  const outgoing = new URLSearchParams();
+  for (const name of names ?? []) {
+    const values = incoming.getAll(name);
+    if (values.length > 1) return jsonFailure(400, failure('invalid_request', `${name} must be supplied once.`, false, name));
+    const value = values[0];
+    if (value === undefined) continue;
+    if (name === 'limit' && (!/^\d+$/.test(value) || Number(value) < 1 || Number(value) > 100)) {
+      return jsonFailure(400, failure('invalid_request', 'limit must be an integer from 1 to 100.', false, name));
+    }
+    if (name === 'cursor' && (value.length < 1 || value.length > 1024 || /[\u0000-\u001f\u007f]/.test(value))) {
+      return jsonFailure(400, failure('invalid_request', 'cursor is invalid.', false, name));
+    }
+    outgoing.set(name, value);
+  }
+  return outgoing;
 }
 
 async function readJsonBody(request: Request): Promise<{ body: JsonObject; bytes: Uint8Array } | Response> {
@@ -163,10 +189,22 @@ async function upstreamFailure(response: Response): Promise<{ status: number; er
   return mappedFailure(response.status, upstreamCode);
 }
 
-async function proxyAllowedRequest(request: Request, upstreamPath: string, bodyBytes: Uint8Array | undefined, dependencies: GatewayDependencies): Promise<Response> {
+async function proxyAllowedRequest(
+  request: Request,
+  upstreamPath: string,
+  bodyBytes: Uint8Array | undefined,
+  dependencies: GatewayDependencies,
+  responseKind: 'json' | 'export' = 'json',
+  query = new URLSearchParams(),
+): Promise<Response> {
   const config = dependencies.config ?? readGatewayConfig();
   const fetchImpl = dependencies.fetchImpl ?? fetch;
   const credentialReader = dependencies.readCredential ?? ((path: string) => readFile(path, 'utf8'));
+  const upstreamUrl = new URL(upstreamPath, config.upstreamUrl);
+  if (upstreamUrl.pathname !== upstreamPath) {
+    return jsonFailure(404, failure('not_found', 'Gateway route not found.', false));
+  }
+  upstreamUrl.search = query.toString();
   let rawCredential: string;
   try {
     rawCredential = (await credentialReader(config.credentialFile)).trim();
@@ -185,8 +223,6 @@ async function proxyAllowedRequest(request: Request, upstreamPath: string, bodyB
   request.signal.addEventListener('abort', cancel, { once: true });
   if (request.signal.aborted) controller.abort();
   try {
-    const upstreamUrl = new URL(upstreamPath, config.upstreamUrl);
-    upstreamUrl.search = new URL(request.url).search;
     const response = await fetchImpl(upstreamUrl, {
       method: request.method,
       headers: {
@@ -206,9 +242,32 @@ async function proxyAllowedRequest(request: Request, upstreamPath: string, bodyB
     if (!bytes) {
       return jsonFailure(502, failure('capacity_exceeded', 'The upstream response is too large.', false));
     }
+    if (responseKind === 'json') {
+      try {
+        JSON.parse(new TextDecoder().decode(bytes));
+      } catch {
+        return jsonFailure(502, failure('unavailable', 'The upstream service returned an invalid response.', true));
+      }
+      return new Response(Buffer.from(bytes), {
+        status: response.status,
+        headers: { 'content-type': 'application/json', 'x-content-type-options': 'nosniff' },
+      });
+    }
+    const upstreamType = response.headers.get('content-type')?.toLowerCase() ?? '';
+    const exportType = upstreamType.includes('text/csv') ? 'text/csv; charset=utf-8'
+      : upstreamType.includes('application/json') || upstreamType.includes('+json') ? 'application/json'
+        : null;
+    if (!exportType) {
+      return jsonFailure(502, failure('unavailable', 'The upstream service returned an invalid export.', true));
+    }
+    const extension = exportType.startsWith('text/csv') ? 'csv' : 'json';
     return new Response(Buffer.from(bytes), {
       status: response.status,
-      headers: { 'content-type': response.headers.get('content-type') ?? 'application/json' },
+      headers: {
+        'content-type': exportType,
+        'content-disposition': `attachment; filename="enrichment-export.${extension}"`,
+        'x-content-type-options': 'nosniff',
+      },
     });
   } catch {
     if (timedOut) return jsonFailure(504, failure('timeout', 'The upstream request timed out.', true));
@@ -224,6 +283,8 @@ export async function handleGatewayRequest(request: Request, segments: readonly 
   const route = findRoute(request.method, segments);
   if (!route) return jsonFailure(404, failure('not_found', 'Gateway route not found.', false));
   if (!sameOrigin(request)) return jsonFailure(403, failure('invalid_request', 'Cross-origin requests are not allowed.', false));
+  const query = allowedQuery(request, route.rule.query);
+  if (query instanceof Response) return query;
 
   let bytes: Uint8Array | undefined;
   if (!['GET', 'HEAD'].includes(request.method)) {
@@ -236,7 +297,8 @@ export async function handleGatewayRequest(request: Request, segments: readonly 
       if (first) return jsonFailure(400, failure('invalid_request', first.message, false, first.path));
     }
   }
-  return proxyAllowedRequest(request, route.rule.upstreamPath(route.match), bytes, dependencies);
+  const upstreamPath = route.rule.upstreamPath(route.match);
+  return proxyAllowedRequest(request, upstreamPath, bytes, dependencies, route.rule.responseKind, query);
 }
 
 export async function handleSmokeRequest(request: Request, dependencies: GatewayDependencies = {}): Promise<Response> {
@@ -251,7 +313,7 @@ export async function handleSmokeRequest(request: Request, dependencies: Gateway
     goal: typeof parsed.body.goal === 'string' ? parsed.body.goal : 'Verify the bounded production extraction path.',
     sources: typeof source === 'string' ? [source] : [],
     fields,
-    limits: { maxPages: 1, maxRecords: 10 },
+    limits: { max_pages: 1, max_records: 10 },
   };
   const failures = typeof source === 'string' ? validateGatewayLimits(task) : [{ path: 'source', message: 'One public HTTPS source is required.' }];
   const requestedLimits = typeof parsed.body.limits === 'object' && parsed.body.limits !== null ? parsed.body.limits as JsonObject : {};
@@ -265,8 +327,14 @@ export async function handleSmokeRequest(request: Request, dependencies: Gateway
   return proxyAllowedRequest(request, '/v1/tasks', bodyBytes, dependencies);
 }
 
-export async function checkUpstreamReadiness(dependencies: GatewayDependencies = {}): Promise<boolean> {
-  const request = new Request('http://localhost/readyz', { method: 'GET' });
-  const response = await proxyAllowedRequest(request, '/healthz', undefined, dependencies);
-  return response.ok;
+export function createReadinessChecker(dependencies: GatewayDependencies = {}, now: () => number = Date.now): () => Promise<boolean> {
+  let cached: { expiresAt: number; result: Promise<boolean> } | undefined;
+  return async () => {
+    const currentTime = now();
+    if (cached && cached.expiresAt > currentTime) return cached.result;
+    const request = new Request('http://localhost/readyz', { method: 'GET' });
+    const result = proxyAllowedRequest(request, '/healthz', undefined, dependencies).then((response) => response.ok);
+    cached = { expiresAt: currentTime + 30_000, result };
+    return result;
+  };
 }

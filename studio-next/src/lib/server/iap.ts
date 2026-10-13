@@ -18,7 +18,7 @@ export type VerifiedIapIdentity = {
 export type IapVerificationOptions = {
   audience: string;
   nowSeconds?: number;
-  loadKeys?: () => Promise<JwkSet>;
+  loadKeys?: (forceRefresh?: boolean) => Promise<JwkSet>;
 };
 
 let cachedKeys: { expiresAt: number; value: JwkSet } | undefined;
@@ -29,9 +29,9 @@ function decodeJson(segment: string): JsonObject {
   return value as JsonObject;
 }
 
-async function loadGoogleKeys(): Promise<JwkSet> {
+async function loadGoogleKeys(forceRefresh = false): Promise<JwkSet> {
   const now = Date.now();
-  if (cachedKeys && cachedKeys.expiresAt > now) return cachedKeys.value;
+  if (!forceRefresh && cachedKeys && cachedKeys.expiresAt > now) return cachedKeys.value;
   const response = await fetch(IAP_JWKS_URL, { cache: 'no-store', signal: AbortSignal.timeout(5_000) });
   if (!response.ok) throw new Error('Unable to load IAP verification keys.');
   const value: unknown = await response.json();
@@ -49,15 +49,20 @@ export async function verifyIapJwt(token: string, options: IapVerificationOption
   const [encodedHeader = '', encodedPayload = '', encodedSignature = ''] = segments;
   const header = decodeJson(encodedHeader);
   const claims = decodeJson(encodedPayload);
-  if (header.alg !== 'RS256' || typeof header.kid !== 'string') throw new Error('Invalid IAP token header.');
+  if (header.alg !== 'ES256' || typeof header.kid !== 'string') throw new Error('Invalid IAP token header.');
 
-  const keySet = await (options.loadKeys ?? loadGoogleKeys)();
-  const jwk = keySet.keys.find((candidate) => candidate.kid === header.kid && (!candidate.alg || candidate.alg === 'RS256'));
+  const keyLoader = options.loadKeys ?? loadGoogleKeys;
+  let keySet = await keyLoader(false);
+  let jwk = keySet.keys.find((candidate) => candidate.kid === header.kid && (!candidate.alg || candidate.alg === 'ES256'));
+  if (!jwk) {
+    keySet = await keyLoader(true);
+    jwk = keySet.keys.find((candidate) => candidate.kid === header.kid && (!candidate.alg || candidate.alg === 'ES256'));
+  }
   if (!jwk) throw new Error('Unknown IAP signing key.');
   const validSignature = verify(
-    'RSA-SHA256',
+    'sha256',
     Buffer.from(`${encodedHeader}.${encodedPayload}`),
-    createPublicKey({ key: jwk, format: 'jwk' }),
+    { key: createPublicKey({ key: jwk, format: 'jwk' }), dsaEncoding: 'ieee-p1363' },
     Buffer.from(encodedSignature, 'base64url'),
   );
   if (!validSignature) throw new Error('Invalid IAP signature.');

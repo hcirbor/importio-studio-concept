@@ -12,6 +12,7 @@ export type FakeCiteOtter = {
   url: URL;
   calls: FakeCall[];
   setHealthy(value: boolean): void;
+  setScenario(value: string | undefined): void;
   close(): Promise<void>;
 };
 
@@ -28,6 +29,7 @@ function json(response: ServerResponse, status: number, body: unknown): void {
 
 export async function startFakeCiteOtter(): Promise<FakeCiteOtter> {
   let healthy = true;
+  let scenario: string | undefined;
   const calls: FakeCall[] = [];
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? '/', 'http://fake.local');
@@ -43,9 +45,13 @@ export async function startFakeCiteOtter(): Promise<FakeCiteOtter> {
       return;
     }
 
-    const scenario = url.searchParams.get('case');
     if (scenario === 'timeout') {
       setTimeout(() => json(response, 200, { id: 'late-task' }), 250);
+      return;
+    }
+    if (scenario === 'html') {
+      response.writeHead(200, { 'content-type': 'text/html' });
+      response.end('<script>window.pwned = true</script>');
       return;
     }
     const failures: Record<string, [number, string]> = {
@@ -72,6 +78,10 @@ export async function startFakeCiteOtter(): Promise<FakeCiteOtter> {
     else if (request.method === 'POST' && url.pathname === '/v1/search') json(response, 200, { results: [] });
     else if (request.method === 'POST' && url.pathname === '/v1/monitors/validate') json(response, 200, { valid: true, issues: [] });
     else if (/^\/v1\/monitors(\/.*)?$/.test(url.pathname)) json(response, 200, { monitors: [], id: 'monitor-1' });
+    else if (/^\/v1\/enrichments\/[^/]+\/export$/.test(url.pathname)) {
+      response.writeHead(200, { 'content-type': 'text/csv' });
+      response.end('name,value\nExample,1\n');
+    }
     else if (/^\/v1\/enrichments(\/.*)?$/.test(url.pathname)) json(response, 200, { enrichments: [], id: 'enrichment-1' });
     else if (url.pathname === '/v1/usage') json(response, 200, { model_requests: 0, cost_usd: null });
     else json(response, 404, { code: 'not_found' });
@@ -84,6 +94,7 @@ export async function startFakeCiteOtter(): Promise<FakeCiteOtter> {
     url: new URL(`http://127.0.0.1:${address.port}`),
     calls,
     setHealthy(value) { healthy = value; },
+    setScenario(value) { scenario = value; },
     async close() {
       server.close();
       await once(server, 'close');
