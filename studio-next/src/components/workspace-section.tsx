@@ -7,7 +7,6 @@ import { DatasetsSection, MonitorsSection, PipelinesSection, RunsSection } from 
 import { DevelopersSection, SettingsSection, UsageSection, WebhooksSection } from './workspace/reference-sections';
 import { SectionTabs, useSectionTab, type SectionTab } from './workspace/section-tabs';
 import { PageHead } from './workspace/shared';
-import { QuickTrySection } from './workspace/quick-try-section';
 
 const runTabs: SectionTab[] = [
   { value: 'all', label: 'All runs' },
@@ -90,8 +89,7 @@ export function WorkspaceSection({ section }: { section: string }) {
             : section === 'monitors' ? <MonitorsSection />
               : section === 'usage' ? <UsageSection />
               : section === 'settings' ? <SettingsSection />
-                : section === 'try' ? <QuickTrySection />
-                  : <PipelinesSection />;
+                : <PipelinesSection />;
 
   return <div className="page">{content}</div>;
 }

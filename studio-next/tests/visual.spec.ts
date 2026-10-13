@@ -83,15 +83,8 @@ for (const viewport of viewports) {
 
     test(`run needs input · ${viewport.name}`, async ({ page }) => {
       await ready(page, '/runs/run_batch_91af');
-      await expect(page.getByText('1 source needs input').first()).toBeVisible();
+      await expect(page.getByText('Input required').first()).toBeVisible();
       await expect(page).toHaveScreenshot(`run-needs-input-${viewport.name}.png`);
-    });
-
-    test(`quick try preview · ${viewport.name}`, async ({ page }) => {
-      await ready(page, '/try');
-      await page.getByRole('button', { name: 'Preview extract' }).click();
-      await expect(page.getByRole('heading', { name: 'Trailhead 2P Tent' })).toBeVisible();
-      await expect(page).toHaveScreenshot(`quick-try-${viewport.name}.png`);
     });
 
     test(`dataset detail · ${viewport.name}`, async ({ page }) => {

@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import { notFound } from 'next/navigation';
 import { WorkspaceSection } from '@/components/workspace-section';
 import { isWorkspaceSectionSlug, workspaceSectionSlugs, workspaceSectionTitles } from '@/components/workspace/registry';
 
@@ -13,6 +14,7 @@ export async function generateMetadata({ params }: { params: Promise<{ section: 
 
 export default async function WorkspacePage({ params }: { params: Promise<{ section: string }> }) {
   const { section } = await params;
+  if (!isWorkspaceSectionSlug(section)) notFound();
   return (
     <Suspense fallback={<div className="page"><div className="section-loading" aria-label="Loading section" /></div>}>
       <WorkspaceSection section={section} />

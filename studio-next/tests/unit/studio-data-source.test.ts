@@ -125,7 +125,7 @@ describe('mock Studio data source', () => {
     source.controlPlane.inviteMembers(['audit@example.com'], 'Editor');
     source.controlPlane.approvePipelineRepair('competitor-prices-card-layout');
 
-    expect(source.getSnapshot().auditEntries.map((entry) => entry.action)).toEqual([
+    expect(source.getSnapshot().auditEntries.slice(0, 3).map((entry) => entry.action)).toEqual([
       'approved repair for “Competitor prices” and created v5',
       'invited 1 member as Editor',
       'created API key “Audit key”',

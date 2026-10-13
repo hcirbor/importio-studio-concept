@@ -62,19 +62,28 @@ export function WorkspaceSwitcher({ collapsed = false }: { collapsed?: boolean }
         if (!value) setCreating(false);
       }}
     >
-      <Tooltip><TooltipTrigger asChild><Button
-        variant="ghost"
-        className={collapsed ? 'workspace-card workspace-card-collapsed' : 'workspace-card'}
-        aria-label={`${workspace?.name.slice(0, 1) ?? 'I'} ${workspace?.name ?? 'Import.io Studio'} ${workspace?.subtitle ?? 'Demo workspace'} · Switch workspace`}
-        onClick={() => setOpen(true)}
-      >
-        <span className="workspace-icon">{workspace?.name.slice(0, 1) ?? 'I'}</span>
-        <span>
-          <strong>{workspace?.name ?? 'Import.io Studio'}</strong>
-          <small>{workspace?.subtitle ?? 'Demo workspace'}</small>
-        </span>
-        <span className="workspace-chevron">⌄</span>
-      </Button></TooltipTrigger>{collapsed ? <TooltipContent side="right">{workspace?.name ?? 'Import.io Studio'} · {workspace?.subtitle ?? 'Demo workspace'}</TooltipContent> : null}</Tooltip>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <Button
+            variant="ghost"
+            className={collapsed ? 'workspace-card workspace-card-collapsed' : 'workspace-card'}
+            aria-label={`${workspace?.name.slice(0, 1) ?? 'I'} ${workspace?.name ?? 'Import.io Studio'} ${workspace?.subtitle ?? 'Demo workspace'} · Switch workspace`}
+            onClick={() => setOpen(true)}
+          >
+            <span className="workspace-icon">{workspace?.name.slice(0, 1) ?? 'I'}</span>
+            <span>
+              <strong title={workspace?.name ?? 'Import.io Studio'}>
+                {workspace?.name ?? 'Import.io Studio'}
+              </strong>
+              <small>{workspace?.subtitle ?? 'Demo workspace'}</small>
+            </span>
+            <span className="workspace-chevron">⌄</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent side={collapsed ? 'right' : 'bottom'}>
+          {workspace?.name ?? 'Import.io Studio'}
+        </TooltipContent>
+      </Tooltip>
       <DialogContent className="workspace-dialog">
         <DialogHeader>
           <DialogTitle>Switch workspace</DialogTitle>

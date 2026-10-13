@@ -126,7 +126,6 @@ export function AuthScreen({ mode }: { mode: 'login' | 'signup' }) {
         </footer>
       </section>
       <div className="auth-stage-shell">
-        <span className="demo-chip">Interactive demo</span>
         <LoginStage />
       </div>
     </main>

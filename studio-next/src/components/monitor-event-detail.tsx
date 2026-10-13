@@ -2,7 +2,17 @@
 
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Badge, Button, Eyebrow } from '@/components/design-system';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  Eyebrow,
+} from '@/components/design-system';
 import { useStudio } from '@/lib/data';
 
 export function MonitorEventDetail({ eventId }: { eventId: string }) {
@@ -49,25 +59,29 @@ export function MonitorEventDetail({ eventId }: { eventId: string }) {
         <p>{event.monitorName} · {event.occurredAt}</p>
         <Badge tone={event.status === 'New' ? 'warning' : 'success'}>{event.status}</Badge>
       </header>
-      <section className="panel monitor-event-detail" aria-labelledby="monitor-change-title">
-        <div className="section-head">
+      <Card aria-labelledby="monitor-change-title">
+        <CardHeader>
           <div>
-            <h2 id="monitor-change-title">What changed</h2>
-            <p>{event.field} changed against the trusted baseline.</p>
+            <CardTitle id="monitor-change-title">What changed</CardTitle>
+            <CardDescription>{event.field} changed against the trusted baseline.</CardDescription>
           </div>
-        </div>
-        <div className="monitor-change-values">
-          <article>
-            <small>Old value</small>
-            <strong>{event.previousValue}</strong>
-          </article>
-          <span aria-hidden="true">→</span>
-          <article>
-            <small>New value</small>
-            <strong>{event.currentValue}</strong>
-          </article>
-        </div>
-        <dl className="detail-list">
+        </CardHeader>
+        <CardContent>
+          <div className="definition-grid">
+            <Card>
+              <CardContent>
+                <Eyebrow>Before · baseline</Eyebrow>
+                <strong>{event.previousValue}</strong>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent>
+                <Eyebrow>After · detected</Eyebrow>
+                <strong>{event.currentValue}</strong>
+              </CardContent>
+            </Card>
+          </div>
+          <dl className="detail-list">
           <div>
             <dt>Evidence</dt>
             <dd>“{event.evidence}”</dd>
@@ -84,12 +98,13 @@ export function MonitorEventDetail({ eventId }: { eventId: string }) {
             <dt>Run</dt>
             <dd>
               <Link className="text-link" href={event.runHref}>
-                {event.runId} →
+                {event.monitorName} · {event.occurredAt.replace(',', '').toLowerCase()} →
               </Link>
             </dd>
           </div>
-        </dl>
-        <div className="page-action-row">
+          </dl>
+        </CardContent>
+        <CardFooter>
           <span>{event.status === 'New' ? 'Choose how this field should be monitored.' : event.status}</span>
           <Button variant="secondary" onClick={muteField}>
             Mute field for 7 days
@@ -100,8 +115,8 @@ export function MonitorEventDetail({ eventId }: { eventId: string }) {
           <Button variant="primary" onClick={acceptBaseline}>
             Accept as new baseline
           </Button>
-        </div>
-      </section>
+        </CardFooter>
+      </Card>
     </div>
   );
 }

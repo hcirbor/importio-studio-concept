@@ -2,18 +2,23 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { Expand } from 'lucide-react';
 import {
   Badge,
   Button,
+  Card,
+  CardContent,
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   Eyebrow,
 } from '@/components/design-system';
-import { RunSession } from './run-session';
+import { ActionBar } from './action-bar';
+import { RunSession, type RunSessionHandle } from './run-session';
 import { RunDetailAction } from './run-detail-action';
 import { useStudio, type WorkspaceRun } from '@/lib/data';
 
@@ -47,6 +52,7 @@ export function RunDetail({ id }: { id: string }) {
   const searchParams = useSearchParams();
   const currentId = searchParams.get('run') ?? id;
   const [apiOpen, setApiOpen] = useState(false);
+  const runSession = useRef<RunSessionHandle>(null);
   const state = useStudio((snapshot) => ({
     run: snapshot.auth.runs.find((item) => item.id === currentId),
     datasets: snapshot.auth.datasets,
@@ -96,35 +102,17 @@ export function RunDetail({ id }: { id: string }) {
         </div>
         <div>
           <Badge tone={displayRun.tone}>{displayRun.badge}</Badge>
-          <RunDetailAction
-            status={displayRun.status}
-            runId={currentId}
-            href={displayRun.actionHref}
-            label={displayRun.actionLabel}
-          />
+          <DialogFooter>
+            <Button variant="secondary" size="sm" onClick={() => setApiOpen(true)}>
+              Get API code
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => runSession.current?.openExpanded()}>
+              <Expand size={16} />
+              Expand
+            </Button>
+          </DialogFooter>
         </div>
       </header>
-      {fromReview && needsReview ? (
-        <section className="run-context-banner">
-          <span>
-            <strong>{dataset?.review?.field} needs review</strong>
-            <small>Price supported; availability not found.</small>
-          </span>
-          <Button variant="secondary" asChild>
-            <Link href="/review">Back to review</Link>
-          </Button>
-        </section>
-      ) : null}
-      <div className="run-control-row">
-        <Button variant="secondary" onClick={() => setApiOpen(true)}>
-          Get API code
-        </Button>
-        {needsInput ? (
-          <Button variant="secondary" onClick={resolveInputs}>
-            Resolve inputs ({needsInput.count})
-          </Button>
-        ) : null}
-      </div>
       <Dialog open={apiOpen} onOpenChange={setApiOpen}>
         <DialogContent>
           <DialogHeader>
@@ -137,22 +125,36 @@ export function RunDetail({ id }: { id: string }) {
         </DialogContent>
       </Dialog>
       <section className="metric-grid run-detail-metrics">
-        <article>
-          <small>Sources</small>
-          <b>{displayRun.metrics[0]}</b>
-        </article>
-        <article>
-          <small>Complete</small>
-          <b>{displayRun.metrics[1]}</b>
-        </article>
-        <article>
-          <small>{displayRun.status === 'failed' ? 'Blocked' : displayRun.status === 'completed' ? 'Needs review' : 'Needs input'}</small>
-          <b>{displayRun.metrics[2]}</b>
-        </article>
-        <article>
-          <small>Supported records</small>
-          <b>{displayRun.metrics[3]}</b>
-        </article>
+        <Card>
+          <CardContent>
+            <small>Sources</small>
+            <b>{displayRun.metrics[0]}</b>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <small>Complete</small>
+            <b>{displayRun.metrics[1]}</b>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <small>
+              {displayRun.status === 'failed'
+                ? 'Blocked'
+                : displayRun.status === 'completed'
+                  ? 'Needs review'
+                  : 'Needs input'}
+            </small>
+            <b>{displayRun.metrics[2]}</b>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <small>Supported records</small>
+            <b>{displayRun.metrics[3]}</b>
+          </CardContent>
+        </Card>
       </section>
       {workspaceRun?.domainQueue?.length ? (
         <section className="panel domain-queue">
@@ -177,40 +179,50 @@ export function RunDetail({ id }: { id: string }) {
           ))}
         </section>
       ) : null}
-      <RunSession runId={currentId} />
-      <section className={`run-sticky-actions${needsInput || needsReview ? ' warning' : ''}`}>
-        <span>
-          {needsInput ? (
-            <>
-              <strong>Input required</strong>
-              <small>{needsInput.summary}</small>
-            </>
-          ) : needsReview ? (
-            <>
-              <strong>{dataset?.review?.field} needs review</strong>
-              <small>{dataset?.review?.summary}</small>
-            </>
-          ) : (
-            <>
-              <strong>Run complete</strong>
-              <small>Review the supported records and retained evidence.</small>
-            </>
-          )}
-        </span>
-        {needsInput ? (
+      <RunSession
+        ref={runSession}
+        runId={currentId}
+        showNeedsInputNotice={false}
+        showExpandAction={false}
+      />
+      <ActionBar
+        status={needsInput
+          ? 'Input required'
+          : needsReview
+            ? `${dataset?.review?.field} needs review`
+            : displayRun.status === 'completed'
+              ? 'Ready to review'
+              : displayRun.badge}
+        summary={needsInput?.summary
+          ?? dataset?.review?.summary
+          ?? 'Review the supported records and retained evidence.'}
+        secondary={fromReview ? (
+          <Button variant="secondary" asChild>
+            <Link href="/review">Back to review</Link>
+          </Button>
+        ) : needsInput ? (
+          <RunDetailAction
+            status={displayRun.status}
+            runId={currentId}
+          />
+        ) : undefined}
+        primary={needsInput ? (
           <Button variant="primary" onClick={resolveInputs}>
             Resolve inputs ({needsInput.count})
           </Button>
         ) : needsReview ? (
           <Button variant="primary" asChild>
-            <Link href="/review">Open review item</Link>
-          </Button>
-        ) : (
-          <Button variant="primary" asChild>
             <Link href={displayRun.actionHref ?? '/datasets'}>Review data</Link>
           </Button>
+        ) : (
+          <RunDetailAction
+            status={displayRun.status}
+            runId={currentId}
+            href={displayRun.actionHref}
+            label={displayRun.actionLabel}
+          />
         )}
-      </section>
+      />
     </div>
   );
 }

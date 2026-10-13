@@ -23,8 +23,10 @@ Decisions recorded 13 Oct 2026 for Phase 3B review consistency:
 
 - The persistent product identity is **import.io Studio**; the product name remains distinct from the active workspace name.
 - The compact icon theme control remains visible in the top bar.
-- The permanent **API & database ready** chip is removed. Readiness belongs in contextual health and status surfaces, not the global shell.
+- The top bar uses a compact **API + DB ready** design-system status badge (accessible label: **API & database ready**); the larger **Interactive demo** label is removed from the prototype shell.
 - The seeded demo workspace is the fictional team **Northwind Research**.
+- Review journeys use one shared Studio `ActionBar` composed from design-system Card, Button and spacing tokens. It is a candidate for promotion into `@importio/design-system`.
+- The installed design-system revision does not export Alert/Callout, ButtonGroup or Toast/Toaster components. Studio uses the closest existing design-system primitives and retains its existing Sonner toast until those exports are available; no replacement visual pattern is introduced.
 
 ## Architecture
 
@@ -103,7 +105,7 @@ Already carried over under new names: Memories → Runs › Saved · Groups → 
 | Medium | Settings | Notifications and Audit log sections |
 | Medium | Qualification follow-through | "Save qualified candidates" → dataset; "Extend search" |
 | Removed | Managed handoff | Intentionally removed in Phase 3B: "Hand to Import.io experts" conflicts with the no-contact-sales rule and has no live-engine support. No replacement contact or sales CTA is provided. |
-| Low | Quick try | `#try` single-page Extract preview with "Save to workspace" |
+| Removed | Quick try | Intentional removal — duplicates New workflow › Extract. |
 | Low | Usage | "Download JSON", usage by pipeline |
 | Low | Runs | "Load older" pagination |
 

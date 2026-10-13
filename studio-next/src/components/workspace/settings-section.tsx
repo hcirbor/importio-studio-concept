@@ -83,7 +83,7 @@ export function SettingsSection() {
           </div>
         </article>
         <article className="panel">
-          <PanelHead title="Audit log" meta="Real demo actions" />
+          <PanelHead title="Audit log" meta="Last 30 days" />
           <div className="panel-body">
             <label>
               MEMBER

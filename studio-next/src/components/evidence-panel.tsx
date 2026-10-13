@@ -4,6 +4,7 @@ import { X } from 'lucide-react';
 import { useRef } from 'react';
 import { Button } from '@/components/design-system';
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { ActionBar } from './action-bar';
 
 export type EvidenceDetail = {
   field: string;
@@ -63,6 +64,22 @@ export function EvidencePanel({ evidence, onClose }: { evidence: EvidenceDetail 
             </div>
           </section>
         </div>
+        <ActionBar
+          status="Evidence retained"
+          summary={`${evidence.record} · ${evidence.field}`}
+          secondary={(
+            <SheetClose asChild>
+              <Button variant="secondary">Close</Button>
+            </SheetClose>
+          )}
+          primary={(
+            <Button variant="primary" asChild>
+              <a href={evidence.sourceUrl} target="_blank" rel="noreferrer">
+                Open source
+              </a>
+            </Button>
+          )}
+        />
       </SheetContent> : null}
     </Sheet>
   );

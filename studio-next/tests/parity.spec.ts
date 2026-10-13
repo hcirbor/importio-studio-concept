@@ -1,12 +1,18 @@
 import { expect, test, waitForStudio } from './fixtures';
 
-test('approved product identity, workspace identity, and compact theme control remain distinct', async ({ page }) => {
+test('approved product identity, workspace identity, readiness, and compact theme control remain distinct', async ({ page }) => {
   await page.goto('/');
   await waitForStudio(page);
   await expect(page.getByRole('link', { name: 'Import.io Studio home' })).toContainText('Studio');
   await expect(page.getByRole('button', { name: /Northwind Research.*Switch workspace/ })).toBeVisible();
-  await expect(page.locator('.theme-control')).toBeVisible();
-  await expect(page.getByText('API & database ready')).toHaveCount(0);
+  const theme = page.getByRole('button', { name: 'Theme' });
+  await expect(theme).toBeVisible();
+  await expect(theme.locator('svg')).toBeVisible();
+  await theme.click();
+  await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
+  await expect(theme.locator('svg')).toBeVisible();
+  await expect(page.getByLabel('API & database ready')).toBeVisible();
+  await expect(page.getByText('Interactive demo', { exact: false })).toHaveCount(0);
 });
 
 test('pipeline repair compares evidence, creates a version, and rolls back', async ({ page }) => {
@@ -41,14 +47,14 @@ test('monitor event supports evidence, baseline acceptance, muting, and opening 
 test('running multi-worker run exposes queue warnings, resolve action, API code, cancel, and capture artefacts', async ({ page }) => {
   await page.goto('/runs/run_batch_91af');
   await waitForStudio(page);
-  await expect(page.getByText('1 source needs input').first()).toBeVisible();
+  await expect(page.getByText('Input required')).toBeVisible();
   await page.getByRole('button', { name: 'Get API code' }).click();
   await expect(page.getByRole('dialog', { name: 'Run with the API' })).toContainText('run_batch_91af');
   await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Cancel run' }).click();
   await expect(page.getByRole('link', { name: 'Retry as new run' })).toBeVisible();
   await page.getByRole('button', { name: 'Resolve inputs (1)' }).last().click();
-  await expect(page.getByText('Run complete')).toBeVisible();
+  await expect(page.getByText('Ready to review')).toBeVisible();
   await page.getByRole('button', { name: 'View screenshot' }).click();
   await expect(page.getByText('Screenshot preview opened for this capture.')).toBeVisible();
 });
@@ -58,11 +64,11 @@ test('review evidence preserves context and resolution remains synchronized', as
   await waitForStudio(page);
   await page.getByRole('link', { name: /Price supported/ }).click();
   await expect(page.getByText('Availability needs review').first()).toBeVisible();
-  await expect(page.getByText('Price supported; availability not found.')).toBeVisible();
+  await expect(page.getByText('Trail Shop availability was not found.')).toBeVisible();
   await page.getByRole('link', { name: 'Back to review' }).click();
   await page.getByRole('button', { name: 'Accept unknown' }).click();
   await page.goto('/runs/run_7f3a?from=review');
-  await expect(page.getByText('Run complete')).toBeVisible();
+  await expect(page.getByText('Ready to review')).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open review item' })).toHaveCount(0);
 });
 
@@ -100,7 +106,7 @@ test('real demo actions appear in the member-filterable audit log', async ({ pag
   await page.getByPlaceholder('maya@example.com, sam@example.com').fill('alex@example.com');
   await page.getByRole('button', { name: 'Send invites' }).click();
 
-  await expect(page.getByText(/approved repair for “Competitor prices”/)).toBeVisible();
+  await expect(page.getByText('Jordan Davis approved repair for “Competitor prices” and created v5')).toBeVisible();
   await expect(page.getByText(/created monitor “Competitor prices monitor”/)).toBeVisible();
   await expect(page.getByText(/created API key “Audit journey”/)).toBeVisible();
   await expect(page.getByText(/revoked API key “Audit journey”/)).toBeVisible();
@@ -108,7 +114,7 @@ test('real demo actions appear in the member-filterable audit log', async ({ pag
 
   await page.getByRole('combobox', { name: 'Filter audit log by member' }).click();
   await page.getByRole('option', { name: 'Jordan Davis' }).click();
-  await expect(page.getByText(/approved repair for “Competitor prices”/)).toBeVisible();
+  await expect(page.getByText('Jordan Davis approved repair for “Competitor prices” and created v5')).toBeVisible();
 });
 
 test('qualification can save candidates and extend search', async ({ page }) => {
@@ -120,13 +126,9 @@ test('qualification can save candidates and extend search', async ({ page }) => 
   await expect(page.getByText('Search extended · 18 more candidates queued for qualification.')).toBeVisible();
 });
 
-test('quick try previews a page and saves it to the workspace', async ({ page }) => {
+test('quick try is intentionally removed in favour of New workflow Extract', async ({ page }) => {
   await page.goto('/try');
-  await waitForStudio(page);
-  await page.getByRole('button', { name: 'Preview extract' }).click();
-  await expect(page.getByRole('heading', { name: 'Trailhead 2P Tent' })).toBeVisible();
-  await page.getByRole('button', { name: 'Save to workspace' }).click();
-  await expect(page.getByRole('link', { name: 'Open workspace datasets' })).toBeVisible();
+  await expect(page.getByText('Not found')).toBeVisible();
 });
 
 test('usage downloads JSON and runs load older history', async ({ page }) => {

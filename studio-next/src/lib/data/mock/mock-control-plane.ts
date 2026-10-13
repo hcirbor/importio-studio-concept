@@ -363,7 +363,43 @@ const seededMonitorEvents: Record<string, MonitorEvent[]> = {
   northwind: [],
 };
 const seededAuditEntries: Record<string, AuditEntry[]> = {
-  studio: [],
+  studio: [
+    {
+      id: 'audit-seed-repair',
+      memberId: 'jordan',
+      memberName: 'Jordan Davis',
+      action: 'approved repair for “Competitor prices”',
+      createdAt: seededNow - 2 * 60 * 60_000,
+    },
+    {
+      id: 'audit-seed-monitor',
+      memberId: 'maya',
+      memberName: 'Maya Chen',
+      action: 'created monitor “Trailhead availability”',
+      createdAt: seededNow - 26 * 60 * 60_000,
+    },
+    {
+      id: 'audit-seed-key',
+      memberId: 'jordan',
+      memberName: 'Jordan Davis',
+      action: 'created API key “Production sync”',
+      createdAt: seededNow - 4 * 24 * 60 * 60_000,
+    },
+    {
+      id: 'audit-seed-invite',
+      memberId: 'jordan',
+      memberName: 'Jordan Davis',
+      action: 'invited 1 member as Viewer',
+      createdAt: seededNow - 9 * 24 * 60 * 60_000,
+    },
+    {
+      id: 'audit-seed-revoke',
+      memberId: 'maya',
+      memberName: 'Maya Chen',
+      action: 'revoked API key “Legacy export”',
+      createdAt: seededNow - 18 * 24 * 60 * 60_000,
+    },
+  ],
   northwind: [],
 };
 const seededNotificationPreferences: Record<string, NotificationPreference[]> = {

@@ -7,11 +7,11 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import {
   Activity, Braces, CheckSquare2, Database, Home,
-  Layers3, MonitorDot, PanelLeft, Plus, Search, Settings, Table2, Zap,
+  Layers3, MonitorDot, PanelLeft, Plus, Search, Settings, Table2,
 } from 'lucide-react';
 import { ThemeControl } from './theme-control';
 import { CommandPalette } from './command-palette';
-import { BrandMark, Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/design-system';
+import { Badge, BrandMark, Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/design-system';
 import { useStudio } from '@/lib/data';
 import { UserMenu, WorkspaceSwitcher } from './auth-controls';
 
@@ -19,7 +19,6 @@ const groups = [
   { label: 'Build', items: [
     { href: '/build', label: 'New workflow', icon: Plus },
     { href: '/search', label: 'Search', icon: Search },
-    { href: '/try', label: 'Quick try', icon: Zap },
   ] },
   { label: 'Operate', items: [
     { href: '/pipelines', label: 'Pipelines', icon: Layers3 },
@@ -247,7 +246,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [auth.ready, auth.session, isAuthRoute, pathname, router]);
 
   if (isAuthRoute) return <>{children}</>;
-  if (!auth.ready || !auth.session) return <div className="auth-loading"><span className="demo-chip">INTERACTIVE DEMO</span><p>Opening Studio…</p></div>;
+  if (!auth.ready || !auth.session) {
+    return (
+      <div className="auth-loading">
+        <p>Opening Studio…</p>
+      </div>
+    );
+  }
   const rail = desktopNavigation && sidebarCollapsed;
   return (
     <TooltipProvider delayDuration={300}>
@@ -287,7 +292,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Button variant="ghost" className="nav-toggle" aria-label={desktopNavigation ? (sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation') : (navOpen ? 'Close navigation' : 'Open navigation')} onClick={toggleNavigation}><PanelLeft /></Button>
             <Suspense fallback={<div className="breadcrumbs"><span>Build</span><i>/</i><strong>Workflow</strong></div>}><Breadcrumbs pathname={pathname} /></Suspense>
           </div>
-          <div className="top-actions"><CommandPalette /><span className="demo-chip">INTERACTIVE DEMO</span><ThemeControl /><UserMenu compact /></div>
+          <div className="top-actions">
+            <CommandPalette />
+            <Badge
+              tone="success"
+              aria-label="API & database ready"
+              title="API & database ready"
+            >
+              API + DB ready
+            </Badge>
+            <ThemeControl />
+            <UserMenu compact />
+          </div>
         </header>
         <main id="main">{auth.currentWorkspace?.empty && !['/build','/settings','/developers','/usage'].includes(pathname)
           ? <section className="empty-workspace"><span className="eyebrow">{auth.currentWorkspace.name}</span><h1>Nothing here yet</h1><p>This workspace is ready for its first workflow.</p><Button asChild><Link href="/build">Create a workflow</Link></Button></section>

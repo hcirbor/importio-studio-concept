@@ -70,16 +70,18 @@ export function MonitorsSection() {
           </div>
           <Status tone={newEventCount ? 'warning' : 'success'}>{newEventCount} new</Status>
         </div>
-        {state.monitorEvents.map((event) => (
-          <Link className="monitor-event-row" href={`/monitors/events/${event.id}`} key={event.id}>
-            <span>
-              <strong>{event.title}</strong>
-              <small>{event.monitorName} · {event.occurredAt}</small>
-            </span>
-            <span>{event.previousValue} → {event.currentValue}</span>
-            <Status tone={event.status === 'New' ? 'warning' : 'success'}>{event.status}</Status>
-          </Link>
-        ))}
+        <div className="panel-body">
+          {state.monitorEvents.map((event) => (
+            <Link className="monitor-event-row" href={`/monitors/events/${event.id}`} key={event.id}>
+              <span>
+                <strong>{event.title}</strong>
+                <small>{event.monitorName} · {event.occurredAt}</small>
+              </span>
+              <span>{event.previousValue} → {event.currentValue}</span>
+              <Status tone={event.status === 'New' ? 'warning' : 'success'}>{event.status}</Status>
+            </Link>
+          ))}
+        </div>
       </section>
       <TablePanel
         title="Active monitors"

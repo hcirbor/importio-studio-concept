@@ -2,7 +2,17 @@
 
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { Badge, Button, Eyebrow } from '@/components/design-system';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+  Eyebrow,
+} from '@/components/design-system';
 import { can, useStudio } from '@/lib/data';
 
 export function PipelineRepair({ pipelineId }: { pipelineId: string }) {
@@ -66,38 +76,48 @@ export function PipelineRepair({ pipelineId }: { pipelineId: string }) {
           {approved ? `Active · v${repair.proposedVersion}` : 'Needs attention'}
         </Badge>
       </header>
-      <section className="panel repair-panel">
-        <div className="section-head">
+      <Card>
+        <CardHeader>
           <div>
-            <h2>What changed</h2>
-            <p>Compare the retained evidence for every repaired field.</p>
+            <CardTitle>What changed</CardTitle>
+            <CardDescription>Compare the retained evidence for every repaired field.</CardDescription>
           </div>
           <Eyebrow>v{repair.baseVersion} → v{repair.proposedVersion}</Eyebrow>
-        </div>
+        </CardHeader>
         {repair.fields.map((field) => (
-          <article className="repair-field" key={field.field}>
-            <h3>{field.field}</h3>
-            <div className="repair-evidence">
-              <div>
-                <small>Before · v{repair.baseVersion}</small>
-                <strong>{field.before}</strong>
-                <p>{field.beforeEvidence}</p>
-                <Link className="text-link" href={field.beforeHref}>
-                  View before evidence →
-                </Link>
+          <section key={field.field}>
+            <CardHeader>
+              <CardTitle>{field.field}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="definition-grid">
+                <Card>
+                  <CardContent>
+                    <Eyebrow>Before · v{repair.baseVersion}</Eyebrow>
+                    <strong>{field.before}</strong>
+                    <p>{field.beforeEvidence}</p>
+                    <Link className="text-link" href={field.beforeHref}>
+                      View before evidence →
+                    </Link>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent>
+                    <Eyebrow>
+                      {approved ? 'Active' : 'After'} · v{repair.proposedVersion}
+                    </Eyebrow>
+                    <strong>{field.after}</strong>
+                    <p>{field.afterEvidence}</p>
+                    <Link className="text-link" href={field.afterHref}>
+                      View after evidence →
+                    </Link>
+                  </CardContent>
+                </Card>
               </div>
-              <div>
-                <small>After · proposed v{repair.proposedVersion}</small>
-                <strong>{field.after}</strong>
-                <p>{field.afterEvidence}</p>
-                <Link className="text-link" href={field.afterHref}>
-                  View after evidence →
-                </Link>
-              </div>
-            </div>
-          </article>
+            </CardContent>
+          </section>
         ))}
-        <div className="page-action-row">
+        <CardFooter>
           <span>
             {approved
               ? 'The repaired version is active; the previous version remains available.'
@@ -112,8 +132,8 @@ export function PipelineRepair({ pipelineId }: { pipelineId: string }) {
               Approve repair (creates v{repair.proposedVersion})
             </Button>
           )}
-        </div>
-      </section>
+        </CardFooter>
+      </Card>
     </div>
   );
 }
@@ -124,15 +144,17 @@ export function PipelineRepairSummary({ pipelineId }: { pipelineId: string }) {
   if (!repair || repair.status === 'Approved') return null;
 
   return (
-    <section className="panel repair-summary">
-      <div>
-        <Eyebrow>Pipeline repair</Eyebrow>
-        <strong>{repair.title}</strong>
-        <small>{repair.summary}</small>
-      </div>
-      <Button variant="secondary" asChild>
-        <Link href={`/pipelines/${pipelineId}/repair`}>Review repair</Link>
-      </Button>
-    </section>
+    <Card>
+      <CardHeader>
+        <div>
+          <Eyebrow>Pipeline repair</Eyebrow>
+          <CardTitle>{repair.title}</CardTitle>
+          <CardDescription>{repair.summary}</CardDescription>
+        </div>
+        <Button variant="secondary" asChild>
+          <Link href={`/pipelines/${pipelineId}/repair`}>Review repair</Link>
+        </Button>
+      </CardHeader>
+    </Card>
   );
 }
