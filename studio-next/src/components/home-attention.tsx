@@ -5,16 +5,61 @@ import { Badge } from '@/components/design-system';
 import { useStudio } from '@/lib/data';
 
 export function HomeAttention() {
-  const hasReviewItem = useStudio((snapshot) => snapshot.humanReview.hasReviewItem);
+  const state = useStudio((snapshot) => ({
+    datasets: snapshot.auth.datasets,
+    repairs: snapshot.pipelineRepairs,
+    monitorEvents: snapshot.monitorEvents,
+  }));
+  const reviewItems = state.datasets.filter((dataset) => dataset.review?.status === 'Open');
+  const repairs = state.repairs.filter((repair) => repair.status !== 'Approved');
+  const monitorEvents = state.monitorEvents.filter((event) => event.status === 'New');
+  const itemCount = reviewItems.length + repairs.length + monitorEvents.length;
+
   return (
     <article className="panel attention-panel">
       <div className="section-head">
         <h2>Needs attention</h2>
-        <Badge tone="warning">{hasReviewItem ? '2 items' : '1 item'}</Badge>
+        <Badge tone={itemCount ? 'warning' : 'success'}>
+          {itemCount} {itemCount === 1 ? 'item' : 'items'}
+        </Badge>
       </div>
       <div className="panel-body">
-        {hasReviewItem ? <div className="attention-item"><span>!</span><div><strong>Trailhead availability is unknown</strong><small>Competitor prices · unresolved field</small></div><Link href="/review" className="text-link">Review</Link></div> : null}
-        <div className="attention-item"><span>!</span><div><strong>Outdoor catalogue needs repair</strong><small>Product cards changed · repair ready to review</small></div><Link href="/pipelines/competitor-prices#repair" className="text-link">Review repair</Link></div>
+        {reviewItems.map((dataset) => (
+          <div className="attention-item" key={`review-${dataset.id}`}>
+            <span>!</span>
+            <div>
+              <strong>{dataset.review?.field} needs review</strong>
+              <small>{dataset.title} · {dataset.review?.summary}</small>
+            </div>
+            <Link href="/review" className="text-link">
+              Review
+            </Link>
+          </div>
+        ))}
+        {repairs.map((repair) => (
+          <div className="attention-item" key={repair.id}>
+            <span>!</span>
+            <div>
+              <strong>{repair.pipelineName} needs repair</strong>
+              <small>{repair.title} · repair ready to review</small>
+            </div>
+            <Link href={`/pipelines/${repair.pipelineId}/repair`} className="text-link">
+              Review repair
+            </Link>
+          </div>
+        ))}
+        {monitorEvents.map((event) => (
+          <div className="attention-item" key={event.id}>
+            <span>!</span>
+            <div>
+              <strong>{event.title}</strong>
+              <small>{event.previousValue} → {event.currentValue}</small>
+            </div>
+            <Link href={`/monitors/events/${event.id}`} className="text-link">
+              Review change
+            </Link>
+          </div>
+        ))}
       </div>
     </article>
   );

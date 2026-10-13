@@ -62,7 +62,16 @@ export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
           <div><dt>Fields</dt><dd>{fields.map(formatFieldLabel).join(', ') || '—'}</dd></div>
           <div><dt>Status</dt><dd>{dataset.status} · {unresolvedCount} unresolved</dd></div>
           <div><dt>Last updated</dt><dd><RelativeTime timestamp={dataset.updatedAt} fallback={dataset.lastUpdated ?? 'Just now'} /></dd></div>
-          <div><dt>Source</dt><dd>{dataset.sourceRunId ? <Link className="text-link" href={['run_batch_91af','run_7f3a','run_7e91','run_failed_9d11'].includes(dataset.sourceRunId) ? `/runs/${dataset.sourceRunId}` : `/runs/run_7f3a?run=${encodeURIComponent(dataset.sourceRunId)}`}>{dataset.sourceWorkflow ?? 'Workflow'} · {dataset.sourceRunId} →</Link> : dataset.sourceWorkflow ?? 'Saved workflow'}</dd></div>
+          <div>
+            <dt>Source</dt>
+            <dd>
+              {dataset.sourceRunId && dataset.sourceRunHref ? (
+                <Link className="text-link" href={dataset.sourceRunHref}>
+                  {dataset.sourceWorkflow ?? 'Workflow'} · {dataset.sourceRunId} →
+                </Link>
+              ) : dataset.sourceWorkflow ?? 'Saved workflow'}
+            </dd>
+          </div>
         </dl>
       </section>
       <section className="panel dataset-detail-table">

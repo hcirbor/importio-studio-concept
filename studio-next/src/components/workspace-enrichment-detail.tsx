@@ -44,8 +44,7 @@ export function WorkspaceEnrichmentDetail({ enrichmentId }: { enrichmentId: stri
   const fields = [...enrichment.inputFields, ...enrichment.enrichedFields];
   const reviewRows = enrichment.rows.filter((row) => enrichment.enrichedFields.some((field) => ['Not stated', 'Conflicting'].includes(row.enriched[field]?.verdict ?? '')));
   const exportDataset = { title: enrichment.name, records: exportRecords };
-  const staticRunIds = ['run_batch_91af', 'run_7f3a', 'run_7e91', 'run_failed_9d11'];
-  const runHref = enrichment.runId && (staticRunIds.includes(enrichment.runId) ? `/runs/${enrichment.runId}` : `/runs/run_7f3a?run=${encodeURIComponent(enrichment.runId)}`);
+  const runHref = enrichment.runHref;
 
   function runEnrichment() {
     void execution.startEnrichment({ enrichmentId: activeEnrichment.id });

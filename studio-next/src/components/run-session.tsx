@@ -17,15 +17,6 @@ export function RunSession({ runId, onResearchResolved, onResearchStateChange }:
 
   useEffect(() => { researchCallbacks.current = { onResearchResolved, onResearchStateChange }; }, [onResearchResolved, onResearchStateChange]);
   useEffect(() => execution.subscribeRunEvents(runId, (event) => { setScenario(event.presentation); if (event.decisionState) researchCallbacks.current.onResearchStateChange?.(event.decisionState); if (event.decisionState === 'Complete') researchCallbacks.current.onResearchResolved?.(); }), [execution, runId]);
-  useEffect(() => {
-    const resolveInput = () => {
-      const waitingIndex = scenario.workers.findIndex((worker) => worker.state === 'Needs input');
-      if (waitingIndex >= 0) { setWorkerIndex(waitingIndex); setStep(1); setPlaying(false); }
-    };
-    window.addEventListener('studio:resolve-run-input', resolveInput);
-    return () => window.removeEventListener('studio:resolve-run-input', resolveInput);
-  }, [scenario.workers, setPlaying, setStep, setWorkerIndex]);
-
   function recordCookieDecision() { setStep(2); setPlaying(false); void execution.resolveRunDecision(runId); }
 
   return <><div className="session-actions"><Button ref={expandButton} variant="secondary" className="session-expand-button" type="button" onClick={() => setExpanded(true)}><Expand size={15} /> Expand</Button></div>{expanded ? <div className="expanded-run-overlay" role="presentation"><section className="expanded-run-dialog" role="dialog" aria-modal="true" aria-labelledby="expanded-run-title"><header className="expanded-run-header"><div><span className="mono-label">Expanded run</span><h2 id="expanded-run-title">{scenario.title}</h2><p>{scenario.completed ? 'Completed run replay and retained evidence.' : 'Live multi-worker session.'}</p></div><Button ref={closeButton} variant="secondary" size="icon" type="button" className="expanded-run-close" aria-label="Close expanded run" onClick={closeExpanded}><X size={18} /></Button></header><SessionContents scenario={scenario} workerIndex={workerIndex} setWorkerIndex={setWorkerIndex} step={step} setStep={setStep} playing={playing} setPlaying={setPlaying} onCookieDecision={recordCookieDecision} expanded /></section></div> : null}<SessionContents scenario={scenario} workerIndex={workerIndex} setWorkerIndex={setWorkerIndex} step={step} setStep={setStep} playing={playing} setPlaying={setPlaying} onCookieDecision={recordCookieDecision} /><CaptureHistory scenario={scenario} workerIndex={workerIndex} step={step} onCookieDecision={recordCookieDecision} /></>;

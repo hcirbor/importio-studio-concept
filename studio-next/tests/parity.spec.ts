@@ -1,34 +1,41 @@
 import { expect, test, waitForStudio } from './fixtures';
 
-test('persistent identity and compact theme control distinguish product and workspace', async ({ page }) => {
+test('approved product identity, workspace identity, and compact theme control remain distinct', async ({ page }) => {
   await page.goto('/');
   await waitForStudio(page);
   await expect(page.getByRole('link', { name: 'Import.io Studio home' })).toContainText('Studio');
-  await expect(page.getByRole('button', { name: /Demo workspace.*Switch workspace/ })).toBeVisible();
+  await expect(page.getByRole('button', { name: /Northwind Research.*Switch workspace/ })).toBeVisible();
   await expect(page.locator('.theme-control')).toBeVisible();
   await expect(page.getByText('API & database ready')).toHaveCount(0);
 });
 
 test('pipeline repair compares evidence, creates a version, and rolls back', async ({ page }) => {
-  await page.goto('/pipelines/competitor-prices#repair');
+  await page.goto('/pipelines/competitor-prices/repair');
   await waitForStudio(page);
   await expect(page.getByRole('heading', { name: 'Product cards changed' })).toBeVisible();
   await page.getByRole('button', { name: 'Approve repair (creates v5)' }).click();
   await expect(page.getByText('Repair approved. Version 5 created and activated.')).toBeVisible();
+  await page.getByRole('button', { name: 'Close toast' }).click();
   await page.getByRole('button', { name: 'Roll back to v4' }).click();
   await expect(page.getByText('Rolled back to v4.')).toBeVisible();
+  await page.reload();
+  await waitForStudio(page);
+  await expect(page.getByRole('button', { name: 'Approve repair (creates v5)' })).toBeVisible();
 });
 
 test('monitor event supports evidence, baseline acceptance, muting, and opening its run', async ({ page }) => {
   await page.goto('/monitors');
   await waitForStudio(page);
-  await page.getByRole('button', { name: /Trailhead availability changed/ }).click();
+  await page.getByRole('link', { name: /Trailhead availability changed/ }).click();
   await expect(page.getByRole('heading', { name: 'Trailhead availability changed' })).toBeVisible();
   await page.getByRole('button', { name: 'Mute field for 7 days' }).click();
-  await expect(page.getByText('Muted 7 days').last()).toBeVisible();
-  await page.getByRole('button', { name: 'Accept new baseline' }).click();
-  await expect(page.getByText('Baseline accepted').last()).toBeVisible();
+  await expect(page.getByText('Muted 7 days').first()).toBeVisible();
+  await page.getByRole('button', { name: 'Accept as new baseline' }).click();
+  await expect(page.getByText('Baseline accepted').first()).toBeVisible();
   await expect(page.getByRole('link', { name: 'Open run' })).toHaveAttribute('href', '/runs/run_monitor');
+  await page.reload();
+  await waitForStudio(page);
+  await expect(page.getByText('Baseline accepted').first()).toBeVisible();
 });
 
 test('running multi-worker run exposes queue warnings, resolve action, API code, cancel, and capture artefacts', async ({ page }) => {
@@ -38,10 +45,10 @@ test('running multi-worker run exposes queue warnings, resolve action, API code,
   await page.getByRole('button', { name: 'Get API code' }).click();
   await expect(page.getByRole('dialog', { name: 'Run with the API' })).toContainText('run_batch_91af');
   await page.keyboard.press('Escape');
-  await page.getByRole('button', { name: 'Resolve input' }).last().click();
-  await expect(page.getByRole('button', { name: 'Accept necessary only' })).toBeVisible();
   await page.getByRole('button', { name: 'Cancel run' }).click();
-  await expect(page.getByRole('button', { name: 'Cancelled' })).toBeDisabled();
+  await expect(page.getByRole('link', { name: 'Retry as new run' })).toBeVisible();
+  await page.getByRole('button', { name: 'Resolve inputs (1)' }).last().click();
+  await expect(page.getByText('Run complete')).toBeVisible();
   await page.getByRole('button', { name: 'View screenshot' }).click();
   await expect(page.getByText('Screenshot preview opened for this capture.')).toBeVisible();
 });
@@ -71,6 +78,37 @@ test('settings include notifications and audit log', async ({ page }) => {
   await waitForStudio(page);
   await expect(page.getByRole('heading', { name: 'Notifications' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Audit log' })).toBeVisible();
+});
+
+test('real demo actions appear in the member-filterable audit log', async ({ page }) => {
+  await page.goto('/pipelines/competitor-prices/repair');
+  await waitForStudio(page);
+  await page.getByRole('button', { name: 'Approve repair (creates v5)' }).click();
+
+  await page.goto('/monitors');
+  await page.getByRole('button', { name: 'Choose a pipeline to monitor' }).click();
+  await page.getByRole('button', { name: 'Create monitor' }).click();
+
+  await page.goto('/settings');
+  await page.getByRole('button', { name: 'Create key' }).click();
+  await page.getByPlaceholder('Cursor laptop').fill('Audit journey');
+  await page.getByRole('dialog').getByRole('button', { name: 'Create key' }).click();
+  await page.getByRole('button', { name: 'Done' }).click();
+  await page.getByRole('button', { name: 'Revoke' }).last().click();
+
+  await page.getByRole('button', { name: 'Invite members' }).click();
+  await page.getByPlaceholder('maya@example.com, sam@example.com').fill('alex@example.com');
+  await page.getByRole('button', { name: 'Send invites' }).click();
+
+  await expect(page.getByText(/approved repair for “Competitor prices”/)).toBeVisible();
+  await expect(page.getByText(/created monitor “Competitor prices monitor”/)).toBeVisible();
+  await expect(page.getByText(/created API key “Audit journey”/)).toBeVisible();
+  await expect(page.getByText(/revoked API key “Audit journey”/)).toBeVisible();
+  await expect(page.getByText(/invited 1 member as Editor/)).toBeVisible();
+
+  await page.getByRole('combobox', { name: 'Filter audit log by member' }).click();
+  await page.getByRole('option', { name: 'Jordan Davis' }).click();
+  await expect(page.getByText(/approved repair for “Competitor prices”/)).toBeVisible();
 });
 
 test('qualification can save candidates and extend search', async ({ page }) => {

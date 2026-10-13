@@ -62,7 +62,10 @@ function pageTitle(pathname: string, searchParams: QueryReader): [string, string
     const datasetName = pathname.split('/').at(-1)?.replaceAll('-', ' ').replace(/^./, (letter) => letter.toUpperCase()) ?? 'Dataset';
     return ['Datasets', datasetName, datasetName];
   }
-  if (pathname.includes('competitor-prices')) return ['Pipelines', 'Competitor prices', 'Competitor prices'];
+  if (pathname.startsWith('/pipelines/')) {
+    const pipelineName = pathname.split('/')[2]?.replaceAll('-', ' ').replace(/^./, (letter) => letter.toUpperCase()) ?? 'Pipeline';
+    return ['Pipelines', pipelineName, pipelineName];
+  }
   const name = pathname.split('/').filter(Boolean).at(-1)?.replaceAll('-', ' ') ?? 'Home';
   const current = name.replace(/^./, (letter) => letter.toUpperCase());
   return ['Studio', current, current];

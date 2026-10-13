@@ -100,11 +100,12 @@ export function createMockExecution(controlPlane: StudioControlPlane, getSnapsho
       const needsReview = plan.needsReview ?? false;
       const recordCount = plan.recordCount ?? sourceCount;
       const run: WorkspaceRun = {
-        id: runId, when: completed ? 'Just now' : 'Running now', createdAt: Date.now(), pipeline: plan.name,
+        id: runId, href: `/runs/run_7f3a?run=${encodeURIComponent(runId)}`, when: completed ? 'Just now' : 'Running now', createdAt: Date.now(), pipeline: plan.name,
         coverage: completed ? `${sourceCount} / ${sourceCount} sources` : `${Math.max(0, sourceCount - 1)} / ${sourceCount} sources`,
         records: completed ? String(recordCount) : String(Math.max(0, recordCount - 1)), queries: plan.queries,
         state: completed ? 'Completed' : 'Running', outcome: completed ? (needsReview ? 'Partial' : 'Succeeded') : 'Running',
         tone: completed ? (needsReview ? 'warning' : 'success') : 'info', badge: true, scenario: plan.scenario,
+        issueCount: needsReview ? 1 : 0,
       };
       presentations.set(runId, presentationForPlan(plan));
       runResults.set(runId, plan.sources.map((source) => mockDomainRecord(sourceDomain(source), plan.fields)));
@@ -138,7 +139,7 @@ export function createMockExecution(controlPlane: StudioControlPlane, getSnapsho
         const complete: RunPresentation = { ...running, completed: true, workers: running.workers.map((worker, index) => index === 2 ? { ...worker, state: 'Complete', price: '$9 / month' } : worker) };
         presentations.set(runId, complete);
         const count = complete.workers.length;
-        controlPlane.updateRun(runId, { when: 'Just now', coverage: `${count} / ${count} sources`, records: String(count), state: 'Completed', outcome: 'Succeeded', tone: 'success' });
+        controlPlane.updateRun(runId, { when: 'Just now', coverage: `${count} / ${count} sources`, records: String(count), state: 'Completed', outcome: 'Succeeded', tone: 'success', issueCount: 0, needsInput: undefined });
         timers.delete(runId);
         emit(runId, 'Complete');
       }, 900);
@@ -153,7 +154,9 @@ export function createMockExecution(controlPlane: StudioControlPlane, getSnapsho
       controlPlane.updateEnrichment(enrichment.id, { state: 'Running', runId });
       const plan = suggest({ prompt: enrichment.name, sources: enrichment.rows.map((row) => enrichmentSourceUrl(row.values)).filter(Boolean), fields: enrichment.enrichedFields });
       presentations.set(runId, presentationForPlan({ ...plan, scenario: 'extract', completed: false }));
-      controlPlane.addRun({ id: runId, when: 'Running now', createdAt: Date.now(), pipeline: enrichment.name, coverage: `0 / ${enrichment.rowCount} rows`, records: '0', queries: enrichment.rowCount, state: 'Running', outcome: 'Running', tone: 'info', badge: true, scenario: 'extract' });
+      const runHref = `/runs/run_7f3a?run=${encodeURIComponent(runId)}`;
+      controlPlane.addRun({ id: runId, href: runHref, when: 'Running now', createdAt: Date.now(), pipeline: enrichment.name, coverage: `0 / ${enrichment.rowCount} rows`, records: '0', queries: enrichment.rowCount, state: 'Running', outcome: 'Running', tone: 'info', badge: true, scenario: 'extract', issueCount: 0 });
+      controlPlane.updateEnrichment(enrichment.id, { runHref });
       emit(runId);
       const timer = setTimeout(() => {
         const rows = enrichment.rows.map((row, rowIndex) => ({ ...row, enriched: Object.fromEntries(enrichment.enrichedFields.map((field) => [field, enrichedValue(field, rowIndex, row.values)])) }));
@@ -189,7 +192,9 @@ export function createMockExecution(controlPlane: StudioControlPlane, getSnapsho
         detail: `2 records · ${request.fields.length} ${request.fields.length === 1 ? 'field' : 'fields'} · fully validated`,
         status: 'Validated' as const, tone: 'success' as const, href: `/datasets/${identity.id}`, recordCount: 2,
         fields: request.fields, lastUpdated: 'Just now', updatedAt: Date.now(), unresolvedCount: 0,
-        sourceWorkflow: request.workflowName, sourceRunId: request.runId, records,
+        sourceWorkflow: request.workflowName, sourceRunId: request.runId,
+        sourceRunHref: request.runId ? getSnapshot().auth.runs.find((run) => run.id === request.runId)?.href : undefined,
+        records,
       };
       const fullMonitor = { ...request, id: `monitor-${request.runId ?? Date.now()}`, baselineDataset: dataset.title };
       const { workflowName: _workflowName, sources: _sources, runId: _runId, ...monitor } = fullMonitor;

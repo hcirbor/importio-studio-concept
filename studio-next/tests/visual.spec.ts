@@ -76,7 +76,7 @@ for (const viewport of viewports) {
     });
 
     test(`pipeline repair · ${viewport.name}`, async ({ page }) => {
-      await ready(page, '/pipelines/competitor-prices#repair');
+      await ready(page, '/pipelines/competitor-prices/repair');
       await expect(page.getByRole('heading', { name: 'Product cards changed' })).toBeVisible();
       await expect(page).toHaveScreenshot(`pipeline-repair-${viewport.name}.png`);
     });

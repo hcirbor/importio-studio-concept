@@ -17,6 +17,15 @@ Keep the Studio interface as the target design. Power it, one workflow at a time
 5. **CiteOtter stays read-only through the initial integration.** Any required engine change goes on a separate branch and PR with an identified company owner. Never push to its master branch.
 6. **Nothing is hidden because it isn't built.** Use "Coming soon" or "Preview" labels instead.
 
+## Design decisions
+
+Decisions recorded 13 Oct 2026 for Phase 3B review consistency:
+
+- The persistent product identity is **import.io Studio**; the product name remains distinct from the active workspace name.
+- The compact icon theme control remains visible in the top bar.
+- The permanent **API & database ready** chip is removed. Readiness belongs in contextual health and status surfaces, not the global shell.
+- The seeded demo workspace is the fictional team **Northwind Research**.
+
 ## Architecture
 
 ```

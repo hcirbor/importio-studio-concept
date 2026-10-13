@@ -19,7 +19,7 @@ const routes = [
   { name: 'developers', path: '/developers' },
   { name: 'settings', path: '/settings' },
   { name: 'quick-try', path: '/try' },
-  { name: 'pipeline-repair', path: '/pipelines/competitor-prices#repair' },
+  { name: 'pipeline-repair', path: '/pipelines/competitor-prices/repair' },
   { name: 'run-needs-input', path: '/runs/run_batch_91af' },
 ] as const;
 

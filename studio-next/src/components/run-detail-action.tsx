@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { Button } from '@/components/design-system';
 import { can, useStudio, viewerTooltip } from '@/lib/data';
 
-export function RunDetailAction({ status, runId, href = '/datasets/competitor-prices', label = 'Review data' }: { status: 'running' | 'completed' | 'failed'; runId?: string; href?: string; label?: string }) {
+export function RunDetailAction({ status, runId, href = '/datasets', label = 'Review data' }: { status: 'running' | 'completed' | 'failed'; runId?: string; href?: string; label?: string }) {
   const session = useStudio((snapshot) => snapshot.auth.session);
   const execution = useStudio((snapshot) => snapshot.execution);
   const mayRun = can(session, 'run');
