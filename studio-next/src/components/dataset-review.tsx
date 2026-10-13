@@ -1,12 +1,15 @@
 'use client';
 
+import Link from 'next/link';
 import { useState } from 'react';
+import { toast } from 'sonner';
 import { Badge, Button, Tabs, TabsList, TabsTrigger } from '@/components/design-system';
 import type { DatasetRecord } from '@/lib/data';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
 import { formatFieldLabel, normalizeFieldName } from '@/lib/workflow/fields';
 import { sourceDomain } from '@/lib/web/source-domain';
+import { ActionBar } from './action-bar';
 
 const records = [
   {
@@ -45,10 +48,9 @@ function recordValue(record: (typeof records)[number], field: string) {
   return null;
 }
 
-export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io Studio', datasetName = 'Competitor prices', savedDatasetId = '' }: { fields?: string[]; onSaved?: (records?: DatasetRecord[], fields?: string[]) => void; workspaceName?: string; datasetName?: string; savedDatasetId?: string } = {}) {
+export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io Studio', datasetName = 'Competitor prices', savedDatasetId = '', back }: { fields?: string[]; onSaved?: (records?: DatasetRecord[], fields?: string[]) => void; workspaceName?: string; datasetName?: string; savedDatasetId?: string; back?: () => void } = {}) {
   const [tab, setTab] = useState('table');
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [feedback, setFeedback] = useState('');
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const selectedRecord = records[selectedIndex];
   const outputFields = (fields.length ? fields : ['retailer','product_name','price','availability']).filter((field) => normalizeFieldName(field) !== 'source');
@@ -84,12 +86,13 @@ export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io
   }
 
   function saveDataset() {
-    setFeedback(`Dataset saved to ${workspaceName}.`);
+    toast.success(`Dataset saved to ${workspaceName}.`);
     onSaved?.(exportRecords, outputFields);
   }
 
   return (
-    <section className="panel dataset-review">
+    <>
+      <section className="panel dataset-review">
       <div className="review-summary">
         <span>PREVIEW COMPLETE · RUN_7F3A</span>
         <strong>{hasAvailability ? '3 retailers checked. 1 field needs review.' : '3 retailers checked. Records are ready to review.'}</strong>
@@ -97,7 +100,6 @@ export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io
       {hasAvailability ? <div className="review-warning">
         Availability for Trail Shop is unresolved—not rejected. The record remains in the dataset.
       </div> : null}
-      {feedback ? <p className="review-feedback" role="status">{feedback}</p> : null}
       <Tabs className="dataset-view-tabs" value={tab} onValueChange={setTab}>
         <TabsList>
           <TabsTrigger value="table">Table</TabsTrigger>
@@ -194,9 +196,29 @@ export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io
       <footer className="review-footer">
         <span>Preview only · review before saving</span>
         <DatasetExportMenu dataset={{ title: datasetName, records: exportRecords }} />
-        {savedDatasetId ? <><Button variant="primary" disabled>Saved</Button><Button variant="ghost" asChild><a href={`/datasets/${savedDatasetId}`}>Open dataset</a></Button></> : <Button variant="primary" onClick={saveDataset}>Save dataset</Button>}
       </footer>
       <EvidencePanel evidence={evidence} onClose={() => setEvidence(null)} />
-    </section>
+      </section>
+      <ActionBar
+        status={savedDatasetId ? 'Dataset saved' : hasAvailability ? 'Review required' : 'Ready to save'}
+        summary={hasAvailability
+          ? '3 retailers checked · 1 field needs review.'
+          : '3 retailers checked · records are ready to save.'}
+        secondary={back ? (
+          <Button variant="secondary" onClick={back}>
+            Back to run
+          </Button>
+        ) : undefined}
+        primary={savedDatasetId ? (
+          <Button variant="primary" asChild>
+            <Link href={`/datasets/${savedDatasetId}`}>Open dataset</Link>
+          </Button>
+        ) : (
+          <Button variant="primary" onClick={saveDataset}>
+            Save dataset
+          </Button>
+        )}
+      />
+    </>
   );
 }

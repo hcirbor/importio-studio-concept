@@ -88,8 +88,8 @@ export function WorkspaceSection({ section }: { section: string }) {
           : section === 'pipelines' ? <PipelinesSection />
             : section === 'monitors' ? <MonitorsSection />
               : section === 'usage' ? <UsageSection />
-                : section === 'settings' ? <SettingsSection />
-                  : <PipelinesSection />;
+              : section === 'settings' ? <SettingsSection />
+                : <PipelinesSection />;
 
   return <div className="page">{content}</div>;
 }

@@ -2,9 +2,24 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { Badge, Eyebrow } from '@/components/design-system';
-import { RunSession } from './run-session';
+import { useRef, useState } from 'react';
+import { Expand } from 'lucide-react';
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Eyebrow,
+} from '@/components/design-system';
+import { ActionBar } from './action-bar';
+import { RunSession, type RunSessionHandle } from './run-session';
 import { RunDetailAction } from './run-detail-action';
 import { useStudio, type WorkspaceRun } from '@/lib/data';
 
@@ -25,75 +40,205 @@ function detailStatus(state: WorkspaceRun['state']): RunDetailData['status'] {
   return 'running';
 }
 
-function researchStatus(state: 'Running' | 'Complete'): 'running' | 'complete' {
-  return state === 'Complete' ? 'complete' : 'running';
-}
+const unavailableRun: RunDetailData = {
+  title: 'Run unavailable',
+  description: 'This run is not available in the current workspace.',
+  status: 'failed',
+  badge: 'Unavailable',
+  tone: 'danger',
+  metrics: ['0', '0', '0', '0'],
+};
 
-export function RunDetail({ id, run }: { id: string; run: RunDetailData }) {
-  const runs = useStudio((snapshot) => snapshot.auth.runs);
-  const execution = useStudio((snapshot) => snapshot.execution);
+export function RunDetail({ id }: { id: string }) {
   const searchParams = useSearchParams();
   const currentId = searchParams.get('run') ?? id;
-  const [engineResult, setEngineResult] = useState<{ id: string; run?: WorkspaceRun }>();
-  const engineRun = engineResult?.id === currentId ? engineResult.run : undefined;
-  const workspaceRun = engineRun ?? runs.find((item) => item.id === currentId);
-  useEffect(() => {
-    let active = true;
-    void execution.getRun(currentId).then((nextRun) => {
-      if (active) setEngineResult({ id: currentId, run: nextRun });
-    });
-    return () => { active = false; };
-  }, [currentId, execution]);
-  const [researchState, setResearchState] = useState<'idle' | 'running' | 'complete'>('idle');
-  const isResearch = currentId === 'run_batch_91af';
-  const researchResolved = researchState === 'complete';
+  const [apiOpen, setApiOpen] = useState(false);
+  const runSession = useRef<RunSessionHandle>(null);
+  const state = useStudio((snapshot) => ({
+    run: snapshot.auth.runs.find((item) => item.id === currentId),
+    datasets: snapshot.auth.datasets,
+    execution: snapshot.execution,
+  }));
+  const workspaceRun = state.run;
+  const dataset = state.datasets.find((item) => item.id === workspaceRun?.datasetId);
   const sourceTotal = workspaceRun?.coverage.match(/[\d,]+/g)?.at(-1) ?? '1';
+  const issueCount = dataset?.review?.issueCount ?? workspaceRun?.issueCount ?? 0;
+  const actionHref = dataset?.href ?? (workspaceRun?.state === 'Completed' ? '/datasets' : undefined);
   const workspaceDetail: RunDetailData | null = workspaceRun ? {
     title: workspaceRun.pipeline,
     description: `${workspaceRun.state} run · ${workspaceRun.coverage} · ${workspaceRun.records} ${workspaceRun.records === '1' ? 'record' : 'records'}`,
     status: detailStatus(workspaceRun.state),
     badge: `${workspaceRun.state} · ${workspaceRun.outcome}`,
     tone: workspaceRun.tone,
-    metrics: [sourceTotal, workspaceRun.state === 'Completed' ? sourceTotal : workspaceRun.records, ['Partial','Blocked'].includes(workspaceRun.outcome) ? '1' : '0', workspaceRun.records],
-    actionHref: workspaceRun.state === 'Completed' ? '/datasets' : undefined,
-    actionLabel: workspaceRun.state === 'Completed' ? 'Open datasets' : undefined,
+    metrics: [
+      sourceTotal,
+      workspaceRun.state === 'Completed' ? sourceTotal : workspaceRun.records,
+      String(issueCount),
+      workspaceRun.records,
+    ],
+    actionHref,
+    actionLabel: workspaceRun.state === 'Completed' ? 'Open dataset' : undefined,
   } : null;
-  const baseDisplayRun = workspaceDetail ?? run;
-  const displayRun = isResearch && researchResolved
-    ? {
-        ...baseDisplayRun,
-        description: 'Completed run · 3 SaaS sources · all records supported',
-        status: 'completed' as const,
-        badge: 'Completed · Succeeded',
-        tone: 'success' as const,
-        metrics: ['3', '3', '0', '3'],
-        actionHref: '/build?template=research',
-        actionLabel: 'Review data',
-      }
-    : isResearch && researchState === 'running'
-      ? {
-          ...baseDisplayRun,
-          badge: 'Running',
-          metrics: ['3', '2', '0', '2'],
-        }
-    : baseDisplayRun;
+  const displayRun = workspaceDetail ?? unavailableRun;
+  const fromReview = searchParams.get('from') === 'review';
+  const needsInput = workspaceRun?.needsInput;
+  const needsReview = dataset?.review?.status === 'Open' && issueCount > 0;
+
+  function resolveInputs() {
+    void state.execution.resolveRunDecision(currentId);
+  }
+
   return (
     <div className="page">
-      <Link href="/runs" className="back-link">← Runs</Link>
+      <Link href={fromReview ? '/review' : '/runs'} className="back-link">
+        {fromReview ? '← Review' : '← Runs'}
+      </Link>
       <header className="page-head run-detail-heading">
-        <div><Eyebrow>Runs / {currentId}</Eyebrow><h1>{displayRun.title}</h1><p>{displayRun.description}</p></div>
-        <div><Badge tone={displayRun.tone}>{displayRun.badge}</Badge><RunDetailAction status={displayRun.status} runId={currentId} href={displayRun.actionHref} label={displayRun.actionLabel} /></div>
+        <div>
+          <Eyebrow>Runs / {currentId}</Eyebrow>
+          <h1>{displayRun.title}</h1>
+          <p>{displayRun.description}</p>
+        </div>
+        <div>
+          {needsReview ? (
+            <Link href={`/review?dataset=${dataset?.id}`}>
+              <Badge tone="warning">Needs review</Badge>
+            </Link>
+          ) : (
+            <Badge tone={displayRun.tone}>{displayRun.badge}</Badge>
+          )}
+          <DialogFooter>
+            <Button variant="secondary" size="sm" onClick={() => setApiOpen(true)}>
+              Get API code
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => runSession.current?.openExpanded()}>
+              <Expand size={16} />
+              Expand
+            </Button>
+          </DialogFooter>
+        </div>
       </header>
+      <Dialog open={apiOpen} onOpenChange={setApiOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Run with the API</DialogTitle>
+            <DialogDescription>Use the same saved pipeline and bounded mock inputs.</DialogDescription>
+          </DialogHeader>
+          <pre className="api-code">
+            <code>{`curl -X POST https://api.import.io/v1/runs \\\n+  -d '{"pipeline":"${displayRun.title}","run_id":"${currentId}"}'`}</code>
+          </pre>
+        </DialogContent>
+      </Dialog>
       <section className="metric-grid run-detail-metrics">
-        <article><small>Sources</small><b>{displayRun.metrics[0]}</b></article>
-        <article><small>Complete</small><b>{displayRun.metrics[1]}</b></article>
-        <article><small>{displayRun.status === 'failed' ? 'Blocked' : displayRun.status === 'completed' && displayRun.metrics[2] === '0' ? 'Unresolved' : displayRun.status === 'completed' ? 'Needs review' : 'Needs input'}</small><b>{displayRun.metrics[2]}</b></article>
-        <article><small>Supported records</small><b>{displayRun.metrics[3]}</b></article>
+        <Card>
+          <CardContent>
+            <small>Sources</small>
+            <b>{displayRun.metrics[0]}</b>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <small>Complete</small>
+            <b>{displayRun.metrics[1]}</b>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <small>
+              {displayRun.status === 'failed'
+                ? 'Blocked'
+                : displayRun.status === 'completed'
+                  ? needsReview
+                    ? 'Needs review'
+                    : 'Issues'
+                  : 'Needs input'}
+            </small>
+            <b>{displayRun.metrics[2]}</b>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent>
+            <small>Supported records</small>
+            <b>{displayRun.metrics[3]}</b>
+          </CardContent>
+        </Card>
       </section>
+      {workspaceRun?.domainQueue?.length ? (
+        <Card className="domain-queue">
+          <CardHeader>
+            <div>
+              <h2>Domain queue</h2>
+              <p>Large runs stay bounded per domain.</p>
+            </div>
+            <Badge tone={workspaceRun.domainQueue.every((item) => item.status === 'Complete') ? 'success' : 'info'}>
+              {workspaceRun.domainQueue.length} {workspaceRun.domainQueue.length === 1 ? 'domain' : 'domains'}
+            </Badge>
+          </CardHeader>
+          <CardContent>
+            {workspaceRun.domainQueue.map((item) => (
+              <div className="domain-queue-row" key={item.domain}>
+                <span>
+                  <strong>{item.domain}</strong>
+                  <small>{item.scope}</small>
+                </span>
+                <span>{item.progress}</span>
+                <Badge tone={item.status === 'Complete' ? 'success' : 'info'}>{item.status}</Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      ) : null}
       <RunSession
+        ref={runSession}
         runId={currentId}
-        onResearchResolved={() => setResearchState('complete')}
-        onResearchStateChange={(state) => setResearchState(researchStatus(state))}
+        review={needsReview && dataset?.review ? {
+          description: dataset.review.itemDescription,
+          href: `/review?dataset=${dataset.id}`,
+        } : undefined}
+        showNeedsInputNotice={false}
+        showExpandAction={false}
+      />
+      <ActionBar
+        status={needsInput
+          ? 'Input required'
+          : needsReview
+            ? `${issueCount} ${issueCount === 1 ? 'value needs' : 'values need'} review`
+            : displayRun.status === 'completed'
+              ? 'Dataset ready'
+              : displayRun.badge}
+        summary={needsInput?.summary
+          ?? dataset?.review?.itemDescription
+          ?? 'Review the supported records and retained evidence.'}
+        secondary={fromReview ? (
+          <Button variant="secondary" asChild>
+            <Link href="/review">
+              Back to review
+            </Link>
+          </Button>
+        ) : needsInput ? (
+          <RunDetailAction
+            status={displayRun.status}
+            runId={currentId}
+          />
+        ) : undefined}
+        primary={needsInput ? (
+          <Button variant="primary" onClick={resolveInputs}>
+            Resolve inputs ({needsInput.count})
+          </Button>
+        ) : needsReview && dataset?.review ? (
+          <Button variant="primary" asChild>
+            <Link href={`/review?dataset=${dataset.id}`}>
+              Review {dataset.review.field.toLowerCase()}
+            </Link>
+          </Button>
+        ) : (
+          <RunDetailAction
+            status={displayRun.status}
+            runId={currentId}
+            href={displayRun.actionHref}
+            label={displayRun.actionLabel}
+          />
+        )}
       />
     </div>
   );

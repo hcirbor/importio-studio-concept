@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { Eyebrow } from '@/components/design-system';
+import { useSearchParams } from 'next/navigation';
+import { Badge, Eyebrow } from '@/components/design-system';
 import { useStudio } from '@/lib/data';
 import { formatFieldLabel } from '@/lib/workflow/fields';
 import { DatasetExportMenu } from './dataset-export-menu';
@@ -11,6 +12,7 @@ import { RelativeTime } from './relative-time';
 import { sourceDomain as domainFromSource } from '@/lib/web/source-domain';
 
 export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
+  const searchParams = useSearchParams();
   const auth = useStudio((snapshot) => ({
     datasets: snapshot.auth.datasets,
     currentWorkspace: snapshot.auth.currentWorkspace,
@@ -18,7 +20,23 @@ export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const dataset = auth.datasets.find((item) => item.id === datasetId);
   if (!dataset) {
-    return <div className="page"><Link href="/datasets" className="back-link">← Datasets</Link><div className="panel empty-page"><div><h1>Dataset not found</h1><p className="muted">This dataset is not in {auth.currentWorkspace?.name ?? 'the active workspace'}.</p></div></div></div>;
+    return (
+      <div className="page">
+        <Link href="/datasets" className="back-link">
+          ← Datasets
+        </Link>
+        <div className="panel empty-page">
+          <div>
+            <h1>
+              Dataset not found
+            </h1>
+            <p className="muted">
+              This dataset is not in {auth.currentWorkspace?.name ?? 'the active workspace'}.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
   }
   const records = dataset.records ?? [];
   const datasetTitle = dataset.title;
@@ -27,6 +45,7 @@ export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
   const tableFields = ['source', ...fields.filter((field) => field.trim().toLowerCase() !== 'source')];
   const recordCount = dataset.recordCount ?? records.length;
   const unresolvedCount = dataset.unresolvedCount ?? Number(dataset.detail.match(/(\d+)\s+unresolved/i)?.[1] ?? 0);
+  const fromReview = searchParams.get('from') === 'review';
   function sourceDomain(record: (typeof records)[number]) {
     const retainedSource = sourceField ? record.values[sourceField] : undefined;
     const evidenceSource = Object.values(record.evidence).find((item) => item.sourceUrl)?.sourceUrl;
@@ -51,25 +70,131 @@ export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
   }
   return (
     <div className="page">
-      <Link href="/datasets" className="back-link">← Datasets</Link>
+      <Link href={fromReview ? '/review' : '/datasets'} className="back-link">
+        {fromReview ? '← Review' : '← Datasets'}
+      </Link>
       <header className="page-head dataset-detail-head">
-        <div><Eyebrow>Dataset</Eyebrow><h1>{dataset.title}</h1><p>{dataset.version.replace('DATASET · ', 'Version ')} · evidence retained with every supported value.</p></div>
+        <div>
+          <Eyebrow>
+            Dataset
+          </Eyebrow>
+          <h1>
+            {dataset.title}
+          </h1>
+          <p>
+            {dataset.version.replace('DATASET · ', 'Dataset ')} · evidence retained with every supported value.
+          </p>
+          {dataset.review?.status === 'Open' ? (
+            <Link href={`/review?dataset=${dataset.id}`}>
+              <Badge tone="warning">
+                Needs review
+              </Badge>
+            </Link>
+          ) : null}
+        </div>
         <DatasetExportMenu dataset={dataset} />
       </header>
       <section className="panel dataset-metadata">
         <dl className="detail-list">
-          <div><dt>Records</dt><dd>{recordCount} {recordCount === 1 ? 'record' : 'records'}</dd></div>
-          <div><dt>Fields</dt><dd>{fields.map(formatFieldLabel).join(', ') || '—'}</dd></div>
-          <div><dt>Status</dt><dd>{dataset.status} · {unresolvedCount} unresolved</dd></div>
-          <div><dt>Last updated</dt><dd><RelativeTime timestamp={dataset.updatedAt} fallback={dataset.lastUpdated ?? 'Just now'} /></dd></div>
-          <div><dt>Source</dt><dd>{dataset.sourceRunId ? <Link className="text-link" href={['run_batch_91af','run_7f3a','run_7e91','run_failed_9d11'].includes(dataset.sourceRunId) ? `/runs/${dataset.sourceRunId}` : `/runs/run_7f3a?run=${encodeURIComponent(dataset.sourceRunId)}`}>{dataset.sourceWorkflow ?? 'Workflow'} · {dataset.sourceRunId} →</Link> : dataset.sourceWorkflow ?? 'Saved workflow'}</dd></div>
+          <div>
+            <dt>Records</dt>
+            <dd>
+              {recordCount} {recordCount === 1 ? 'record' : 'records'}
+            </dd>
+          </div>
+          <div>
+            <dt>Fields</dt>
+            <dd>
+              {fields.map(formatFieldLabel).join(', ') || '—'}
+            </dd>
+          </div>
+          <div>
+            <dt>Status</dt>
+            <dd>
+              {dataset.status} · {unresolvedCount} unresolved
+            </dd>
+          </div>
+          <div>
+            <dt>Last updated</dt>
+            <dd>
+              <RelativeTime timestamp={dataset.updatedAt} fallback={dataset.lastUpdated ?? 'Just now'} />
+            </dd>
+          </div>
+          <div>
+            <dt>Source</dt>
+            <dd>
+              {dataset.sourceRunId && dataset.sourceRunHref ? (
+                <Link className="text-link" href={dataset.sourceRunHref}>
+                  {dataset.sourceWorkflow ?? 'Workflow'} · {dataset.sourceRunId} →
+                </Link>
+              ) : dataset.sourceWorkflow ?? 'Saved workflow'}
+            </dd>
+          </div>
         </dl>
       </section>
       <section className="panel dataset-detail-table">
-        <div className="table-scroll"><table className="data-table"><thead><tr>{tableFields.map((field)=><th key={field}>{formatFieldLabel(field)}</th>)}</tr></thead><tbody>{records.map((record)=><tr key={record.id}>{tableFields.map((field)=><td key={field}><button type="button" className="value-evidence-button" onClick={()=>showEvidence(record.id,field)}>{field === 'source' ? sourceDomain(record) : record.values[field] === null ? <><code>null</code><span className="unknown-value">Not stated · unknown</span></> : record.values[field] ?? '—'}{field !== 'source' && record.reviewedBy?.[field] ? <small className="reviewed-by">Reviewed by {record.reviewedBy[field]}</small> : null}</button></td>)}</tr>)}</tbody></table></div>
-        {!records.length ? <div className="panel-body"><p className="muted">No records have been saved yet.</p></div> : null}
+        <div className="table-scroll">
+          <table className="data-table">
+            <thead>
+              <tr>
+                {tableFields.map((field) => (
+                  <th key={field}>
+                    {formatFieldLabel(field)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((record) => (
+                <tr key={record.id}>
+                  {tableFields.map((field) => {
+                    const unresolved = field !== 'source'
+                      && dataset.review?.status === 'Open'
+                      && dataset.review.field === field
+                      && (record.values[field] === null || record.values[field] === 'Unknown');
+                    return (
+                      <td key={field}>
+                        {unresolved ? (
+                          <Link
+                            href={`/review?dataset=${dataset.id}`}
+                            className="value-evidence-button"
+                          >
+                            Unknown · Open review →
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            className="value-evidence-button"
+                            onClick={() => showEvidence(record.id, field)}
+                          >
+                            {field === 'source' ? sourceDomain(record) : record.values[field] ?? '—'}
+                            {field !== 'source' && record.reviewedBy?.[field] ? (
+                              <small className="reviewed-by">
+                                Reviewed by {record.reviewedBy[field]}
+                              </small>
+                            ) : null}
+                          </button>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!records.length ? (
+          <div className="panel-body">
+            <p className="muted">
+              No records have been saved yet.
+            </p>
+          </div>
+        ) : null}
       </section>
-      <EvidencePanel evidence={evidence} onClose={()=>setEvidence(null)} />
+      <EvidencePanel
+        evidence={evidence}
+        onClose={() => setEvidence(null)}
+      />
     </div>
   );
 }

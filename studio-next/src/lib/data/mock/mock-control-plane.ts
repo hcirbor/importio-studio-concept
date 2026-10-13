@@ -1,10 +1,15 @@
-import { datasetDisplayName } from '@/lib/dataset-slug';
+import { datasetDisplayName, datasetSlug } from '@/lib/dataset-slug';
 import { isRole } from '@/lib/data/StudioDataSource';
 import type {
   AuthInterface,
+  AuditEntry,
   AuthUser,
   DatasetRecord,
   Member,
+  MonitorEvent,
+  NotificationEventType,
+  NotificationPreference,
+  PipelineRepair,
   Role,
   Session,
   SignInMethod,
@@ -31,12 +36,13 @@ type AuthState = {
   apiKeysByWorkspace: Record<string, WorkspaceApiKey[]>;
   monitorsByWorkspace: Record<string, WorkspaceMonitor[]>;
   enrichmentsByWorkspace: Record<string, WorkspaceEnrichment[]>;
+  pipelineRepairsByWorkspace: Record<string, PipelineRepair[]>;
+  monitorEventsByWorkspace: Record<string, MonitorEvent[]>;
+  auditEntriesByWorkspace: Record<string, AuditEntry[]>;
+  notificationPreferencesByWorkspace: Record<string, NotificationPreference[]>;
   sourcesByWorkspace: Record<string, string[]>;
   demoRole?: Role;
 };
-
-type WorkspaceReviewState = { hasReviewItem: boolean; pipelineVersion: number };
-type ReviewStateMap = Record<string, WorkspaceReviewState>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -65,11 +71,12 @@ function isMember(value: unknown): value is Member {
 }
 
 function isWorkspaceRun(value: unknown): value is WorkspaceRun {
-  return isRecord(value) && isString(value.id) && isString(value.when) && isString(value.pipeline)
+  return isRecord(value) && isString(value.id) && isString(value.href) && isString(value.when) && isString(value.pipeline)
     && isString(value.coverage) && isString(value.records) && typeof value.queries === 'number'
     && ['Running', 'Completed', 'Failed'].includes(String(value.state))
     && ['Running', 'Succeeded', 'Partial', 'Blocked'].includes(String(value.outcome))
     && ['info', 'success', 'warning', 'danger'].includes(String(value.tone))
+    && typeof value.issueCount === 'number'
     && (value.createdAt === undefined || typeof value.createdAt === 'number');
 }
 
@@ -108,6 +115,52 @@ function isWorkspaceEnrichment(value: unknown): value is WorkspaceEnrichment {
     && Array.isArray(value.enrichedFields) && value.enrichedFields.every(isString) && Array.isArray(value.rows);
 }
 
+function isPipelineRepair(value: unknown): value is PipelineRepair {
+  return isRecord(value)
+    && isString(value.id)
+    && isString(value.pipelineId)
+    && isString(value.pipelineName)
+    && isString(value.title)
+    && isString(value.summary)
+    && typeof value.baseVersion === 'number'
+    && typeof value.proposedVersion === 'number'
+    && ['Ready', 'Approved', 'Rolled back'].includes(String(value.status))
+    && Array.isArray(value.fields);
+}
+
+function isMonitorEvent(value: unknown): value is MonitorEvent {
+  return isRecord(value)
+    && isString(value.id)
+    && isString(value.monitorId)
+    && isString(value.monitorName)
+    && isString(value.title)
+    && isString(value.field)
+    && isString(value.previousValue)
+    && isString(value.currentValue)
+    && isString(value.evidence)
+    && isString(value.sourceUrl)
+    && isString(value.runId)
+    && isString(value.runHref)
+    && isString(value.occurredAt)
+    && ['New', 'Baseline accepted', 'Muted 7 days'].includes(String(value.status));
+}
+
+function isAuditEntry(value: unknown): value is AuditEntry {
+  return isRecord(value)
+    && isString(value.id)
+    && isString(value.memberId)
+    && isString(value.memberName)
+    && isString(value.action)
+    && typeof value.createdAt === 'number';
+}
+
+function isNotificationPreference(value: unknown): value is NotificationPreference {
+  return isRecord(value)
+    && ['Review required', 'Monitor change', 'Repair ready'].includes(String(value.eventType))
+    && typeof value.inApp === 'boolean'
+    && typeof value.email === 'boolean';
+}
+
 function decodeWorkspaceMap<T>(value: unknown, fallback: Record<string, T[]>, isItem: (item: unknown) => item is T) {
   if (!isRecord(value)) return fallback;
   const result: Record<string, T[]> = { ...fallback };
@@ -119,7 +172,7 @@ function decodeWorkspaceMap<T>(value: unknown, fallback: Record<string, T[]>, is
 
 const jordan: AuthUser = { id: 'jordan', name: 'Jordan Davis', email: 'jordan@example.com' };
 const seededWorkspaces: Workspace[] = [
-  { id: 'studio', name: 'Import.io Studio', subtitle: 'Demo workspace', role: 'Owner' },
+  { id: 'studio', name: 'Northwind Research', subtitle: 'Owner workspace', role: 'Owner' },
   { id: 'northwind', name: 'Northwind Pricing', subtitle: 'Editor', role: 'Editor', empty: true },
 ];
 const seededMembers: Record<string, Member[]> = {
@@ -136,10 +189,81 @@ const seededMembers: Record<string, Member[]> = {
 const seededNow = Date.now();
 const seededRuns: Record<string, WorkspaceRun[]> = {
   studio: [
-    { id: 'run_batch_91af', when: 'Running now', createdAt: seededNow, pipeline: 'SaaS pricing research', coverage: '2 / 3 sources', records: '2', queries: 3, state: 'Running', outcome: 'Running', tone: 'info', badge: true, scenario: 'research' },
-    { id: 'run_7f3a', when: '2 minutes ago', createdAt: seededNow - 2 * 60_000, pipeline: 'Competitor prices', coverage: '3 / 3 sources', records: '3', queries: 3, state: 'Completed', outcome: 'Partial', tone: 'warning', badge: true, scenario: 'compare' },
-    { id: 'run_7e91', when: '1 hour ago', createdAt: seededNow - 60 * 60_000, pipeline: 'Outdoor catalogue', coverage: '1,284 / 1,284 pages', records: '1,284', queries: 1284, state: 'Completed', outcome: 'Succeeded', tone: 'success', badge: true, scenario: 'collect' },
-    { id: 'run_failed_9d11', when: 'Yesterday', createdAt: seededNow - 24 * 60 * 60_000, pipeline: 'Retail availability', coverage: '2 / 3 sources', records: '2', queries: 3, state: 'Failed', outcome: 'Blocked', tone: 'danger', scenario: 'extract' },
+    {
+      id: 'run_batch_91af',
+      href: '/runs/run_batch_91af',
+      when: 'Running now',
+      createdAt: seededNow,
+      pipeline: 'SaaS pricing research',
+      coverage: '2 / 3 sources',
+      records: '2',
+      queries: 3,
+      state: 'Running',
+      outcome: 'Running',
+      tone: 'info',
+      badge: true,
+      scenario: 'research',
+      issueCount: 1,
+      needsInput: { count: 1, summary: 'BrightSend needs a cookie choice while other workers continue.' },
+    },
+    {
+      id: 'run_7f3a',
+      href: '/runs/run_7f3a',
+      when: '2 minutes ago',
+      createdAt: seededNow - 2 * 60_000,
+      pipeline: 'Competitor prices',
+      coverage: '3 / 3 sources',
+      records: '3',
+      queries: 3,
+      state: 'Completed',
+      outcome: 'Partial',
+      tone: 'warning',
+      badge: true,
+      scenario: 'compare',
+      defaultOpen: true,
+      issueCount: 1,
+      datasetId: 'competitor-prices',
+    },
+    {
+      id: 'run_7e91',
+      href: '/runs/run_7e91',
+      when: '1 hour ago',
+      createdAt: seededNow - 60 * 60_000,
+      pipeline: 'Outdoor catalogue',
+      coverage: '1,284 / 1,284 pages',
+      records: '1,284',
+      queries: 1284,
+      state: 'Completed',
+      outcome: 'Succeeded',
+      tone: 'success',
+      badge: true,
+      scenario: 'collect',
+      issueCount: 0,
+      datasetId: 'outdoor-catalogue',
+      domainQueue: [
+        {
+          domain: 'northwind-outdoors.example',
+          scope: 'Catalogue pages 1–1,284',
+          progress: '1,284 / 1,284',
+          status: 'Complete',
+        },
+      ],
+    },
+    {
+      id: 'run_failed_9d11',
+      href: '/runs/run_failed_9d11',
+      when: 'Yesterday',
+      createdAt: seededNow - 24 * 60 * 60_000,
+      pipeline: 'Retail availability',
+      coverage: '2 / 3 sources',
+      records: '2',
+      queries: 3,
+      state: 'Failed',
+      outcome: 'Blocked',
+      tone: 'danger',
+      scenario: 'extract',
+      issueCount: 1,
+    },
   ],
   northwind: [],
 };
@@ -148,14 +272,82 @@ const seededDatasets: Record<string, WorkspaceDataset[]> = {
     {
       id: 'competitor-prices', version: 'DATASET · V4', title: 'Competitor prices', detail: '3 records · 5 fields · 1 unresolved', status: 'Needs review', tone: 'warning', href: '/datasets/competitor-prices', recordCount: 3,
       fields: ['Retailer','Product','Price','Availability'], lastUpdated: '2 minutes ago', updatedAt: seededNow - 2 * 60_000, unresolvedCount: 1, sourceWorkflow: 'Competitor prices', sourceRunId: 'run_7f3a',
+      pipelineId: 'competitor-prices',
+      sourceRunHref: '/runs/run_7f3a',
+      review: {
+        title: 'Trailhead availability is unknown',
+        status: 'Open',
+        issueCount: 1,
+        summary: 'Trail Shop availability was not found.',
+        description: 'The product page exposes a price but no supported availability statement. Keep the field unknown or enter a reviewed value.',
+        itemDescription: 'Trail Shop · Trailhead 2P availability not found',
+        recommendation: 'Accept unknown — the page states price but not availability.',
+        captureLabel: 'Trail Shop · Trailhead 2P capture',
+        field: 'Availability',
+      },
       records: [
         { id: 'northwind', values: { Retailer:'Northwind Outdoors',Product:'Trailhead 2P Tent',Price:'€249.00',Availability:'In stock' }, evidence: { Retailer:{sourceUrl:'https://northwind-outdoors.example/tents/trailhead-2p',quote:'Northwind Outdoors — Trailhead 2P Tent.'}, Product:{sourceUrl:'https://northwind-outdoors.example/tents/trailhead-2p',quote:'Trailhead 2P Tent — €249.00 · In stock.'}, Price:{sourceUrl:'https://northwind-outdoors.example/tents/trailhead-2p',quote:'Trailhead 2P Tent — €249.00 · In stock.'}, Availability:{sourceUrl:'https://northwind-outdoors.example/tents/trailhead-2p',quote:'Trailhead 2P Tent — €249.00 · In stock.'} } },
         { id: 'summit', values: { Retailer:'Summit Supply',Product:'Trailhead Two-Person Tent',Price:'€239.00',Availability:'Low stock' }, evidence: { Retailer:{sourceUrl:'https://summit-supply.example/camping/trailhead-two-person',quote:'Summit Supply — Trailhead Two-Person Tent.'}, Product:{sourceUrl:'https://summit-supply.example/camping/trailhead-two-person',quote:'Trailhead Two-Person Tent — €239.00 · Low stock.'}, Price:{sourceUrl:'https://summit-supply.example/camping/trailhead-two-person',quote:'Trailhead Two-Person Tent — €239.00 · Low stock.'}, Availability:{sourceUrl:'https://summit-supply.example/camping/trailhead-two-person',quote:'Trailhead Two-Person Tent — €239.00 · Low stock.'} } },
         { id: 'trail-shop', values: { Retailer:'Trail Shop',Product:'Trailhead 2 Person',Price:'€259.00',Availability:'Unknown' }, evidence: { Retailer:{sourceUrl:'https://trail-shop.example/search?q=trailhead',quote:'Trail Shop — Trailhead 2 Person.'}, Product:{sourceUrl:'https://trail-shop.example/search?q=trailhead',quote:'Trailhead 2 Person — €259.00.'}, Price:{sourceUrl:'https://trail-shop.example/search?q=trailhead',quote:'Trailhead 2 Person — €259.00.'}, Availability:{sourceUrl:'https://trail-shop.example/search?q=trailhead',quote:'No availability statement appears on the captured page.'} } },
       ],
     },
-    { id: 'outdoor-catalogue', version: 'DATASET · V7', title: 'Outdoor catalogue', detail: '1,284 records · 8 fields · fully validated', status: 'Validated', tone: 'success', href: '/datasets/outdoor-catalogue', recordCount: 1284, fields: ['Product','Price','Availability','URL'], lastUpdated:'1 hour ago', updatedAt: seededNow - 60 * 60_000, unresolvedCount: 0, sourceWorkflow:'Outdoor catalogue', sourceRunId:'run_7e91', records: [{ id:'summit-solo', values:{Product:'Summit Solo Tent',Price:'€179',Availability:'In stock',URL:'northwind-outdoors.example/tents/summit-solo'}, evidence:{Product:{sourceUrl:'https://northwind-outdoors.example/tents/summit-solo',quote:'Summit Solo Tent — €179 · In stock.'},Price:{sourceUrl:'https://northwind-outdoors.example/tents/summit-solo',quote:'Summit Solo Tent — €179 · In stock.'},Availability:{sourceUrl:'https://northwind-outdoors.example/tents/summit-solo',quote:'Summit Solo Tent — €179 · In stock.'},URL:{sourceUrl:'https://northwind-outdoors.example/tents/summit-solo',quote:'Summit Solo Tent product page.'}}}] },
-    { id: 'qualified-suppliers', version: 'DATASET · V2', title: 'Qualified suppliers', detail: '74 records · 9 fields · 6 unresolved', status: 'Partial', tone: 'warning', href: '/datasets/qualified-suppliers', recordCount:74, fields:['Company','Location','Categories','Minimum order'], lastUpdated:'Yesterday', updatedAt: seededNow - 24 * 60 * 60_000, unresolvedCount: 6, sourceWorkflow:'Qualified supplier discovery', sourceRunId:'run_supplier_2b81', records:[{id:'northwind-trade',values:{Company:'Northwind Trade',Location:'Rotterdam',Categories:'Tents, packs','Minimum order':'€500'},evidence:{Company:{sourceUrl:'https://worthington-directory.example/northwind-trade',quote:'Northwind Trade — wholesale outdoor equipment.'},Location:{sourceUrl:'https://worthington-directory.example/northwind-trade',quote:'Based in Rotterdam, Netherlands.'},Categories:{sourceUrl:'https://worthington-directory.example/northwind-trade',quote:'Categories: tents and packs.'},'Minimum order':{sourceUrl:'https://worthington-directory.example/northwind-trade',quote:'Minimum order €500.'}}}] },
+    {
+      id: 'outdoor-catalogue',
+      version: 'DATASET · V7',
+      title: 'Outdoor catalogue',
+      detail: '1,284 records · 8 fields · fully validated',
+      status: 'Validated',
+      tone: 'success',
+      href: '/datasets/outdoor-catalogue',
+      recordCount: 1284,
+      fields: ['Product', 'Price', 'Availability', 'URL'],
+      lastUpdated: '1 hour ago',
+      updatedAt: seededNow - 60 * 60_000,
+      unresolvedCount: 0,
+      sourceWorkflow: 'Outdoor catalogue',
+      pipelineId: 'outdoor-catalogue',
+      sourceRunId: 'run_7e91',
+      sourceRunHref: '/runs/run_7e91',
+      review: {
+        title: 'Outdoor catalogue review resolved',
+        status: 'Resolved',
+        issueCount: 0,
+        summary: 'All required fields are supported.',
+        description: 'All required fields are supported.',
+        itemDescription: 'Northwind catalogue · all required fields supported',
+        recommendation: 'No decision required.',
+        captureLabel: 'Northwind catalogue capture',
+        field: 'Availability',
+      },
+      records: [{
+        id: 'summit-solo',
+        values: {
+          Product: 'Summit Solo Tent',
+          Price: '€179',
+          Availability: 'In stock',
+          URL: 'northwind-outdoors.example/tents/summit-solo',
+        },
+        evidence: {
+          Product: {
+            sourceUrl: 'https://northwind-outdoors.example/tents/summit-solo',
+            quote: 'Summit Solo Tent — €179 · In stock.',
+          },
+          Price: {
+            sourceUrl: 'https://northwind-outdoors.example/tents/summit-solo',
+            quote: 'Summit Solo Tent — €179 · In stock.',
+          },
+          Availability: {
+            sourceUrl: 'https://northwind-outdoors.example/tents/summit-solo',
+            quote: 'Summit Solo Tent — €179 · In stock.',
+          },
+          URL: {
+            sourceUrl: 'https://northwind-outdoors.example/tents/summit-solo',
+            quote: 'Summit Solo Tent product page.',
+          },
+        },
+      }],
+    },
+    { id: 'qualified-suppliers', version: 'DATASET · V2', title: 'Qualified suppliers', detail: '74 records · 9 fields · 6 unresolved', status: 'Partial', tone: 'warning', href: '/datasets/qualified-suppliers', recordCount:74, fields:['Company','Location','Categories','Minimum order'], lastUpdated:'Yesterday', updatedAt: seededNow - 24 * 60 * 60_000, unresolvedCount: 6, sourceWorkflow:'Qualified supplier discovery', sourceRunId:'run_supplier_2b81', sourceRunHref: '/runs/run_7f3a?run=run_supplier_2b81', records:[{id:'northwind-trade',values:{Company:'Northwind Trade',Location:'Rotterdam',Categories:'Tents, packs','Minimum order':'€500'},evidence:{Company:{sourceUrl:'https://worthington-directory.example/northwind-trade',quote:'Northwind Trade — wholesale outdoor equipment.'},Location:{sourceUrl:'https://worthington-directory.example/northwind-trade',quote:'Based in Rotterdam, Netherlands.'},Categories:{sourceUrl:'https://worthington-directory.example/northwind-trade',quote:'Categories: tents and packs.'},'Minimum order':{sourceUrl:'https://worthington-directory.example/northwind-trade',quote:'Minimum order €500.'}}}] },
   ],
   northwind: [],
 };
@@ -171,6 +363,113 @@ const seededMonitors: Record<string, WorkspaceMonitor[]> = {
   ],
   northwind: [],
 };
+const seededPipelineRepairs: Record<string, PipelineRepair[]> = {
+  studio: [
+    {
+      id: 'competitor-prices-card-layout',
+      pipelineId: 'competitor-prices',
+      pipelineName: 'Competitor prices',
+      title: 'Product cards changed',
+      summary: 'Price moved into a new offer block; availability is now a labelled badge.',
+      baseVersion: 4,
+      proposedVersion: 5,
+      status: 'Ready',
+      fields: [
+        {
+          field: 'Price',
+          before: '.product-card .price',
+          after: '[data-offer] .amount',
+          beforeEvidence: '€249.00 from the product card price node.',
+          afterEvidence: '€249.00 from the new offer amount node.',
+          beforeHref: '/runs/run_7f3a?worker=northwind&step=1',
+          afterHref: '/runs/run_7f3a?worker=northwind&step=2',
+        },
+        {
+          field: 'Availability',
+          before: '.product-card .stock',
+          after: '[data-offer] .availability-badge',
+          beforeEvidence: 'In stock from the product card text.',
+          afterEvidence: 'In stock from the labelled availability badge.',
+          beforeHref: '/runs/run_7f3a?worker=northwind&step=1',
+          afterHref: '/runs/run_7f3a?worker=northwind&step=2',
+        },
+      ],
+    },
+  ],
+  northwind: [],
+};
+const seededMonitorEvents: Record<string, MonitorEvent[]> = {
+  studio: [
+    {
+      id: 'trailhead-availability-change',
+      monitorId: 'trailhead-availability',
+      monitorName: 'Trailhead availability',
+      title: 'Trailhead availability changed',
+      field: 'Availability',
+      previousValue: 'Low stock',
+      currentValue: 'In stock',
+      evidence: 'Trailhead 2P Tent · €249.00 · In stock',
+      sourceUrl: 'https://northwind-outdoors.example/tents/trailhead-2p',
+      runId: 'run_monitor',
+      runHref: '/runs/run_monitor',
+      occurredAt: 'Today, 09:42',
+      status: 'New',
+    },
+  ],
+  northwind: [],
+};
+const seededAuditEntries: Record<string, AuditEntry[]> = {
+  studio: [
+    {
+      id: 'audit-seed-repair',
+      memberId: 'jordan',
+      memberName: 'Jordan Davis',
+      action: 'approved repair for “Competitor prices”',
+      createdAt: seededNow - 2 * 60 * 60_000,
+    },
+    {
+      id: 'audit-seed-monitor',
+      memberId: 'maya',
+      memberName: 'Maya Chen',
+      action: 'created monitor “Trailhead availability”',
+      createdAt: seededNow - 26 * 60 * 60_000,
+    },
+    {
+      id: 'audit-seed-key',
+      memberId: 'jordan',
+      memberName: 'Jordan Davis',
+      action: 'created API key “Production sync”',
+      createdAt: seededNow - 4 * 24 * 60 * 60_000,
+    },
+    {
+      id: 'audit-seed-invite',
+      memberId: 'jordan',
+      memberName: 'Jordan Davis',
+      action: 'invited 1 member as Viewer',
+      createdAt: seededNow - 9 * 24 * 60 * 60_000,
+    },
+    {
+      id: 'audit-seed-revoke',
+      memberId: 'maya',
+      memberName: 'Maya Chen',
+      action: 'revoked API key “Legacy export”',
+      createdAt: seededNow - 18 * 24 * 60 * 60_000,
+    },
+  ],
+  northwind: [],
+};
+const seededNotificationPreferences: Record<string, NotificationPreference[]> = {
+  studio: [
+    { eventType: 'Review required', inApp: true, email: true },
+    { eventType: 'Monitor change', inApp: true, email: true },
+    { eventType: 'Repair ready', inApp: true, email: false },
+  ],
+  northwind: [
+    { eventType: 'Review required', inApp: true, email: false },
+    { eventType: 'Monitor change', inApp: true, email: false },
+    { eventType: 'Repair ready', inApp: true, email: false },
+  ],
+};
 const seededEnrichments: Record<string, WorkspaceEnrichment[]> = {
   studio: [
     {
@@ -183,6 +482,7 @@ const seededEnrichments: Record<string, WorkspaceEnrichment[]> = {
       inputFields: ['company', 'website'],
       enrichedFields: ['category', 'headquarters'],
       runId: 'run_supplier_2b81',
+      runHref: '/runs/run_7f3a?run=run_supplier_2b81',
       rows: [
         {
           id: 'acme-tools',
@@ -220,6 +520,7 @@ const seededEnrichments: Record<string, WorkspaceEnrichment[]> = {
       inputFields: ['retailer', 'country'],
       enrichedFields: ['domain'],
       runId: 'run_7e91',
+      runHref: '/runs/run_7e91',
       rows: [
         {
           id: 'northwind-outdoors',
@@ -259,6 +560,32 @@ function unresolvedCountFromDetail(detail: string) {
   return Number(detail.match(/(\d+)\s+unresolved/i)?.[1] ?? 0);
 }
 
+function normalizeDatasetReview(dataset: WorkspaceDataset) {
+  if (!dataset.review) return dataset;
+  const records = dataset.records;
+  const unresolvedRecords = records
+    ? records.filter((record) => {
+        const value = record.values[dataset.review?.field ?? ''];
+        return value === null || value === 'Unknown';
+      }).length
+    : dataset.unresolvedCount ?? dataset.review.issueCount;
+  const open = dataset.review.status === 'Open' && unresolvedRecords > 0;
+  const unresolvedCount = open ? unresolvedRecords : 0;
+  const baseDetail = dataset.detail.replace(/\s·\s(?:\d+\s+unresolved|fully validated)$/, '');
+  return {
+    ...dataset,
+    unresolvedCount,
+    status: open ? 'Needs review' as const : 'Validated' as const,
+    tone: open ? 'warning' as const : 'success' as const,
+    detail: `${baseDetail} · ${open ? `${unresolvedCount} unresolved` : 'fully validated'}`,
+    review: {
+      ...dataset.review,
+      status: open ? 'Open' as const : 'Resolved' as const,
+      issueCount: unresolvedCount,
+    },
+  };
+}
+
 function normalizeRuns(collections: Record<string, WorkspaceRun[]> | undefined) {
   if (!collections) return {};
   return Object.fromEntries(Object.entries(collections).map(([workspaceId, runs]) => [
@@ -275,6 +602,8 @@ function normalizeDatasets(collections: Record<string, WorkspaceDataset[]> | und
   return Object.fromEntries(Object.entries(collections).map(([workspaceId, datasets]) => {
     const seen = new Set<string>();
     const normalized = datasets.flatMap((dataset) => {
+      if (dataset.id === 'trailhead-quick-try' || dataset.title === 'Trailhead quick try') return [];
+      const baseTitle = dataset.title.replace(/\s+\(\d+\)$/, '');
       const stableIds: Record<string,string> = {
         'SaaS pricing research': 'saas-pricing-research',
         'Extract': 'extract',
@@ -283,7 +612,8 @@ function normalizeDatasets(collections: Record<string, WorkspaceDataset[]> | und
         'Trailhead baseline': 'trailhead-baseline',
         'Competitor prices': 'competitor-prices',
       };
-      const stableId = stableIds[dataset.title] ?? dataset.id;
+      const stableId = stableIds[baseTitle]
+        ?? (baseTitle !== dataset.title ? datasetSlug(baseTitle) : dataset.id);
       if (seen.has(stableId)) return [];
       seen.add(stableId);
       const recordCount = dataset.title === 'Build a dataset' || dataset.title === 'SaaS pricing research'
@@ -294,18 +624,31 @@ function normalizeDatasets(collections: Record<string, WorkspaceDataset[]> | und
             ? 2
             : null;
       const seeded = seededDatasets[workspaceId]?.find((item) => item.id === stableId);
-      return [{
+      return [normalizeDatasetReview({
         ...seeded,
         ...dataset,
         id: stableId,
-        title: datasetDisplayName(dataset.title.replace(/\s+\(\d+\)$/, ''), stableId),
+        title: datasetDisplayName(baseTitle, stableId),
         href: `/datasets/${stableId}`,
         updatedAt: dataset.updatedAt ?? seeded?.updatedAt ?? timestampFromRelativeLabel(dataset.lastUpdated),
         unresolvedCount: dataset.unresolvedCount ?? seeded?.unresolvedCount ?? unresolvedCountFromDetail(dataset.detail),
+        review: dataset.review ? {
+          ...seeded?.review,
+          ...dataset.review,
+          itemDescription: dataset.review.itemDescription
+            ?? seeded?.review?.itemDescription
+            ?? dataset.review.summary,
+          recommendation: dataset.review.recommendation
+            ?? seeded?.review?.recommendation
+            ?? 'Review the retained evidence before deciding.',
+          captureLabel: dataset.review.captureLabel
+            ?? seeded?.review?.captureLabel
+            ?? `${baseTitle} capture`,
+        } : seeded?.review,
         detail: recordCount === null
           ? dataset.detail
           : dataset.detail.replace(/^\d+ records?/, `${recordCount} ${recordCount === 1 ? 'record' : 'records'}`),
-      }];
+      })];
     });
     return [workspaceId, normalized];
   }));
@@ -313,10 +656,8 @@ function normalizeDatasets(collections: Record<string, WorkspaceDataset[]> | und
 
 const storageKey = 'importio-studio-demo-auth';
 const reviewStateKey = 'importio-studio-review-state';
-const seededReviewState: ReviewStateMap = {
-  studio: { hasReviewItem: true, pipelineVersion: 4 },
-  northwind: { hasReviewItem: false, pipelineVersion: 4 },
-};
+const storageSchemaKey = 'importio-studio-demo-schema';
+const storageSchemaVersion = 'phase-3b-review-v3';
 const initialState = (): AuthState => ({
     session: null,
     workspaces: seededWorkspaces,
@@ -326,6 +667,10 @@ const initialState = (): AuthState => ({
     apiKeysByWorkspace: seededApiKeys,
     monitorsByWorkspace: seededMonitors,
     enrichmentsByWorkspace: seededEnrichments,
+    pipelineRepairsByWorkspace: seededPipelineRepairs,
+    monitorEventsByWorkspace: seededMonitorEvents,
+    auditEntriesByWorkspace: seededAuditEntries,
+    notificationPreferencesByWorkspace: seededNotificationPreferences,
     sourcesByWorkspace: seededSources,
 });
 
@@ -333,7 +678,8 @@ function decodeAuthState(value: unknown): AuthState {
   const fallback = initialState();
   if (!isRecord(value)) return fallback;
   const session = value.session === null || isSession(value.session) ? value.session : fallback.session;
-  const workspaces = Array.isArray(value.workspaces) && value.workspaces.every(isWorkspace) ? value.workspaces : fallback.workspaces;
+  const workspaces = (Array.isArray(value.workspaces) && value.workspaces.every(isWorkspace) ? value.workspaces : fallback.workspaces)
+    .map((workspace) => workspace.id === 'studio' ? { ...workspace, name: 'Northwind Research' } : workspace);
   const demoRole = isRole(value.demoRole) ? value.demoRole : undefined;
   return {
     session,
@@ -344,30 +690,19 @@ function decodeAuthState(value: unknown): AuthState {
     apiKeysByWorkspace: decodeWorkspaceMap(value.apiKeysByWorkspace, fallback.apiKeysByWorkspace, isWorkspaceApiKey),
     monitorsByWorkspace: decodeWorkspaceMap(value.monitorsByWorkspace, fallback.monitorsByWorkspace, isWorkspaceMonitor),
     enrichmentsByWorkspace: decodeWorkspaceMap(value.enrichmentsByWorkspace, fallback.enrichmentsByWorkspace, isWorkspaceEnrichment),
+    pipelineRepairsByWorkspace: decodeWorkspaceMap(value.pipelineRepairsByWorkspace, fallback.pipelineRepairsByWorkspace, isPipelineRepair),
+    monitorEventsByWorkspace: decodeWorkspaceMap(value.monitorEventsByWorkspace, fallback.monitorEventsByWorkspace, isMonitorEvent),
+    auditEntriesByWorkspace: decodeWorkspaceMap(value.auditEntriesByWorkspace, fallback.auditEntriesByWorkspace, isAuditEntry),
+    notificationPreferencesByWorkspace: decodeWorkspaceMap(value.notificationPreferencesByWorkspace, fallback.notificationPreferencesByWorkspace, isNotificationPreference),
     sourcesByWorkspace: decodeWorkspaceMap(value.sourcesByWorkspace, fallback.sourcesByWorkspace, isString),
     demoRole,
   };
-}
-
-function isWorkspaceReviewState(value: unknown): value is WorkspaceReviewState {
-  return isRecord(value) && typeof value.hasReviewItem === 'boolean' && typeof value.pipelineVersion === 'number';
-}
-
-function decodeReviewState(value: unknown): ReviewStateMap {
-  if (isWorkspaceReviewState(value)) return { ...seededReviewState, studio: value };
-  if (!isRecord(value)) return seededReviewState;
-  const result: ReviewStateMap = { ...seededReviewState };
-  for (const [workspaceId, review] of Object.entries(value)) {
-    if (isWorkspaceReviewState(review)) result[workspaceId] = review;
-  }
-  return result;
 }
 
 class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
   readonly source = 'mock' as const;
   readonly capabilities = mockCapabilities;
   private state = initialState();
-  private reviewState: ReviewStateMap = seededReviewState;
   private ready = false;
   private initialized = false;
   private listeners = new Set<() => void>();
@@ -382,17 +717,21 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     this.initialized = true;
     window.setTimeout(() => {
       const stored = window.localStorage.getItem(storageKey);
+      const storedSchema = window.localStorage.getItem(storageSchemaKey);
       if (stored) {
         try {
-          this.state = decodeAuthState(JSON.parse(stored));
+          const decoded = decodeAuthState(JSON.parse(stored));
+          this.state = storedSchema === storageSchemaVersion
+            ? decoded
+            : {
+                ...initialState(),
+                session: decoded.session,
+                demoRole: decoded.demoRole,
+              };
         } catch { window.localStorage.removeItem(storageKey); }
       }
-      const storedReview = window.localStorage.getItem(reviewStateKey);
-      if (storedReview) {
-        try {
-          this.reviewState = decodeReviewState(JSON.parse(storedReview));
-        } catch { window.localStorage.removeItem(reviewStateKey); }
-      }
+      window.localStorage.removeItem(reviewStateKey);
+      window.localStorage.setItem(storageSchemaKey, storageSchemaVersion);
       this.ready = true;
       this.publish();
     }, 0);
@@ -409,7 +748,7 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     this.snapshot = this.createSnapshot();
     if (this.ready && typeof window !== 'undefined') {
       window.localStorage.setItem(storageKey, JSON.stringify(this.state));
-      window.localStorage.setItem(reviewStateKey, JSON.stringify(this.reviewState));
+      window.localStorage.setItem(storageSchemaKey, storageSchemaVersion);
     }
     this.listeners.forEach((listener) => listener());
   }
@@ -428,7 +767,6 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       : null;
     const currentRole = state.session ? state.demoRole ?? state.session.role : null;
     const session = state.session && currentRole ? { ...state.session, role: currentRole } : null;
-    const currentReview = this.reviewState[session?.workspaceId ?? 'studio'] ?? { hasReviewItem: false, pipelineVersion: 4 };
     const auth: AuthInterface = {
       ready: this.ready,
       session,
@@ -442,24 +780,43 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       apiKeys: session ? state.apiKeysByWorkspace[session.workspaceId] ?? [] : [],
       monitors: session ? state.monitorsByWorkspace[session.workspaceId] ?? [] : [],
       enrichments: session ? state.enrichmentsByWorkspace[session.workspaceId] ?? [] : [],
+      pipelineRepairs: session ? state.pipelineRepairsByWorkspace[session.workspaceId] ?? [] : [],
+      monitorEvents: session ? state.monitorEventsByWorkspace[session.workspaceId] ?? [] : [],
+      auditEntries: session ? state.auditEntriesByWorkspace[session.workspaceId] ?? [] : [],
+      notificationPreferences: session ? state.notificationPreferencesByWorkspace[session.workspaceId] ?? [] : [],
       sources: session ? state.sourcesByWorkspace[session.workspaceId] ?? [] : [],
       demoRole: state.demoRole,
       ...this.auth,
       ...this.controlPlane,
     };
+    const reviewItems = auth.datasets.filter((dataset) => (
+      dataset.review?.status === 'Open'
+      && dataset.review.issueCount > 0
+      && (dataset.unresolvedCount ?? 0) > 0
+    ));
+    const reviewCount = reviewItems.length;
     const humanReview = {
-      hasReviewItem: currentReview.hasReviewItem,
-      reviewCount: currentReview.hasReviewItem ? 1 : 0,
-      pipelineVersion: currentReview.pipelineVersion,
-      pipelineStatus: currentReview.hasReviewItem ? 'Needs review' as const : 'Healthy' as const,
-      acceptReviewItem: this.acceptReviewItem,
-      restoreReviewItem: this.restoreReviewItem,
-      promotePipeline: this.promotePipeline,
+      items: reviewItems,
+      reviewCount,
+      pipelineStatus: reviewCount > 0 ? 'Needs review' as const : 'Healthy' as const,
     };
+    const reviewPipelineIds = new Set(reviewItems.map((dataset) => dataset.pipelineId).filter(Boolean));
     const recentPipelines = (mockFixtures.homePipelinesByWorkspace[session?.workspaceId ?? ''] ?? []).map((pipeline) => pipeline.reviewLinked
-      ? { ...pipeline, status: currentReview.hasReviewItem ? 'Needs review' : 'Healthy', tone: currentReview.hasReviewItem ? 'warning' as const : 'success' as const }
+      ? { ...pipeline, status: pipeline.id && reviewPipelineIds.has(pipeline.id) ? 'Needs review' : 'Healthy', tone: pipeline.id && reviewPipelineIds.has(pipeline.id) ? 'warning' as const : 'success' as const }
       : pipeline);
-    return { auth, humanReview, execution: this.execution, controlPlane: this.controlPlane, capabilities: this.capabilities, fixtures: mockFixtures, recentPipelines };
+    return {
+      auth,
+      humanReview,
+      execution: this.execution,
+      controlPlane: this.controlPlane,
+      capabilities: this.capabilities,
+      fixtures: mockFixtures,
+      recentPipelines,
+      pipelineRepairs: auth.pipelineRepairs,
+      monitorEvents: auth.monitorEvents,
+      auditEntries: auth.auditEntries,
+      notificationPreferences: auth.notificationPreferences,
+    };
   }
 
   signIn = (method: SignInMethod) => {
@@ -478,6 +835,10 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
           apiKeysByWorkspace: { ...current.apiKeysByWorkspace, [id]: [] },
           monitorsByWorkspace: { ...current.monitorsByWorkspace, [id]: [] },
           enrichmentsByWorkspace: { ...current.enrichmentsByWorkspace, [id]: [] },
+          pipelineRepairsByWorkspace: { ...current.pipelineRepairsByWorkspace, [id]: [] },
+          monitorEventsByWorkspace: { ...current.monitorEventsByWorkspace, [id]: [] },
+          auditEntriesByWorkspace: { ...current.auditEntriesByWorkspace, [id]: [] },
+          notificationPreferencesByWorkspace: { ...current.notificationPreferencesByWorkspace, [id]: seededNotificationPreferences.northwind },
           sourcesByWorkspace: { ...current.sourcesByWorkspace, [id]: [] },
         };
       }
@@ -512,6 +873,10 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       apiKeysByWorkspace: { ...current.apiKeysByWorkspace, [id]: [] },
       monitorsByWorkspace: { ...current.monitorsByWorkspace, [id]: [] },
       enrichmentsByWorkspace: { ...current.enrichmentsByWorkspace, [id]: [] },
+      pipelineRepairsByWorkspace: { ...current.pipelineRepairsByWorkspace, [id]: [] },
+      monitorEventsByWorkspace: { ...current.monitorEventsByWorkspace, [id]: [] },
+      auditEntriesByWorkspace: { ...current.auditEntriesByWorkspace, [id]: [] },
+      notificationPreferencesByWorkspace: { ...current.notificationPreferencesByWorkspace, [id]: seededNotificationPreferences.northwind },
       sourcesByWorkspace: { ...current.sourcesByWorkspace, [id]: [] },
       demoRole: undefined,
     };
@@ -519,15 +884,47 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
 
   setDemoRole = (role?: Role) => this.commit((current) => ({ ...current, demoRole: role }));
 
-  private updateMembers(updater: (members: Member[]) => Member[]) {
+  private updateMembers(updater: (members: Member[]) => Member[], auditAction?: string) {
     this.commit((current) => {
     if (!current.session) return current;
     const id = current.session.workspaceId;
-    return { ...current, membersByWorkspace: { ...current.membersByWorkspace, [id]: updater(current.membersByWorkspace[id] ?? []) } };
+    const next = { ...current, membersByWorkspace: { ...current.membersByWorkspace, [id]: updater(current.membersByWorkspace[id] ?? []) } };
+    return auditAction ? this.addAuditToState(next, id, auditAction) : next;
     });
   }
 
-  inviteMembers = (emails: string[], role: Role) => this.updateMembers((members) => [...members, ...emails.map((email) => ({ id: `invite-${email}-${Date.now()}`, name: 'Pending invite', email, role, lastActive: 'Invited', status: 'Invited' as const }))]);
+  private addAuditToState(state: AuthState, workspaceId: string, action: string) {
+    const user = state.session?.user;
+    if (!user) return state;
+    const entry: AuditEntry = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      memberId: user.id,
+      memberName: user.name,
+      action,
+      createdAt: Date.now(),
+    };
+    return {
+      ...state,
+      auditEntriesByWorkspace: {
+        ...state.auditEntriesByWorkspace,
+        [workspaceId]: [entry, ...(state.auditEntriesByWorkspace[workspaceId] ?? [])],
+      },
+    };
+  }
+
+  inviteMembers = (emails: string[], role: Role) => {
+    this.updateMembers((members) => [
+      ...members,
+      ...emails.map((email) => ({
+        id: `invite-${email}-${Date.now()}`,
+        name: 'Pending invite',
+        email,
+        role,
+        lastActive: 'Invited',
+        status: 'Invited' as const,
+      })),
+    ], `invited ${emails.length} ${emails.length === 1 ? 'member' : 'members'} as ${role}`);
+  };
   resendInvite = (id: string) => this.updateMembers((members) => members.map((member) => member.id === id ? { ...member, lastActive: 'Invited · resent now' } : member));
   revokeInvite = (id: string) => this.updateMembers((members) => members.filter((member) => member.id !== id));
 
@@ -538,7 +935,10 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     const target = members.find((member) => member.id === id);
     const owners = members.filter((member) => member.role === 'Owner' && member.status !== 'Invited');
     if (target?.role === 'Owner' && role !== 'Owner' && owners.length === 1) return { ok: false, message: 'At least one Owner must remain.' };
-    this.updateMembers((current) => current.map((member) => member.id === id ? { ...member, role } : member));
+    this.updateMembers(
+      (current) => current.map((member) => member.id === id ? { ...member, role } : member),
+      `changed ${target?.name ?? id} to ${role}`,
+    );
     return { ok: true };
   };
 
@@ -556,6 +956,7 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     read: (state: AuthState) => Record<string, T[]>,
     write: (state: AuthState, collections: Record<string, T[]>) => AuthState,
     updater: (items: T[]) => T[],
+    auditAction?: string,
   ) {
     this.commit((current) => {
       if (!current.session) return current;
@@ -563,16 +964,36 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       const collections = read(current);
       const nextItems = updater(collections[workspaceId] ?? []);
       const next = write(current, { ...collections, [workspaceId]: nextItems });
-      return {
+      const updated = {
         ...next,
         workspaces: current.workspaces.map((workspace) => workspace.id === workspaceId ? { ...workspace, empty: false } : workspace),
       };
+      return auditAction ? this.addAuditToState(updated, workspaceId, auditAction) : updated;
     });
   }
 
   addRun = (run: WorkspaceRun) => this.updateWorkspaceCollection((state) => state.runsByWorkspace, (state, runsByWorkspace) => ({ ...state, runsByWorkspace }), (runs) => [run, ...runs.filter((item) => item.id !== run.id)]);
   updateRun = (id: string, updates: Partial<WorkspaceRun>) => this.updateWorkspaceCollection((state) => state.runsByWorkspace, (state, runsByWorkspace) => ({ ...state, runsByWorkspace }), (runs) => runs.map((run) => run.id === id ? { ...run, ...updates } : run));
-  addDataset = (dataset: WorkspaceDataset) => this.updateWorkspaceCollection((state) => state.datasetsByWorkspace, (state, datasetsByWorkspace) => ({ ...state, datasetsByWorkspace }), (datasets) => [dataset, ...datasets.filter((item) => item.id !== dataset.id)]);
+  addDataset = (dataset: WorkspaceDataset) => this.updateWorkspaceCollection(
+    (state) => state.datasetsByWorkspace,
+    (state, datasetsByWorkspace) => ({ ...state, datasetsByWorkspace }),
+    (datasets) => {
+      const existing = datasets.find((item) => item.id === dataset.id);
+      const incomingSampleCount = dataset.records?.length ?? 0;
+      const preserveExistingSample = Boolean(
+        existing?.records?.length
+        && existing.recordCount
+        && existing.recordCount > incomingSampleCount,
+      );
+      const nextDataset = preserveExistingSample && existing ? {
+        ...dataset,
+        recordCount: existing.recordCount,
+        fields: existing.fields,
+        records: existing.records,
+      } : dataset;
+      return [nextDataset, ...datasets.filter((item) => item.id !== dataset.id)];
+    },
+  );
   updateDatasetValue = (datasetId: string, recordId: string, field: string, value: string, reviewedBy?: string, note?: string) => this.updateWorkspaceCollection((state) => state.datasetsByWorkspace, (state, datasetsByWorkspace) => ({ ...state, datasetsByWorkspace }), (datasets) => datasets.map((dataset) => dataset.id !== datasetId ? dataset : {
     ...dataset,
     lastUpdated: 'Just now',
@@ -593,45 +1014,116 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       };
     }),
   }));
-  setDatasetReviewState = (datasetId: string, unresolvedCount: number) => this.updateWorkspaceCollection((state) => state.datasetsByWorkspace, (state, datasetsByWorkspace) => ({ ...state, datasetsByWorkspace }), (datasets) => datasets.map((dataset) => {
-    if (dataset.id !== datasetId) return dataset;
-    const status = unresolvedCount > 0 ? 'Needs review' as const : 'Validated' as const;
-    const tone = unresolvedCount > 0 ? 'warning' as const : 'success' as const;
-    if (dataset.unresolvedCount === unresolvedCount && dataset.status === status) return dataset;
-    const baseDetail = dataset.detail.replace(/\s·\s(?:\d+\s+unresolved|fully validated)$/, '');
-    return {
-      ...dataset,
-      unresolvedCount,
-      status,
-      tone,
-      detail: `${baseDetail} · ${unresolvedCount > 0 ? `${unresolvedCount} unresolved` : 'fully validated'}`,
-      lastUpdated: 'Just now',
-      updatedAt: Date.now(),
-    };
-  }));
-  createApiKey = (key: WorkspaceApiKey) => this.updateWorkspaceCollection((state) => state.apiKeysByWorkspace, (state, apiKeysByWorkspace) => ({ ...state, apiKeysByWorkspace }), (keys) => [...keys, key]);
-  revokeApiKey = (id: string) => this.updateWorkspaceCollection((state) => state.apiKeysByWorkspace, (state, apiKeysByWorkspace) => ({ ...state, apiKeysByWorkspace }), (keys) => keys.filter((key) => key.id !== id));
-  addMonitor = (monitor: WorkspaceMonitor) => this.updateWorkspaceCollection((state) => state.monitorsByWorkspace, (state, monitorsByWorkspace) => ({ ...state, monitorsByWorkspace }), (monitors) => [monitor, ...monitors.filter((item) => item.id !== monitor.id)]);
+  setDatasetReviewState = (datasetId: string, unresolvedCount: number) => {
+    this.commit((current) => {
+      if (!current.session) return current;
+      const workspaceId = current.session.workspaceId;
+      const datasets = current.datasetsByWorkspace[workspaceId] ?? [];
+      const sourceRunId = datasets.find((item) => item.id === datasetId)?.sourceRunId;
+      const nextDatasets = datasets.map((item) => {
+        if (item.id !== datasetId) return item;
+        const status = unresolvedCount > 0 ? 'Needs review' as const : 'Validated' as const;
+        const tone = unresolvedCount > 0 ? 'warning' as const : 'success' as const;
+        const baseDetail = item.detail.replace(/\s·\s(?:\d+\s+unresolved|fully validated)$/, '');
+        return {
+          ...item,
+          unresolvedCount,
+          status,
+          tone,
+          detail: `${baseDetail} · ${unresolvedCount > 0 ? `${unresolvedCount} unresolved` : 'fully validated'}`,
+          lastUpdated: 'Just now',
+          updatedAt: Date.now(),
+          review: item.review ? {
+            ...item.review,
+            status: unresolvedCount > 0 ? 'Open' as const : 'Resolved' as const,
+            issueCount: unresolvedCount,
+          } : undefined,
+        };
+      });
+      const runs = current.runsByWorkspace[workspaceId] ?? [];
+      const nextRuns = sourceRunId ? runs.map((run) => run.id === sourceRunId ? {
+        ...run,
+        issueCount: unresolvedCount,
+        outcome: unresolvedCount > 0 ? 'Partial' as const : 'Succeeded' as const,
+        tone: unresolvedCount > 0 ? 'warning' as const : 'success' as const,
+      } : run) : runs;
+      return {
+        ...current,
+        datasetsByWorkspace: { ...current.datasetsByWorkspace, [workspaceId]: nextDatasets },
+        runsByWorkspace: { ...current.runsByWorkspace, [workspaceId]: nextRuns },
+      };
+    });
+  };
+  createApiKey = (key: WorkspaceApiKey) => {
+    this.updateWorkspaceCollection((state) => state.apiKeysByWorkspace, (state, apiKeysByWorkspace) => ({ ...state, apiKeysByWorkspace }), (keys) => [...keys, key], `created API key “${key.name}”`);
+  };
+  revokeApiKey = (id: string) => {
+    const key = this.snapshot.auth.apiKeys.find((item) => item.id === id);
+    this.updateWorkspaceCollection((state) => state.apiKeysByWorkspace, (state, apiKeysByWorkspace) => ({ ...state, apiKeysByWorkspace }), (keys) => keys.filter((item) => item.id !== id), `revoked API key “${key?.name ?? id}”`);
+  };
+  addMonitor = (monitor: WorkspaceMonitor) => {
+    this.updateWorkspaceCollection((state) => state.monitorsByWorkspace, (state, monitorsByWorkspace) => ({ ...state, monitorsByWorkspace }), (monitors) => [monitor, ...monitors.filter((item) => item.id !== monitor.id)], `created monitor “${monitor.name}”`);
+  };
   addEnrichment = (enrichment: WorkspaceEnrichment) => this.updateWorkspaceCollection((state) => state.enrichmentsByWorkspace, (state, enrichmentsByWorkspace) => ({ ...state, enrichmentsByWorkspace }), (enrichments) => [enrichment, ...enrichments.filter((item) => item.id !== enrichment.id)]);
   updateEnrichment = (id: string, updates: Partial<WorkspaceEnrichment>) => this.updateWorkspaceCollection((state) => state.enrichmentsByWorkspace, (state, enrichmentsByWorkspace) => ({ ...state, enrichmentsByWorkspace }), (enrichments) => enrichments.map((enrichment) => enrichment.id === id ? { ...enrichment, ...updates } : enrichment));
   addSource = (source: string) => this.updateWorkspaceCollection((state) => state.sourcesByWorkspace, (state, sourcesByWorkspace) => ({ ...state, sourcesByWorkspace }), (sources) => sources.includes(source) ? sources : [...sources, source]);
   removeSource = (source: string) => this.updateWorkspaceCollection((state) => state.sourcesByWorkspace, (state, sourcesByWorkspace) => ({ ...state, sourcesByWorkspace }), (sources) => sources.filter((item) => item !== source));
 
-  private updateCurrentReview(updates: Partial<WorkspaceReviewState>) {
-    const workspaceId = this.state.session?.workspaceId ?? 'studio';
-    this.reviewState = {
-      ...this.reviewState,
-      [workspaceId]: {
-        ...(this.reviewState[workspaceId] ?? { hasReviewItem: false, pipelineVersion: 4 }),
-        ...updates,
-      },
-    };
-    this.publish();
-  }
+  approvePipelineRepair = (id: string) => {
+    const repair = this.snapshot.pipelineRepairs.find((item) => item.id === id);
+    if (!repair) return;
+    this.updateWorkspaceCollection(
+      (state) => state.pipelineRepairsByWorkspace,
+      (state, pipelineRepairsByWorkspace) => ({ ...state, pipelineRepairsByWorkspace }),
+      (repairs) => repairs.map((item) => item.id === id ? { ...item, status: 'Approved' } : item),
+      `approved repair for “${repair.pipelineName}” and created v${repair.proposedVersion}`,
+    );
+  };
 
-  acceptReviewItem = () => this.updateCurrentReview({ hasReviewItem: false });
-  restoreReviewItem = () => this.updateCurrentReview({ hasReviewItem: true });
-  promotePipeline = () => this.updateCurrentReview({ pipelineVersion: 5 });
+  rollbackPipelineRepair = (id: string) => {
+    const repair = this.snapshot.pipelineRepairs.find((item) => item.id === id);
+    if (!repair) return;
+    this.updateWorkspaceCollection(
+      (state) => state.pipelineRepairsByWorkspace,
+      (state, pipelineRepairsByWorkspace) => ({ ...state, pipelineRepairsByWorkspace }),
+      (repairs) => repairs.map((item) => item.id === id ? { ...item, status: 'Rolled back' } : item),
+      `rolled back “${repair.pipelineName}” to v${repair.baseVersion}`,
+    );
+  };
+
+  acceptMonitorBaseline = (id: string) => {
+    const monitorEvent = this.snapshot.monitorEvents.find((item) => item.id === id);
+    if (!monitorEvent) return;
+    this.updateWorkspaceCollection(
+      (state) => state.monitorEventsByWorkspace,
+      (state, monitorEventsByWorkspace) => ({ ...state, monitorEventsByWorkspace }),
+      (events) => events.map((item) => item.id === id ? { ...item, status: 'Baseline accepted' } : item),
+      `accepted the new ${monitorEvent.field.toLowerCase()} baseline for “${monitorEvent.monitorName}”`,
+    );
+  };
+
+  muteMonitorField = (id: string) => {
+    const monitorEvent = this.snapshot.monitorEvents.find((item) => item.id === id);
+    if (!monitorEvent) return;
+    this.updateWorkspaceCollection(
+      (state) => state.monitorEventsByWorkspace,
+      (state, monitorEventsByWorkspace) => ({ ...state, monitorEventsByWorkspace }),
+      (events) => events.map((item) => item.id === id ? { ...item, status: 'Muted 7 days' } : item),
+      `muted ${monitorEvent.field.toLowerCase()} changes for “${monitorEvent.monitorName}” for 7 days`,
+    );
+  };
+
+  setNotificationPreference = (
+    eventType: NotificationEventType,
+    channel: 'inApp' | 'email',
+    enabled: boolean,
+  ) => this.updateWorkspaceCollection(
+    (state) => state.notificationPreferencesByWorkspace,
+    (state, notificationPreferencesByWorkspace) => ({ ...state, notificationPreferencesByWorkspace }),
+    (preferences) => preferences.map((preference) => preference.eventType === eventType
+      ? { ...preference, [channel]: enabled }
+      : preference),
+  );
 
   readonly auth = {
     getSession: () => this.snapshot.auth.session,
@@ -656,13 +1148,15 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     createApiKey: this.createApiKey,
     revokeApiKey: this.revokeApiKey,
     addMonitor: this.addMonitor,
+    approvePipelineRepair: this.approvePipelineRepair,
+    rollbackPipelineRepair: this.rollbackPipelineRepair,
+    acceptMonitorBaseline: this.acceptMonitorBaseline,
+    muteMonitorField: this.muteMonitorField,
+    setNotificationPreference: this.setNotificationPreference,
     addEnrichment: this.addEnrichment,
     updateEnrichment: this.updateEnrichment,
     addSource: this.addSource,
     removeSource: this.removeSource,
-    acceptReviewItem: this.acceptReviewItem,
-    restoreReviewItem: this.restoreReviewItem,
-    promotePipeline: this.promotePipeline,
   };
 
   readonly execution = createMockExecution(this.controlPlane, this.getSnapshot);

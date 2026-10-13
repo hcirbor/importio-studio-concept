@@ -78,3 +78,13 @@ test('input decisions and take control explain why they cannot run', async ({ pa
   await expect(page.getByRole('heading', { name: 'Check the records and their evidence.' })).toBeVisible();
   await expectAccessible(page, 'labelled input decision');
 });
+
+test('capture artefacts keep capability-driven Preview and Coming soon labels', async ({ page }) => {
+  await page.goto('/runs/run_7f3a');
+  const captures = page.getByRole('group', { name: 'Capture actions' });
+  await expect(captures.getByRole('button', { name: 'Preview' })).toHaveCount(2);
+  await expect(captures.getByRole('button', { name: 'Coming soon' })).toHaveCount(1);
+  await captures.getByRole('button', { name: 'Coming soon' }).hover();
+  await expect(captures.locator('.status-tag-note').filter({ hasText: "Full run recordings aren't available yet." })).toBeVisible();
+  await expectAccessible(page, 'labelled capture artefacts');
+});

@@ -17,6 +17,17 @@ Keep the Studio interface as the target design. Power it, one workflow at a time
 5. **CiteOtter stays read-only through the initial integration.** Any required engine change goes on a separate branch and PR with an identified company owner. Never push to its master branch.
 6. **Nothing is hidden because it isn't built.** Use "Coming soon" or "Preview" labels instead.
 
+## Design decisions
+
+Decisions recorded 13 Oct 2026 for Phase 3B review consistency:
+
+- The persistent product identity is **import.io Studio**; the product name remains distinct from the active workspace name.
+- The compact icon theme control remains visible in the top bar.
+- The top bar uses a compact **API + DB ready** design-system status badge (accessible label: **API & database ready**); the larger **Interactive demo** label is removed from the prototype shell.
+- The seeded demo workspace is the fictional team **Northwind Research**.
+- Review journeys use one shared Studio `ActionBar` composed from design-system Card, Button and spacing tokens. It is a candidate for promotion into `@importio/design-system`.
+- The installed design-system revision does not export Alert/Callout, ButtonGroup or Toast/Toaster components. Studio uses the closest existing design-system primitives and retains its existing Sonner toast until those exports are available; no replacement visual pattern is introduced.
+
 ## Architecture
 
 ```
@@ -93,8 +104,8 @@ Already carried over under new names: Memories → Runs › Saved · Groups → 
 | Medium | Enrichment retries | "Retry N failed" rows on partial enrichments |
 | Medium | Settings | Notifications and Audit log sections |
 | Medium | Qualification follow-through | "Save qualified candidates" → dataset; "Extend search" |
-| Decide | Managed handoff | "Hand to Import.io experts" in Review and Datasets (code exists but isn't shown). Restore it, or record it as an intentional removal (no contact-sales CTAs) |
-| Low | Quick try | `#try` single-page Extract preview with "Save to workspace" |
+| Removed | Managed handoff | Intentionally removed in Phase 3B: "Hand to Import.io experts" conflicts with the no-contact-sales rule and has no live-engine support. No replacement contact or sales CTA is provided. |
+| Removed | Quick try | Intentional removal — duplicates New workflow › Extract. |
 | Low | Usage | "Download JSON", usage by pipeline |
 | Low | Runs | "Load older" pagination |
 
@@ -120,6 +131,8 @@ Studio depends on `"@importio/design-system": "file:../../Import.io design syste
 Recommended: **A now, B later.** The chosen option: **A, using the public repository configured by `DESIGN_SYSTEM_REPOSITORY` (fallback: `hcirbor/importio-design-system`) at a pinned commit; no token required.**
 
 ## Decisions needed before Phase 4
+
+Phase 3B keeps automatic decision-to-`Partial` completion deferred to Phase 4A/5; the mock parity work does not define or claim that live-engine behavior.
 
 - [ ] **Repository home:** move `hcirbor/importio-studio-concept` into the Import.io company GitHub organisation before live integration, or keep it in its current owner through the preview?
 - [ ] **Live preview host** that can run a Next.js server **behind an access gate** (VPN, IAP or SSO). The likely host is the same platform as CiteOtter staging, with Studio running as its own service behind staff sign-in. Not chatgpt.site, not public, not CiteOtter's repo.

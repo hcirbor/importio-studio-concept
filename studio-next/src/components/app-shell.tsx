@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { ThemeControl } from './theme-control';
 import { CommandPalette } from './command-palette';
-import { BrandMark, Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/design-system';
+import { Badge, BrandMark, Button, Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/design-system';
 import { useStudio } from '@/lib/data';
 import { UserMenu, WorkspaceSwitcher } from './auth-controls';
 
@@ -61,7 +61,10 @@ function pageTitle(pathname: string, searchParams: QueryReader): [string, string
     const datasetName = pathname.split('/').at(-1)?.replaceAll('-', ' ').replace(/^./, (letter) => letter.toUpperCase()) ?? 'Dataset';
     return ['Datasets', datasetName, datasetName];
   }
-  if (pathname.includes('competitor-prices')) return ['Pipelines', 'Competitor prices', 'Competitor prices'];
+  if (pathname.startsWith('/pipelines/')) {
+    const pipelineName = pathname.split('/')[2]?.replaceAll('-', ' ').replace(/^./, (letter) => letter.toUpperCase()) ?? 'Pipeline';
+    return ['Pipelines', pipelineName, pipelineName];
+  }
   const name = pathname.split('/').filter(Boolean).at(-1)?.replaceAll('-', ' ') ?? 'Home';
   const current = name.replace(/^./, (letter) => letter.toUpperCase());
   return ['Studio', current, current];
@@ -243,7 +246,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, [auth.ready, auth.session, isAuthRoute, pathname, router]);
 
   if (isAuthRoute) return <>{children}</>;
-  if (!auth.ready || !auth.session) return <div className="auth-loading"><span className="demo-chip">INTERACTIVE DEMO</span><p>Opening Studio…</p></div>;
+  if (!auth.ready || !auth.session) {
+    return (
+      <div className="auth-loading">
+        <p>Opening Studio…</p>
+      </div>
+    );
+  }
   const rail = desktopNavigation && sidebarCollapsed;
   return (
     <TooltipProvider delayDuration={300}>
@@ -252,7 +261,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside ref={sidebarRef} onScroll={handleSidebarScroll} className={navOpen ? 'sidebar mobile-open' : 'sidebar'}>
         <RailTooltip enabled={rail} label="Import.io Studio"><Link href="/" className="brand" aria-label="Import.io Studio home" onClick={handleSidebarNavigation}>
           <BrandMark className="brand-mark" title="" aria-hidden="true" />
-          <span className="brand-name">import.io</span>
+          <span className="brand-name"><b>import.io</b><small>Studio</small></span>
         </Link></RailTooltip>
         <WorkspaceSwitcher collapsed={rail} />
         <nav aria-label="Primary navigation">
@@ -283,7 +292,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Button variant="ghost" className="nav-toggle" aria-label={desktopNavigation ? (sidebarCollapsed ? 'Expand navigation' : 'Collapse navigation') : (navOpen ? 'Close navigation' : 'Open navigation')} onClick={toggleNavigation}><PanelLeft /></Button>
             <Suspense fallback={<div className="breadcrumbs"><span>Build</span><i>/</i><strong>Workflow</strong></div>}><Breadcrumbs pathname={pathname} /></Suspense>
           </div>
-          <div className="top-actions"><CommandPalette /><span className="demo-chip">INTERACTIVE DEMO</span><span className="ready-chip"><i /> API &amp; database ready</span><ThemeControl /><UserMenu compact /></div>
+          <div className="top-actions">
+            <CommandPalette />
+            <Badge
+              tone="success"
+              aria-label="API & database ready"
+              title="API & database ready"
+            >
+              API + DB ready
+            </Badge>
+            <ThemeControl />
+            <UserMenu compact />
+          </div>
         </header>
         <main id="main">{auth.currentWorkspace?.empty && !['/build','/settings','/developers','/usage'].includes(pathname)
           ? <section className="empty-workspace"><span className="eyebrow">{auth.currentWorkspace.name}</span><h1>Nothing here yet</h1><p>This workspace is ready for its first workflow.</p><Button asChild><Link href="/build">Create a workflow</Link></Button></section>

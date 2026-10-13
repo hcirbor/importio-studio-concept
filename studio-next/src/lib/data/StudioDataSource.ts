@@ -11,6 +11,7 @@ export type Workspace = { id: string; name: string; subtitle: string; role: Role
 export type Member = { id: string; name: string; email: string; role: Role; lastActive: string; status?: 'Invited' };
 export type WorkspaceRun = {
   id: string;
+  href: string;
   when: string;
   createdAt?: number;
   pipeline: string;
@@ -21,7 +22,20 @@ export type WorkspaceRun = {
   outcome: 'Running' | 'Succeeded' | 'Partial' | 'Blocked';
   tone: 'info' | 'success' | 'warning' | 'danger';
   badge?: boolean;
+  defaultOpen?: boolean;
   scenario?: 'compare' | 'research' | 'collect' | 'discover' | 'extract' | 'monitor';
+  issueCount: number;
+  datasetId?: string;
+  needsInput?: {
+    count: number;
+    summary: string;
+  };
+  domainQueue?: Array<{
+    domain: string;
+    scope: string;
+    progress: string;
+    status: 'Waiting' | 'Running' | 'Complete';
+  }>;
 };
 type DatasetEvidence = { sourceUrl: string; quote: string };
 export type DatasetRecord = {
@@ -45,8 +59,21 @@ export type WorkspaceDataset = {
   updatedAt?: number;
   unresolvedCount?: number;
   sourceWorkflow?: string;
+  pipelineId?: string;
   sourceRunId?: string;
+  sourceRunHref?: string;
   records?: DatasetRecord[];
+  review?: {
+    title: string;
+    status: 'Open' | 'Resolved';
+    issueCount: number;
+    summary: string;
+    description: string;
+    itemDescription: string;
+    recommendation: string;
+    captureLabel: string;
+    field: string;
+  };
 };
 export type WorkspaceApiKey = { id: string; name: string; display: string; createdBy: string; access?: 'Full' | 'Read-only' };
 export type WorkspaceMonitor = {
@@ -61,6 +88,53 @@ export type WorkspaceMonitor = {
   fields: string[];
   alertRule: string;
   notifyVia?: NotificationChannel;
+};
+export type PipelineRepair = {
+  id: string;
+  pipelineId: string;
+  pipelineName: string;
+  title: string;
+  summary: string;
+  baseVersion: number;
+  proposedVersion: number;
+  status: 'Ready' | 'Approved' | 'Rolled back';
+  fields: Array<{
+    field: string;
+    before: string;
+    after: string;
+    beforeEvidence: string;
+    afterEvidence: string;
+    beforeHref: string;
+    afterHref: string;
+  }>;
+};
+export type MonitorEvent = {
+  id: string;
+  monitorId: string;
+  monitorName: string;
+  title: string;
+  field: string;
+  previousValue: string;
+  currentValue: string;
+  evidence: string;
+  sourceUrl: string;
+  runId: string;
+  runHref: string;
+  occurredAt: string;
+  status: 'New' | 'Baseline accepted' | 'Muted 7 days';
+};
+export type AuditEntry = {
+  id: string;
+  memberId: string;
+  memberName: string;
+  action: string;
+  createdAt: number;
+};
+export type NotificationEventType = 'Review required' | 'Monitor change' | 'Repair ready';
+export type NotificationPreference = {
+  eventType: NotificationEventType;
+  inApp: boolean;
+  email: boolean;
 };
 const NOTIFICATION_CHANNELS = ['Email', 'Slack', 'Webhook'] as const;
 export type NotificationChannel = (typeof NOTIFICATION_CHANNELS)[number];
@@ -81,6 +155,7 @@ export type WorkspaceEnrichment = {
   enrichedFields: string[];
   rows: EnrichmentRow[];
   runId?: string;
+  runHref?: string;
 };
 export type Session = { user: AuthUser; workspaceId: string; role: Role };
 export type SignInMethod =
@@ -111,6 +186,9 @@ export const CAPABILITY_IDS = [
   'monitor-rules',
   'monitor-channels',
   'cost-estimates',
+  'capture-screenshot',
+  'capture-html',
+  'capture-recording',
 ] as const;
 export type CapabilityId = (typeof CAPABILITY_IDS)[number];
 export type CapabilityMap = Readonly<Record<CapabilityId, Capability>>;
@@ -157,6 +235,7 @@ type EnrichmentRequest = { enrichmentId: string };
 
 type QualificationVerdict = 'Supported' | 'Unresolved' | 'Not supported';
 type RecentPipeline = {
+  id?: string;
   name: string;
   status: string;
   records: string;
@@ -168,7 +247,7 @@ export type MockFixtures = {
   candidates: { name: string; domain: string; detail: string }[];
   qualificationRows: { id: string; name: string; verdicts: QualificationVerdict[] }[];
   readyCandidateIds: string[];
-  pipelines: { name: string; detail: string; version: string; lastRun: string; schedule: string; status: string; tone: 'success' | 'warning'; href?: string }[];
+  pipelines: { id: string; name: string; detail: string; version: string; lastRun: string; schedule: string; status: string; tone: 'success' | 'warning'; href?: string }[];
   memoryRows: { id: string; label: string; runId: string; retention: string; status: string; tone: 'success' | 'warning'; href: string }[];
   groups: { name: string; items: string; status: string; tone: 'success' | 'warning' }[];
   usageRows: { id: string; values: string[] }[];
@@ -210,13 +289,15 @@ export interface StudioControlPlane {
   createApiKey(key: WorkspaceApiKey): void;
   revokeApiKey(id: string): void;
   addMonitor(monitor: WorkspaceMonitor): void;
+  approvePipelineRepair(id: string): void;
+  rollbackPipelineRepair(id: string): void;
+  acceptMonitorBaseline(id: string): void;
+  muteMonitorField(id: string): void;
+  setNotificationPreference(eventType: NotificationEventType, channel: 'inApp' | 'email', enabled: boolean): void;
   addEnrichment(enrichment: WorkspaceEnrichment): void;
   updateEnrichment(id: string, updates: Partial<WorkspaceEnrichment>): void;
   addSource(source: string): void;
   removeSource(source: string): void;
-  acceptReviewItem(): void;
-  restoreReviewItem(): void;
-  promotePipeline(): void;
 }
 
 interface StudioAuth {
@@ -239,20 +320,24 @@ type StudioAuthSnapshot = {
   apiKeys: WorkspaceApiKey[];
   monitors: WorkspaceMonitor[];
   enrichments: WorkspaceEnrichment[];
+  pipelineRepairs: PipelineRepair[];
+  monitorEvents: MonitorEvent[];
+  auditEntries: AuditEntry[];
+  notificationPreferences: NotificationPreference[];
   sources: string[];
   demoRole?: Role;
 };
 
 export type AuthInterface = StudioAuthSnapshot & StudioAuth & StudioControlPlane;
 type HumanReviewSnapshot = {
-  hasReviewItem: boolean;
+  items: WorkspaceDataset[];
   reviewCount: number;
-  pipelineVersion: number;
   pipelineStatus: 'Needs review' | 'Healthy';
-  acceptReviewItem(): void;
-  restoreReviewItem(): void;
-  promotePipeline(): void;
 };
+
+export function pipelineVersionForRepair(repair: PipelineRepair | undefined, fallback: number) {
+  return repair?.status === 'Approved' ? repair.proposedVersion : repair?.baseVersion ?? fallback;
+}
 export type StudioSnapshot = {
   auth: AuthInterface;
   humanReview: HumanReviewSnapshot;
@@ -261,6 +346,10 @@ export type StudioSnapshot = {
   capabilities: CapabilityMap;
   fixtures: MockFixtures;
   recentPipelines: RecentPipeline[];
+  pipelineRepairs: PipelineRepair[];
+  monitorEvents: MonitorEvent[];
+  auditEntries: AuditEntry[];
+  notificationPreferences: NotificationPreference[];
 };
 
 export interface StudioDataSource {

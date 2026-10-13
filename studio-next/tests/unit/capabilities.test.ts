@@ -19,6 +19,9 @@ describe('capability profiles', () => {
       'monitor-rules',
       'monitor-channels',
       'cost-estimates',
+      'capture-screenshot',
+      'capture-html',
+      'capture-recording',
     ]);
     expect(labelled.every((id) => Boolean(citeOtterCapabilities[id].note))).toBe(true);
     expect(citeOtterCapabilities['collect-pagination'].limit).toBe(10);

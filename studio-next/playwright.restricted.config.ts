@@ -4,6 +4,7 @@ const baseURL = 'http://127.0.0.1:3102';
 
 export default defineConfig({
   testDir: './tests/restricted',
+  outputDir: 'test-results/playwright-restricted',
   fullyParallel: false,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,

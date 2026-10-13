@@ -72,7 +72,6 @@ export default function HomePage() {
         <h2 id="lifecycle-title">One workflow, the full web-data lifecycle.</h2>
         <p>Open a capability to see its working example with the relevant request and inputs already selected.</p>
         <div className="capability-links">{Object.entries(capabilityRoutes).map(([item, href]) => <Link href={href} key={item}>{item} ↗</Link>)}</div>
-        <div className="free-preview"><strong>Free preview</strong><span>Search and single-page Fetch/Extract are free within live caps.</span></div>
       </section>
       <section className="home-support">
         <article className="support-card"><Eyebrow>Built for developers</Eyebrow><h2>The same task. In your application.</h2><p>Submit a task, keep its ID, and retrieve the result when it&apos;s ready.</p><div className="endpoint-line"><span>POST</span><code>/v1/tasks</code><span>Task interface</span></div><Link href="/developers" className="text-link">Explore the request shape ↗</Link></article>

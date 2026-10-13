@@ -1,6 +1,8 @@
 'use client';
 
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/design-system';
 import { useStudio, type DatasetRecord } from '@/lib/data';
 import { formatFieldLabel, matchingFieldNames, normalizeFieldName } from '@/lib/workflow/fields';
@@ -8,6 +10,7 @@ import { sourceDomain } from '@/lib/web/source-domain';
 import { DatasetReview } from './dataset-review';
 import { DatasetExportMenu } from './dataset-export-menu';
 import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
+import { ActionBar } from './action-bar';
 import type { WorkflowTemplateKey } from './workflow-config';
 
 type ReviewFixture = {
@@ -161,6 +164,8 @@ export function WorkflowScenarioReview({
   datasetName,
   savedDatasetId = '',
   runId,
+  back,
+  monitorCreated = false,
 }: {
   scenario: WorkflowTemplateKey;
   researchResolved?: boolean;
@@ -172,9 +177,10 @@ export function WorkflowScenarioReview({
   datasetName: string;
   savedDatasetId?: string;
   runId?: string;
+  back?: () => void;
+  monitorCreated?: boolean;
 }) {
   const execution = useStudio((snapshot) => snapshot.execution);
-  const [feedback, setFeedback] = useState('');
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
   const [engineResult, setEngineResult] = useState<{ runId: string; records: DatasetRecord[] }>();
   const engineRecords = engineResult && engineResult.runId === runId ? engineResult.records : [];
@@ -189,7 +195,16 @@ export function WorkflowScenarioReview({
   }, [customDomains.length, execution, runId]);
 
   if (scenario === 'compare') {
-    return <DatasetReview fields={customFields} onSaved={onSaved} workspaceName={workspaceName} datasetName={datasetName} savedDatasetId={savedDatasetId} />;
+    return (
+      <DatasetReview
+        fields={customFields}
+        onSaved={onSaved}
+        workspaceName={workspaceName}
+        datasetName={datasetName}
+        savedDatasetId={savedDatasetId}
+        back={back}
+      />
+    );
   }
 
   const baseFixture = scenario === 'research' ? researchFixture(researchResolved) : reviewFixtures[scenario] ?? reviewFixtures.collect!;
@@ -233,19 +248,14 @@ export function WorkflowScenarioReview({
   }
 
   return (
-    <section className="panel scenario-review">
+    <>
+      <section className="panel scenario-review">
       <div className="review-summary">
         <span>PREVIEW COMPLETE</span>
         <strong>
           {supportedCount} of {fixture.rows.length} supported {fixture.rows.length === 1 ? 'record' : 'records'} ready to review.
         </strong>
       </div>
-
-      {feedback ? (
-        <p className="review-feedback" role="status">
-          {feedback}
-        </p>
-      ) : null}
 
       <div className="table-scroll">
         <table className="data-table">
@@ -279,21 +289,47 @@ export function WorkflowScenarioReview({
       <footer className="review-footer">
         <span>Evidence retained with every supported value</span>
         <DatasetExportMenu dataset={{ title: datasetName, records: datasetRecords }} />
-        {savedDatasetId ? <><Button variant="primary" disabled>Saved</Button><Button variant="ghost" asChild><a href={`/datasets/${savedDatasetId}`}>Open dataset</a></Button></> : <Button
-          variant="primary"
-          onClick={() => {
-            if (scenario === 'monitor') {
-              onCreateMonitor?.();
-              return;
-            }
-            setFeedback(`Dataset saved to ${workspaceName}.`);
-            onSaved?.(datasetRecords, savedFields);
-          }}
-        >
-          {scenario === 'monitor' ? 'Create monitor' : 'Save dataset'}
-        </Button>}
       </footer>
       <EvidencePanel evidence={evidence} onClose={() => setEvidence(null)} />
-    </section>
+      </section>
+      <ActionBar
+        status={monitorCreated
+          ? 'Monitor created'
+          : savedDatasetId
+            ? 'Dataset saved'
+            : supportedCount < fixture.rows.length
+              ? 'Review required'
+              : 'Ready to save'}
+        summary={`${supportedCount} of ${fixture.rows.length} supported ${fixture.rows.length === 1 ? 'record' : 'records'}.`}
+        secondary={back ? (
+          <Button variant="secondary" onClick={back}>
+            Back to run
+          </Button>
+        ) : undefined}
+        primary={monitorCreated ? (
+          <Button variant="primary" asChild>
+            <Link href="/monitors">Open monitors</Link>
+          </Button>
+        ) : savedDatasetId ? (
+          <Button variant="primary" asChild>
+            <Link href={`/datasets/${savedDatasetId}`}>Open dataset</Link>
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            onClick={() => {
+              if (scenario === 'monitor') {
+                onCreateMonitor?.();
+                return;
+              }
+              toast.success(`Dataset saved to ${workspaceName}.`);
+              onSaved?.(datasetRecords, savedFields);
+            }}
+          >
+            {scenario === 'monitor' ? 'Create monitor' : 'Save dataset'}
+          </Button>
+        )}
+      />
+    </>
   );
 }

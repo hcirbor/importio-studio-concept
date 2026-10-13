@@ -5,6 +5,7 @@ import { X } from 'lucide-react';
 import { Badge, Button, Eyebrow, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/design-system';
 import { useCapability, viewerTooltip } from '@/lib/data';
 import { StatusTag } from '@/components/status-tag';
+import { ActionBar } from '@/components/action-bar';
 import { FIELD_TYPES, isFieldType, type FieldType } from '@/lib/workflow/fields';
 
 export type PlanField = { id: string; name: string; type: FieldType };
@@ -72,9 +73,27 @@ export function ReviewPlanStage(props: ReviewPlanStageProps) {
             <p className="estimate-with-status">{props.usageEstimate}{showUsageInsteadOfCost ? ' · usage estimate' : ` · ${props.costEstimate}`} <StatusTag capabilityId="cost-estimates" /></p>
           </div>
           {props.sampleLimit ? <div className="sample-run-offer"><p>That plan is above the live record limit.</p><Button variant="secondary" onClick={props.runSample}>Run a sample ({props.sampleLimit} records)</Button><StatusTag capabilityId="large-collect" /></div> : null}
-          <div className="stage-actions"><Button variant="primary" disabled={!props.mayRun || Boolean(props.fieldValidationMessage)} title={!props.mayRun ? viewerTooltip : undefined} onClick={props.startRun}>Approve and run →</Button><Button variant="secondary" onClick={props.back}>Back to describe</Button></div>
         </aside>
       </div>
+      <ActionBar
+        status="Plan ready for approval"
+        summary={`${props.sourceLabel} · ${props.fieldCount} fields · evidence required.`}
+        secondary={(
+          <Button variant="secondary" onClick={props.back}>
+            Back to describe
+          </Button>
+        )}
+        primary={(
+          <Button
+            variant="primary"
+            disabled={!props.mayRun || Boolean(props.fieldValidationMessage)}
+            title={!props.mayRun ? viewerTooltip : undefined}
+            onClick={props.startRun}
+          >
+            Approve and run →
+          </Button>
+        )}
+      />
     </section>
   </>;
 }

@@ -1,23 +1,25 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useState } from 'react';
-import { toast } from 'sonner';
+import { useSearchParams } from 'next/navigation';
 import {
   Badge,
   Button,
-  Input,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
 } from '@/components/design-system';
-import { can, useStudio, viewerTooltip } from '@/lib/data';
+import { pipelineVersionForRepair, useStudio } from '@/lib/data';
+import { ReviewDecisionControls } from './review-decision-controls';
 
-const acceptedUnknownSummary = 'The Trailhead availability item was accepted as unknown.';
-
-function PipelineFilter() {
+function PipelineFilter({ names }: { names: string[] }) {
   return (
     <Select defaultValue="all">
       <SelectTrigger aria-label="Filter review items by pipeline">
@@ -25,152 +27,64 @@ function PipelineFilter() {
       </SelectTrigger>
       <SelectContent>
         <SelectItem value="all">All pipelines</SelectItem>
-        <SelectItem value="competitor">Competitor prices</SelectItem>
+        {names.map((name) => (
+          <SelectItem value={name} key={name}>{name}</SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
 }
 
 export function ReviewInbox() {
-  const auth = useStudio((snapshot) => ({
-    session: snapshot.auth.session,
-    currentUser: snapshot.auth.currentUser,
-    updateDatasetValue: snapshot.auth.updateDatasetValue,
-    setDatasetReviewState: snapshot.auth.setDatasetReviewState,
-  }));
-  const { hasReviewItem, reviewCount, pipelineVersion, acceptReviewItem, restoreReviewItem } = useStudio((snapshot) => ({
-    hasReviewItem: snapshot.humanReview.hasReviewItem,
+  const searchParams = useSearchParams();
+  const state = useStudio((snapshot) => ({
+    datasets: snapshot.auth.datasets,
+    reviewItems: snapshot.humanReview.items,
     reviewCount: snapshot.humanReview.reviewCount,
-    pipelineVersion: snapshot.humanReview.pipelineVersion,
-    acceptReviewItem: snapshot.humanReview.acceptReviewItem,
-    restoreReviewItem: snapshot.humanReview.restoreReviewItem,
+    repairs: snapshot.pipelineRepairs,
+    setDatasetReviewState: snapshot.controlPlane.setDatasetReviewState,
   }));
-  const mayReview = can(auth.session, 'review');
-  const [editing, setEditing] = useState(false);
-  const [selectedIndex, setSelectedIndex] = useState(0);
-  const [reviewedValue, setReviewedValue] = useState('');
-  const [reviewNote, setReviewNote] = useState('');
-  const [feedback, setFeedback] = useState('');
-  const [decisionSummary, setDecisionSummary] = useState(acceptedUnknownSummary);
-
-  const showUndoToast = useCallback((message: string, undo: () => void) => {
-    toast(message, {
-      duration: 8000,
-      action: { label: 'Undo', onClick: undo },
-    });
-  }, []);
-
-  const beginEditing = useCallback(() => {
-    if (!mayReview) return;
-    setFeedback('');
-    setEditing(true);
-    setReviewedValue('In stock');
-    setReviewNote('');
-  }, [mayReview]);
-
-  function cancelEditing() {
-    setEditing(false);
-    setReviewedValue('');
-    setReviewNote('');
-  }
-
-  const queueRetry = useCallback(() => {
-    if (!mayReview) return;
-    setEditing(false);
-    setReviewedValue('');
-    setReviewNote('');
-    setFeedback('');
-    setDecisionSummary('Trailhead availability was resolved by retrying the source.');
-    auth.setDatasetReviewState('competitor-prices', 0);
-    acceptReviewItem();
-    showUndoToast('Retry completed', () => {
-      auth.setDatasetReviewState('competitor-prices', 1);
-      restoreReviewItem();
-    });
-  }, [acceptReviewItem, auth, mayReview, restoreReviewItem, showUndoToast]);
-
-  function saveReviewedValue() {
-    if (!mayReview) return;
-    const value = reviewedValue.trim();
-    const note = reviewNote.trim();
-    if (!value || !note) return;
-
-    setEditing(false);
-    setFeedback('');
-    setDecisionSummary(`Trailhead availability was reviewed and saved as “${value}”.`);
-    auth.updateDatasetValue('competitor-prices', 'trail-shop', 'Availability', value, auth.currentUser?.name ?? 'Jordan Davis', note);
-    auth.setDatasetReviewState('competitor-prices', 0);
-    acceptReviewItem();
-    showUndoToast('Value saved', () => {
-      auth.updateDatasetValue('competitor-prices', 'trail-shop', 'Availability', 'Unknown');
-      auth.setDatasetReviewState('competitor-prices', 1);
-      restoreReviewItem();
-    });
-  }
-
-  const acceptUnknown = useCallback(() => {
-    if (!mayReview) return;
-    setEditing(false);
-    setReviewedValue('');
-    setFeedback('');
-    setDecisionSummary(acceptedUnknownSummary);
-    auth.setDatasetReviewState('competitor-prices', 0);
-    acceptReviewItem();
-    showUndoToast('Unknown value accepted', () => {
-      auth.setDatasetReviewState('competitor-prices', 1);
-      restoreReviewItem();
-    });
-  }, [acceptReviewItem, auth, mayReview, restoreReviewItem, showUndoToast]);
-
-  useEffect(() => {
-    function handleShortcut(event: KeyboardEvent) {
-      const isTextInput = event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement;
-      if (isTextInput) return;
-      const key = event.key.toLowerCase();
-      if ((key === 'j' || key === 'k') && hasReviewItem) {
-        event.preventDefault();
-        setSelectedIndex(0);
-        return;
-      }
-      if (!hasReviewItem) return;
-      if (key === 'a') {
-        event.preventDefault();
-        acceptUnknown();
-      } else if (key === 'e') {
-        event.preventDefault();
-        beginEditing();
-      } else if (key === 'r') {
-        event.preventDefault();
-        queueRetry();
-      }
-    }
-
-    window.addEventListener('keydown', handleShortcut);
-    return () => window.removeEventListener('keydown', handleShortcut);
-  }, [acceptUnknown, beginEditing, hasReviewItem, queueRetry]);
-
+  const requestedDatasetId = searchParams.get('dataset');
+  const reviewDataset = state.reviewItems.find((dataset) => dataset.id === requestedDatasetId)
+    ?? state.reviewItems[0];
+  const restoreDataset = state.datasets.find((dataset) => dataset.review);
+  const review = reviewDataset?.review;
+  const reviewRecord = reviewDataset?.records?.find((record) => {
+    const value = review ? record.values[review.field] : undefined;
+    return value === null || value === 'Unknown';
+  }) ?? reviewDataset?.records?.[0];
+  const sourceEvidence = review && reviewRecord ? reviewRecord.evidence[review.field] : undefined;
+  const sourceDomain = sourceEvidence ? new URL(sourceEvidence.sourceUrl).hostname : 'source.example';
+  const itemTitle = review?.title ?? 'Field needs review';
+  const pipelineId = reviewDataset?.pipelineId;
+  const repair = state.repairs.find((item) => item.pipelineId === pipelineId);
+  const datasetVersion = Number(reviewDataset?.version.match(/V(\d+)/i)?.[1] ?? 1);
+  const pipelineVersion = pipelineVersionForRepair(repair, datasetVersion);
   function restoreDemoReview() {
-    setReviewedValue('');
-    setReviewNote('');
-    setFeedback('');
-    auth.updateDatasetValue('competitor-prices', 'trail-shop', 'Availability', 'Unknown');
-    auth.setDatasetReviewState('competitor-prices', 1);
-    restoreReviewItem();
+    if (!restoreDataset) return;
+    state.setDatasetReviewState(restoreDataset.id, 1);
   }
 
-  if (!hasReviewItem) {
+  if (!reviewDataset || !review || !reviewRecord) {
     return (
       <>
         <section className="panel review-toolbar">
-          <label>PIPELINE<PipelineFilter /></label>
-          <span>{reviewCount} items need review</span>
+          <label>
+            PIPELINE
+            <PipelineFilter names={state.reviewItems.map((dataset) => dataset.title)} />
+          </label>
+          <span>0 items need review</span>
         </section>
         <div className="panel empty-page">
           <div>
             <div className="empty-check">✓</div>
             <h2>Review queue clear</h2>
-            <p className="muted">{decisionSummary} Restore the demo item to explore the other review actions.</p>
-            <Button variant="secondary" onClick={restoreDemoReview}>Restore demo review</Button>
+            <p className="muted">The decision is complete. Restore the demo item to explore the other review actions.</p>
+            {restoreDataset ? (
+              <Button variant="secondary" onClick={restoreDemoReview}>
+                Restore demo review
+              </Button>
+            ) : null}
           </div>
         </div>
       </>
@@ -180,75 +94,100 @@ export function ReviewInbox() {
   return (
     <>
       <section className="panel review-toolbar">
-        <label>PIPELINE<PipelineFilter /></label>
-        <span>{reviewCount} item needs review</span>
-        <Button variant="secondary" disabled={!mayReview} title={!mayReview ? viewerTooltip : undefined} onClick={acceptUnknown}>Bulk accept visible</Button>
-        <small className="review-shortcuts">Keyboard shortcuts: J/K move · A accept · E enter value · R retry</small>
+        <label>
+          PIPELINE
+          <PipelineFilter names={state.reviewItems.map((dataset) => dataset.title)} />
+        </label>
+        <span>
+          {state.reviewCount} {state.reviewCount === 1 ? 'item needs' : 'items need'} review
+        </span>
+        <small className="review-shortcuts">Open the item to inspect evidence and make its decision.</small>
       </section>
       <div className="review-layout">
         <section className="panel">
-          <Button variant="ghost" className={`review-item${selectedIndex === 0 ? ' selected' : ''}`}>
-            <span className="review-index">1</span>
-            <span>
-              <strong>Trailhead availability is unknown</strong>
-              <small className="muted">Competitor prices · unresolved field</small>
-            </span>
-            <Badge tone="warning">Needs review</Badge>
-          </Button>
+          {state.reviewItems.map((dataset, index) => (
+            <Button
+              variant="ghost"
+              className={`review-item${dataset.id === reviewDataset.id ? ' selected' : ''}`}
+              asChild
+              key={dataset.id}
+            >
+              <Link href={`/review?dataset=${dataset.id}`}>
+                <span className="review-index">{index + 1}</span>
+                <span>
+                  <strong>{dataset.review?.title}</strong>
+                  <small className="muted">{dataset.review?.itemDescription}</small>
+                </span>
+                <Badge tone="warning">Needs review</Badge>
+              </Link>
+            </Button>
+          ))}
         </section>
         <aside className="panel">
           <div className="section-head">
             <div>
               <Badge tone="warning">Unresolved field</Badge>
-              <h2 style={{ margin: '9px 0 0' }}>Trailhead availability is unknown</h2>
+              <h2 style={{ margin: '9px 0 0' }}>{itemTitle}</h2>
             </div>
           </div>
           <div className="review-detail">
-            <p>The product page exposes a price but no supported availability statement. Keep the field unknown or enter a reviewed value.</p>
-            <dl className="detail-list" style={{ marginTop: 18, border: '1px solid var(--io-color-border)', borderRadius: 8 }}>
-              <div><dt>Pipeline</dt><dd><Link href="/pipelines/competitor-prices" className="text-link">Competitor prices · v{pipelineVersion} →</Link></dd></div>
-              <div><dt>Source</dt><dd><Link href="/runs/run_7f3a" className="text-link">trail-shop.example →</Link></dd></div>
-              <div><dt>Evidence</dt><dd><Link href="/runs/run_7f3a?worker=trail-shop&step=2" className="text-link">Price supported · availability absent →</Link></dd></div>
-            </dl>
-            {editing ? (
-              <div className="review-value-entry">
-                <label htmlFor="reviewed-value">Reviewed availability</label>
-                <Select value={reviewedValue} onValueChange={setReviewedValue}>
-                  <SelectTrigger id="reviewed-value" autoFocus aria-label="Reviewed availability"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="In stock">In stock</SelectItem>
-                    <SelectItem value="Low stock">Low stock</SelectItem>
-                    <SelectItem value="Out of stock">Out of stock</SelectItem>
-                  </SelectContent>
-                </Select>
-                <label htmlFor="review-source-reason">Source or reason</label>
-                <Input
-                  id="review-source-reason"
-                  value={reviewNote}
-                  onChange={(event) => setReviewNote(event.target.value)}
-                  onKeyDown={(event) => event.key === 'Enter' && saveReviewedValue()}
-                  placeholder="Required"
-                  required
-                />
-                <Button variant="primary" disabled={!reviewedValue.trim() || !reviewNote.trim()} onClick={saveReviewedValue}>
-                  Save reviewed value
-                </Button>
+            <p>{review.itemDescription}</p>
+            <Card>
+              <CardHeader>
+                <div>
+                  <CardTitle>Evidence</CardTitle>
+                  <CardDescription>{sourceDomain}</CardDescription>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <blockquote>“{sourceEvidence?.quote}”</blockquote>
+                <div className="evidence-capture-thumbnail product">
+                  <div>
+                    <i />
+                    <i />
+                    <i />
+                  </div>
+                  <strong>{review.captureLabel}</strong>
+                  <small>{sourceEvidence?.quote}</small>
+                </div>
+              </CardContent>
+            </Card>
+            <p>
+              <strong>Recommended:</strong> {review.recommendation}
+            </p>
+            <dl className="detail-list">
+              <div>
+                <dt>Pipeline</dt>
+                <dd>
+                  <Link href={`/pipelines/${pipelineId ?? reviewDataset.id}?from=review`} className="text-link">
+                    {reviewDataset.sourceWorkflow} · v{pipelineVersion} →
+                  </Link>
+                </dd>
               </div>
-            ) : null}
-            {feedback ? <p className="review-feedback retry-feedback" role="status">{feedback}</p> : null}
-            <div className="review-actions">
-              {editing ? (
-                <Button variant="secondary" onClick={cancelEditing}>Cancel</Button>
-              ) : (
-                <>
-                  <Button variant="secondary" disabled={!mayReview} title={!mayReview ? viewerTooltip : undefined} onClick={beginEditing}>Enter value</Button>
-                  <Button variant="secondary" disabled={!mayReview} title={!mayReview ? viewerTooltip : undefined} onClick={feedback ? () => setFeedback('') : queueRetry}>
-                    {feedback ? 'Cancel retry' : 'Retry'}
-                  </Button>
-                  <Button variant="primary" disabled={!mayReview} title={!mayReview ? viewerTooltip : undefined} onClick={acceptUnknown}>Accept unknown</Button>
-                </>
-              )}
-            </div>
+              <div>
+                <dt>Source</dt>
+                <dd>
+                  <Link href={`/datasets/${reviewDataset.id}?from=review`} className="text-link">
+                    {reviewDataset.title} →
+                  </Link>
+                </dd>
+              </div>
+              <div>
+                <dt>Evidence</dt>
+                <dd>
+                  <Link href={`${reviewDataset.sourceRunHref}?worker=${reviewRecord.id}&step=2&from=review`} className="text-link">
+                    Price supported · {review.field.toLowerCase()} absent →
+                  </Link>
+                </dd>
+              </div>
+            </dl>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href={`${reviewDataset.sourceRunHref}?from=review`}>Open full run</Link>
+            </Button>
+            <ReviewDecisionControls
+              datasetId={reviewDataset.id}
+              includeRetry
+            />
           </div>
         </aside>
       </div>

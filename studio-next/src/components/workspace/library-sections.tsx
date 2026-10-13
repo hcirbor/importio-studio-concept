@@ -181,7 +181,7 @@ export function EnrichmentsSection({ showHeader = true, openCreateOnMount = fals
       enrichment.name,
       `${enrichment.rowCount} ${enrichment.rowCount === 1 ? 'row' : 'rows'}`,
       <Status key="status" tone={enrichment.outcome === 'Partial' ? 'warning' : 'success'}>{enrichment.state} → {enrichment.outcome}</Status>,
-      <Button key="open" variant="ghost" size="sm" asChild>
+      <Button key="open" variant="secondary" size="sm" asChild>
         <Link href={`/datasets/enrichments/${enrichment.id}`}>Open</Link>
       </Button>,
     ],

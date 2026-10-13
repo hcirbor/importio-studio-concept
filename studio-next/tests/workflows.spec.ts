@@ -42,7 +42,7 @@ for (const template of ['extract', 'collect'] as const) {
     await openTemplate(page, template);
     await runToReview(page);
     await page.getByRole('button', { name: 'Save dataset' }).click();
-    await expect(page.getByRole('button', { name: 'Saved' })).toBeDisabled();
+    await expect(page.getByText(/Dataset saved to/)).toBeVisible();
     await expect(page.getByRole('link', { name: 'Open dataset' })).toBeVisible();
   });
 }

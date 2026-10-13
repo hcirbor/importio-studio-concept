@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/design-system';
+import { Moon, Sun } from 'lucide-react';
+import {
+  Button,
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/design-system';
 
 type Theme = 'light' | 'dark';
 
@@ -16,14 +22,31 @@ export function ThemeControl() {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
 
-  function update(next: Theme) {
+  function update() {
+    const next = theme === 'light' ? 'dark' : 'light';
     setTheme(next);
     document.documentElement.dataset.theme = next;
     window.localStorage.setItem('importio-studio-theme', next);
   }
 
-  return <Select value={theme} onValueChange={(value) => update(value as Theme)}>
-    <SelectTrigger className="theme-control" aria-label="Theme"><SelectValue /></SelectTrigger>
-    <SelectContent className="theme-menu" align="end" sideOffset={6}><SelectItem value="light">Light</SelectItem><SelectItem value="dark">Dark</SelectItem></SelectContent>
-  </Select>;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Theme"
+          aria-pressed={theme === 'dark'}
+          onClick={update}
+        >
+          {theme === 'light' ? (
+            <Sun size={16} aria-hidden="true" />
+          ) : (
+            <Moon size={16} aria-hidden="true" />
+          )}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>Theme</TooltipContent>
+    </Tooltip>
+  );
 }

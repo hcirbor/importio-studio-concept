@@ -1,6 +1,7 @@
 'use client';
 
 import { useStudio } from '@/lib/data';
+import { Button } from '@/components/design-system';
 import { PageHead, Status, TablePanel, type TableRow } from './shared';
 
 export function UsageSection() {
@@ -11,12 +12,21 @@ export function UsageSection() {
   const recentRuns = usage.usageTrend.runs;
   const recentDates = usage.usageTrend.dates;
   const usageRows: TableRow[] = usage.usageRows.map((row) => ({ id: row.id, cells: row.values }));
+  function downloadJson() {
+    const blob = new Blob([JSON.stringify({ generatedAt: new Date().toISOString(), pipelines: usage.usageRows }, null, 2)], { type: 'application/json' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'studio-usage.json';
+    link.click();
+    URL.revokeObjectURL(link.href);
+  }
   return (
     <>
       <PageHead
         group="Reference"
         title="Usage"
         description="Understand activity, limits and estimated cost before workflows become production dependencies."
+        action={<Button variant="secondary" onClick={downloadJson}>Download JSON</Button>}
       />
       <section className="panel usage-spend-banner" aria-label="Monthly spend example">
         <div><span>SPEND THIS MONTH</span><strong>$8.98 estimated</strong><small>Based on $7 per 1,000 queries · $25.00 monthly alert</small></div>
@@ -36,8 +46,8 @@ export function UsageSection() {
         </div>
       </section>
       <TablePanel
-        title="Usage by workflow"
-        headings={['Workflow', 'Runs', 'Records', 'Browser time', 'Estimated cost']}
+        title="Usage by pipeline"
+        headings={['Pipeline', 'Runs', 'Records', 'Browser time', 'Estimated cost']}
         rows={usageRows}
       />
     </>
