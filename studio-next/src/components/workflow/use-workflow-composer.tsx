@@ -1,71 +1,25 @@
 'use client';
 
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { useMemo } from 'react';
 import {
   Button,
   Eyebrow,
   Input,
 } from '@/components/design-system';
-import { resolveWorkflowTemplate, visibleStarterKeys, workflowRuntimeTemplates, workflowTemplates, type WorkflowTemplateKey } from '@/lib/workflow/templates';
+import { resolveWorkflowTemplate, workflowRuntimeTemplates, workflowTemplates, type WorkflowTemplateKey } from '@/lib/workflow/templates';
 import { can, useCapability, useStudio, type DatasetRecord } from '@/lib/data';
 import { datasetSlug } from '@/lib/dataset-slug';
-import { fieldTypeRecord, inferFieldType, inferFieldTypes, normalizeFieldName, type FieldType } from '@/lib/workflow/fields';
-import { inferWorkflowTemplate, parsePromptSpecification } from '@/lib/workflow/prompt-parser';
+import { fieldTypeRecord, inferFieldType, normalizeFieldName } from '@/lib/workflow/fields';
 import { sourceDisplayLabel, sourceDomain } from '@/lib/web/source-domain';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
-import { DescribeStage, type ComposerTool, type InputMethod } from './describe-stage';
+import { DescribeStage, type InputMethod } from './describe-stage';
 import { ReviewPlanStage, type PlanField } from './review-plan-stage';
 import { ReviewDataStage } from './review-data-stage';
 import { RunStage } from './run-stage';
 import { ToolSelect } from './tool-select';
-import { usePromptDemo } from './use-prompt-demo';
-import { useWorkflowDraft, type WorkflowDraft } from './use-workflow-draft';
-
-const workflowDraftKey = 'importio-studio-workflow-draft';
-
-function templateSources(key: WorkflowTemplateKey, workspaceSources: string[]) {
-  return [...new Set([...workflowTemplates[key].sourceUrls, ...workspaceSources])].join('\n');
-}
-
-const workflowPromptExamples = visibleStarterKeys.map((key) => ({
-  key,
-  text: workflowTemplates[key].text,
-}));
-const workflowPromptExampleTexts = workflowPromptExamples.map((example) => example.text);
-
-function parseCsvRows(text: string) {
-  return text.replace(/\r/g, '').split('\n').filter((line) => line.trim()).map((line) => {
-    const cells: string[] = [];
-    let cell = '';
-    let quoted = false;
-    for (let index = 0; index < line.length; index += 1) {
-      const character = line[index];
-      if (character === '"' && quoted && line[index + 1] === '"') {
-        cell += '"';
-        index += 1;
-      } else if (character === '"') {
-        quoted = !quoted;
-      } else if (character === ',' && !quoted) {
-        cells.push(cell.trim());
-        cell = '';
-      } else {
-        cell += character;
-      }
-    }
-    cells.push(cell.trim());
-    return cells;
-  });
-}
+import { useWorkflowComposerState } from './use-workflow-composer-state';
+import { parseCsvRows } from './csv';
+import { WorkflowComposerStepper } from './workflow-composer-stepper';
 
 export function WorkflowComposerController() {
   const searchParams = useSearchParams();
@@ -87,238 +41,9 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   }));
   const execution = useStudio((snapshot) => snapshot.execution);
   const largeCollectCapability = useCapability('large-collect');
-  const router = useRouter();
   const mayRun = can(auth.session, 'run');
-  const initialWorkspaceSources = useRef(auth.sources);
-  const activeDraftKey = `${workflowDraftKey}:${auth.session?.workspaceId ?? 'signed-out'}`;
-  const [stage, setStage] = useState(0);
-  const [mode, setMode] = useState(initialInput === 'research' ? 'guided' : 'prompt');
-  const [selected, setSelected] = useState<WorkflowTemplateKey>(initialTemplate);
-  const [prompt, setPrompt] = useState(initialPrompt);
-  const [sources, setSources] = useState<string>(() => templateSources(initialTemplate, auth.sources));
-  const [inputMethod, setInputMethod] = useState<InputMethod>(initialInput);
-  const [sourcePulse, setSourcePulse] = useState(false);
-  const [templatesOpen, setTemplatesOpen] = useState(true);
-  const [templateBrowserOpen, setTemplateBrowserOpen] = useState(false);
-  const [activeTool, setActiveTool] = useState<ComposerTool | null>(null);
-  const parsedInitialFields = initialPrompt ? parsePromptSpecification(initialPrompt).fields : [];
-  const initialFieldNames = initialPrompt
-    ? (parsedInitialFields.length ? parsedInitialFields : workflowRuntimeTemplates[initialTemplate].fields.split(',').map((field) => field.trim()))
-    : [];
-  const [fields, setFields] = useState(initialFieldNames.join(', '));
-  const [fieldTypes, setFieldTypes] = useState<Record<string, FieldType>>(() => inferFieldTypes(initialFieldNames));
-  const [editingPlanFields, setEditingPlanFields] = useState(false);
-  const [planFields, setPlanFields] = useState<PlanField[]>([]);
-  const [access, setAccess] = useState('Approved public sources');
-  const [downloads, setDownloads] = useState('Block downloads');
-  const [region, setRegion] = useState('Automatic');
-  const [missingData, setMissingData] = useState('Use null; never invent');
-  const [evidence, setEvidence] = useState('Source quote per value');
-  const [deduplication, setDeduplication] = useState('Canonical URL + primary key');
-  const [validation, setValidation] = useState('Require type match');
-  const [maxPages, setMaxPages] = useState('3');
-  const [maxRecords, setMaxRecords] = useState('10');
-  const [timeout, setTimeoutValue] = useState('5 minutes');
-  const [datasetSelection, setDatasetSelection] = useState('Competitor prices · v4');
-  const [datasetColumn, setDatasetColumn] = useState('website_url');
-  const [runtimeKey, setRuntimeKey] = useState('product_url');
-  const [runtimeType, setRuntimeType] = useState('Array of URLs');
-  const [discoveryQuery, setDiscoveryQuery] = useState('Official pricing pages for the supplied companies');
-  const [discoveryEntity, setDiscoveryEntity] = useState('Company');
-  const [discoveryLimit, setDiscoveryLimit] = useState('10');
-  const [researchSet, setResearchSet] = useState('SaaS pricing research · 74 records');
-  const [researchPolicy, setResearchPolicy] = useState('Use as leads; re-verify every fact');
-  const [guidedFeedback, setGuidedFeedback] = useState('');
-  const [csvFileLabel, setCsvFileLabel] = useState('');
-  const [csvRawRows, setCsvRawRows] = useState<string[][]>([]);
-  const [csvHeaders, setCsvHeaders] = useState<string[]>([]);
-  const [csvRows, setCsvRows] = useState<string[][]>([]);
-  const [csvColumn, setCsvColumn] = useState('');
-  const [csvHeaderMode, setCsvHeaderMode] = useState('First row contains column names');
-  const [csvDragging, setCsvDragging] = useState(false);
-  const [researchResolved, setResearchResolved] = useState(false);
-  const [savedDatasetId, setSavedDatasetId] = useState('');
-  const [savedDatasetTitle, setSavedDatasetTitle] = useState('');
-  const [runId, setRunId] = useState('');
-  const [workflowName, setWorkflowName] = useState('');
-  const [monitorDialogOpen, setMonitorDialogOpen] = useState(false);
-  const [monitorCreated, setMonitorCreated] = useState(false);
-  const [discardDialogOpen, setDiscardDialogOpen] = useState(false);
-  const [draftDirty, setDraftDirty] = useState(false);
-  const [demoStopped, setDemoStopped] = useState(Boolean(initialPrompt));
-  const csvInputRef = useRef<HTMLInputElement>(null);
-  const nextFieldId = useRef(0);
-  const template = useMemo(() => workflowTemplates[selected], [selected]);
-  const promptSpecification = useMemo(() => parsePromptSpecification(prompt), [prompt]);
-  const { typedExample, resetPromptDemo } = usePromptDemo(workflowPromptExampleTexts, !demoStopped && !prompt && mode === 'prompt' && stage === 0);
-  const currentDraft: WorkflowDraft = { dirty: true, workflowName, fieldTypes, selected, mode, inputMethod, prompt, sources, fields, access, downloads, region, missingData, evidence, deduplication, validation, maxPages, maxRecords, timeout };
-  const { draftStatus, clearDraft } = useWorkflowDraft({
-    storageKey: activeDraftKey,
-    draft: currentDraft,
-    shouldSave: draftDirty && (demoStopped || Boolean(prompt.trim()) || mode !== 'prompt'),
-    onRestore(draft) {
-      const storedPrompt = draft.prompt ?? '';
-      const isGeneratedPrompt = workflowPromptExamples.some((example) => example.text === storedPrompt) || Object.values(workflowTemplates).some((item) => item.text === storedPrompt);
-      const hasUserDraft = draft.dirty ?? (Boolean(storedPrompt.trim()) && !isGeneratedPrompt);
-      if (!hasUserDraft || initialPrompt) return;
-      setSelected(draft.selected);
-      setWorkflowName(draft.workflowName ?? '');
-      if (draft.mode === 'prompt' || draft.mode === 'guided') setMode(draft.mode);
-      setInputMethod(draft.inputMethod);
-      setPrompt(storedPrompt);
-      setSources(draft.sources ?? templateSources(initialTemplate, initialWorkspaceSources.current));
-      const restoredFields = draft.fields ?? workflowRuntimeTemplates[initialTemplate].fields;
-      const restoredFieldNames = restoredFields.split(',').map((field) => normalizeFieldName(field)).filter(Boolean);
-      setFields(restoredFields);
-      setFieldTypes(draft.fieldTypes ?? inferFieldTypes(restoredFieldNames));
-      setAccess(draft.access ?? 'Approved public sources');
-      setDownloads(draft.downloads ?? 'Block downloads');
-      setRegion(draft.region ?? 'Automatic');
-      setMissingData(draft.missingData ?? 'Use null; never invent');
-      setEvidence(draft.evidence ?? 'Source quote per value');
-      setDeduplication(draft.deduplication ?? 'Canonical URL + primary key');
-      setValidation(draft.validation ?? 'Require type match');
-      setMaxPages(draft.maxPages ?? '3');
-      setMaxRecords(draft.maxRecords ?? '10');
-      setTimeoutValue(draft.timeout ?? '5 minutes');
-      setDemoStopped(true);
-      setDraftDirty(true);
-    },
-  });
-  function markDraftDirty() {
-    setDemoStopped(true);
-    setDraftDirty(true);
-  }
-  function updateSetting<T>(setter: (value: T) => void, value: T) {
-    markDraftDirty();
-    setter(value);
-  }
-  function updateFieldsText(value: string) {
-    markDraftDirty();
-    setFields(value);
-    const names = value.split(',').map((field) => normalizeFieldName(field)).filter(Boolean);
-    setFieldTypes((current) => fieldTypeRecord(names.map((name) => [name, current[name] ?? inferFieldType(name)])));
-  }
-  function updatePrompt(value: string) {
-    markDraftDirty();
-    setPrompt(value);
-    const parsed = parsePromptSpecification(value);
-    const inferred = inferWorkflowTemplate(value);
-    if (inferred) setSelected(inferred);
-    if (parsed.domains.length) setSources(parsed.domains.map((domain) => `https://${domain}`).join('\n'));
-    setFields(parsed.fields.join(', '));
-    setFieldTypes(inferFieldTypes(parsed.fields));
-  }
-  useEffect(() => {
-    window.dispatchEvent(new CustomEvent('studio:workflow-title', { detail: prompt.trim() ? template.title : 'New workflow' }));
-  }, [prompt, template.title]);
-  useEffect(() => {
-    if (!auth.sources.length || promptSpecification.domains.length) return;
-    const timer = window.setTimeout(() => setSources((current) => [...new Set([...current.split('\n').map((source) => source.trim()).filter(Boolean), ...auth.sources])].join('\n')), 0);
-    return () => window.clearTimeout(timer);
-  }, [auth.sources, promptSpecification.domains.length]);
-  useEffect(() => {
-    const timer = window.setTimeout(() => setTemplatesOpen(sessionStorage.getItem('studio-templates-open') !== 'false'), 0);
-    return () => window.clearTimeout(timer);
-  }, []);
-  function setTemplateVisibility(open: boolean) {
-    setTemplatesOpen(open);
-    sessionStorage.setItem('studio-templates-open', String(open));
-  }
-  function discardDraft() {
-    clearDraft();
-    setSelected(initialTemplate);
-    setMode(initialInput === 'research' ? 'guided' : 'prompt');
-    setInputMethod(initialInput);
-    setPrompt(initialPrompt);
-    setWorkflowName('');
-    setDemoStopped(Boolean(initialPrompt));
-    setDraftDirty(false);
-    resetPromptDemo();
-    setSources(templateSources(initialTemplate, auth.sources));
-    const parsedResetFields = initialPrompt ? parsePromptSpecification(initialPrompt).fields : [];
-    const resetFieldNames = initialPrompt
-      ? (parsedResetFields.length ? parsedResetFields : workflowRuntimeTemplates[initialTemplate].fields.split(',').map((field) => field.trim()))
-      : [];
-    setFields(resetFieldNames.join(', '));
-    setFieldTypes(inferFieldTypes(resetFieldNames));
-    setEditingPlanFields(false);
-    setPlanFields([]);
-    setAccess('Approved public sources');
-    setDownloads('Block downloads');
-    setRegion('Automatic');
-    setMissingData('Use null; never invent');
-    setEvidence('Source quote per value');
-    setDeduplication('Canonical URL + primary key');
-    setValidation('Require type match');
-    setMaxPages('3');
-    setMaxRecords('10');
-    setTimeoutValue('5 minutes');
-  }
-  function resetNewWorkflow() {
-    const unsavedRun = Boolean(runId) && !savedDatasetId && !monitorCreated;
-    if (unsavedRun) {
-      setDiscardDialogOpen(true);
-      return;
-    }
-    performNewWorkflowReset();
-  }
-  function performNewWorkflowReset() {
-    clearDraft();
-    setStage(0);
-    setMode('prompt');
-    setSelected('research');
-    setPrompt('');
-    setSources(templateSources('research', auth.sources));
-    setInputMethod('urls');
-    setFields('');
-    setFieldTypes({});
-    setEditingPlanFields(false);
-    setPlanFields([]);
-    setActiveTool(null);
-    setResearchResolved(false);
-    setSavedDatasetId('');
-    setSavedDatasetTitle('');
-    setWorkflowName('');
-    setRunId('');
-    setMonitorDialogOpen(false);
-    setMonitorCreated(false);
-    setDraftDirty(false);
-    setDemoStopped(false);
-    resetPromptDemo();
-    setDiscardDialogOpen(false);
-    router.replace('/build', { scroll: false });
-  }
-  useEffect(() => {
-    window.addEventListener('studio:new-workflow', resetNewWorkflow);
-    return () => window.removeEventListener('studio:new-workflow', resetNewWorkflow);
-  });
-  function applyTemplate(key: WorkflowTemplateKey) {
-    markDraftDirty();
-    setSelected(key);
-    setPrompt(workflowTemplates[key].text);
-    setSources(templateSources(key, auth.sources));
-    setFields(workflowRuntimeTemplates[key].fields);
-    setFieldTypes(inferFieldTypes(workflowRuntimeTemplates[key].fields.split(',').map((field) => field.trim())));
-    setEditingPlanFields(false);
-    setPlanFields([]);
-    setInputMethod('urls');
-    setActiveTool(null);
-    setResearchResolved(false);
-    setSavedDatasetId('');
-    setSavedDatasetTitle('');
-    setWorkflowName('');
-    setSourcePulse(true);
-    window.setTimeout(() => setSourcePulse(false), 520);
-  }
-  function chooseInputMethod(method: InputMethod) {
-    markDraftDirty();
-    setInputMethod(method);
-    setGuidedFeedback('');
-    setSourcePulse(false);
-    requestAnimationFrame(() => setSourcePulse(true));
-    window.setTimeout(() => setSourcePulse(false), 520);
-  }
+  const composer = useWorkflowComposerState({ initialTemplate, initialInput, initialPrompt, workspaceSources: auth.sources, workspaceId: auth.session?.workspaceId });
+  const { stage, setStage, mode, setMode, selected, prompt, setPrompt, sources, setSources, inputMethod, sourcePulse, templatesOpen, templateBrowserOpen, setTemplateBrowserOpen, activeTool, setActiveTool, fields, setFields, fieldTypes, setFieldTypes, editingPlanFields, setEditingPlanFields, planFields, setPlanFields, access, setAccess, downloads, setDownloads, region, setRegion, missingData, setMissingData, evidence, setEvidence, deduplication, setDeduplication, validation, setValidation, maxPages, setMaxPages, maxRecords, setMaxRecords, timeout, setTimeoutValue, datasetSelection, setDatasetSelection, datasetColumn, setDatasetColumn, runtimeKey, setRuntimeKey, runtimeType, setRuntimeType, discoveryQuery, setDiscoveryQuery, discoveryEntity, setDiscoveryEntity, discoveryLimit, setDiscoveryLimit, researchSet, setResearchSet, researchPolicy, setResearchPolicy, guidedFeedback, setGuidedFeedback, csvFileLabel, setCsvFileLabel, csvRawRows, setCsvRawRows, csvHeaders, setCsvHeaders, csvRows, setCsvRows, csvColumn, setCsvColumn, csvHeaderMode, setCsvHeaderMode, csvDragging, setCsvDragging, researchResolved, setResearchResolved, savedDatasetId, setSavedDatasetId, savedDatasetTitle, setSavedDatasetTitle, runId, setRunId, workflowName, setWorkflowName, monitorDialogOpen, setMonitorDialogOpen, monitorCreated, setMonitorCreated, discardDialogOpen, setDiscardDialogOpen, draftDirty, demoStopped, setDemoStopped, csvInputRef, nextFieldIdRef, template, promptSpecification, typedExample, draftStatus, markDraftDirty, updateSetting, updateFieldsText, updatePrompt, setTemplateVisibility, discardDraft, performNewWorkflowReset, applyTemplate, chooseInputMethod } = composer;
   function applyCsvColumn(header: string, headers = csvHeaders, rows = csvRows) {
     markDraftDirty();
     setCsvColumn(header);
@@ -410,7 +135,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     markDraftDirty();
   }
   function openPlanFieldEditor() {
-    setPlanFields(fieldDefinitions.map((field) => ({ ...field, id: `plan-field-${nextFieldId.current += 1}` })));
+    setPlanFields(fieldDefinitions.map((field) => ({ ...field, id: `plan-field-${nextFieldIdRef.current += 1}` })));
     setEditingPlanFields(true);
   }
   function finishPlanFieldEditor() {
@@ -470,40 +195,14 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
             : <section className="guided-source-card"><div className="guided-source-intro"><Eyebrow>Prior research</Eyebrow><strong>Continue from reviewed research</strong><p>Reuse retained leads as labelled context, then verify every requested fact against live sources.</p></div><div className="guided-option-controls"><div className="guided-option-grid guided-option-grid-three"><ToolSelect label="Prior research" value={researchSet} onValueChange={(value) => { markDraftDirty(); setResearchSet(value); setGuidedFeedback(''); }} options={['SaaS pricing research · 74 records','Retailer coverage study · 128 records','Supplier discovery · 42 records']} /><ToolSelect label="Reuse policy" value={researchPolicy} onValueChange={(value) => { markDraftDirty(); setResearchPolicy(value); setGuidedFeedback(''); }} options={['Use as leads; re-verify every fact','Use only to seed discovery']} /><div className="guided-retention"><span>Retention</span><strong>24 days remaining</strong></div></div><Button variant="secondary" type="button" onClick={usePriorResearch}>Use selected research</Button>{guidedFeedback ? <p className="guided-option-status" role="status">{guidedFeedback}</p> : null}</div></section>;
 
   const stepper = (
-    <>
-    <div className="stepper" aria-label="Workflow progress">
-      {['Describe', 'Review plan', 'Watch run', 'Review data'].map((label, index) => (
-        <div className="step-segment" key={label}>
-          <Button
-            variant="ghost"
-            className={index === stage ? 'step active' : index < stage ? 'step done' : 'step'}
-            onClick={() => {
-              if (index > stage) return;
-              if (index === 0) setEditingPlanFields(false);
-              setStage(index);
-            }}
-            disabled={index > stage}
-          >
-            <i>{index < stage ? '✓' : index + 1}</i>
-            {label}
-          </Button>
-          {index < 3 ? <i className="step-line" /> : null}
-        </div>
-      ))}
-    </div>
-    <AlertDialog open={discardDialogOpen} onOpenChange={setDiscardDialogOpen}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Discard this run?</AlertDialogTitle>
-          <AlertDialogDescription>The run and its results won&apos;t be saved.</AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel asChild><Button variant="secondary">Cancel</Button></AlertDialogCancel>
-          <AlertDialogAction asChild><Button variant="primary" onClick={performNewWorkflowReset}>Discard</Button></AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-    </>
+    <WorkflowComposerStepper
+      stage={stage}
+      setStage={setStage}
+      discardOpen={discardDialogOpen}
+      setDiscardOpen={setDiscardDialogOpen}
+      resetWorkflow={performNewWorkflowReset}
+      stopEditing={() => setEditingPlanFields(false)}
+    />
   );
 
   const runtimeTemplate = workflowRuntimeTemplates[selected];
@@ -568,7 +267,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   }
 
   if (stage === 1) {
-    return <ReviewPlanStage stepper={stepper} templateType={template.type} sourceLabel={sourceLabel} fieldCount={fieldCount} workflowName={workflowName} suggestedWorkflowName={suggestedWorkflowName} onWorkflowName={(value) => { markDraftDirty(); setWorkflowName(value); }} missingData={missingData} evidence={evidence} sourceDomains={sourceDomains} editingPlanFields={editingPlanFields} fieldValidationMessage={fieldValidationMessage} finishPlanFieldEditor={finishPlanFieldEditor} openPlanFieldEditor={openPlanFieldEditor} planFields={planFields} syncPlanFieldRows={syncPlanFieldRows} addPlanField={() => syncPlanFieldRows([...planFields, { id: `plan-field-${nextFieldId.current += 1}`, name: '', type: 'text' }])} fieldDefinitions={fieldDefinitions} usageEstimate={usageEstimate} costEstimate={costEstimate} mayRun={mayRun} startRun={() => void startRun()} sampleLimit={sampleLimit} runSample={() => { setMaxRecords(String(sampleLimit)); void startRun(); }} needsInputDecision={selected === 'research'} back={() => { setEditingPlanFields(false); setStage(0); }} />;
+    return <ReviewPlanStage stepper={stepper} templateType={template.type} sourceLabel={sourceLabel} fieldCount={fieldCount} workflowName={workflowName} suggestedWorkflowName={suggestedWorkflowName} onWorkflowName={(value) => { markDraftDirty(); setWorkflowName(value); }} missingData={missingData} evidence={evidence} sourceDomains={sourceDomains} editingPlanFields={editingPlanFields} fieldValidationMessage={fieldValidationMessage} finishPlanFieldEditor={finishPlanFieldEditor} openPlanFieldEditor={openPlanFieldEditor} planFields={planFields} syncPlanFieldRows={syncPlanFieldRows} addPlanField={() => syncPlanFieldRows([...planFields, { id: `plan-field-${nextFieldIdRef.current += 1}`, name: '', type: 'text' }])} fieldDefinitions={fieldDefinitions} usageEstimate={usageEstimate} costEstimate={costEstimate} mayRun={mayRun} startRun={() => void startRun()} sampleLimit={sampleLimit} runSample={() => { setMaxRecords(String(sampleLimit)); void startRun(); }} needsInputDecision={selected === 'research'} back={() => { setEditingPlanFields(false); setStage(0); }} />;
   }
 
   if (stage === 2) {

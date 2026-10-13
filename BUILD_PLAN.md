@@ -76,8 +76,8 @@ Naming: CiteOtter's `review` is an automated evidence check. Studio's human inbo
 | 2R | **Code review + cleanup** | P3R | Written review (duplication, components over ~300 lines, `any`, dead code, per-template special cases, text-matching logic); then one cleanup with no visual changes; quality baseline reduced | Yes, demo | `cleanup-1` | Review report saved in `docs/reviews/`; baseline violations reduced; 0 visual differences |
 | 3 | Status labels | P4 | Capabilities map + StatusTag; off on demo | Yes, demo (labels off) | `status-tags` | 0 differences with labels off; labelled states tested |
 | 3B | **Feature parity with the HTML concept** | P4B | Restore features lost in the React port (see "Parity gaps"), on mock data, with status labels where the engine can't support them yet | Yes, demo | `parity-1` | Every gap is either restored or recorded as an intentional removal; journey tests added for each restored flow |
-| 4A | **Engine contract** | P4A | Define and test the production engine contract against mock implementations only | No | `engine-contract` | The contract covers phases 7–10 and the production engine path is confirmed before live feature work begins |
-| 4 | Protected live host + server | P5 | Server build; access gate; allowlisted `/api/engine/*` proxy; health and Extract smoke test | Yes, live preview | `live-gateway` | Gate blocks anonymous access; `/healthz` OK; bounded Extract smoke test passes (provider path works); no credential reaches the browser |
+| 4A | **Engine contract** | P4A | Define and test the production engine contract against mock implementations only | No | `engine-contract` | The contract covers phases 5–10 against mock implementations and is reviewed |
+| 4 | Protected live host + server | P5 | Server build; access gate; allowlisted `/api/engine/*` proxy; health and Extract smoke test | Yes, live preview | `live-gateway` | Gate blocks anonymous access; `/healthz` OK; bounded Extract smoke test passes and confirms the production engine path; no credential reaches the browser |
 | 5 | Extract, live | P6 | Live ExecutionEngine for "Extract from a page" | Live preview | `live-extract` | Supported public HTTPS pages run end to end: plan → run → evidence → dataset → export; blocked/unavailable pages show a clear state |
 | 5R | **Human engineering review** | — | An engineer reviews the CiteOtter translation, the `/api/engine/*` server, the access gate and credential handling. Findings fixed in a follow-up prompt | No | `live-extract-reviewed` | Named reviewer signs off; blocking findings fixed. No wider access to the live preview before this |
 | 6 | Compare + harden | P7 | 10-URL mock-vs-live comparison; error states; usage metrics kept, `cost_usd` unknown | Live preview | `live-extract-hardened` | Blocked, timeout and null cases handled; comparison report written |
@@ -131,17 +131,30 @@ Studio depends on `"@importio/design-system": "file:../../Import.io design syste
 
 Recommended: **A now, B later.** The chosen option: **A, using the public repository configured by `DESIGN_SYSTEM_REPOSITORY` (fallback: `hcirbor/importio-design-system`) at a pinned commit; no token required.**
 
+## Phase 4 host
+
+The host decision is open.
+
+- **Option A (original):** Studio runs as its own service on the Kapeta/Storm Hetzner staging Kubernetes cluster, next to CiteOtter. This needs a `kapeta-cloud-infra` PR, a private registry repository, DNS, a SealedSecret and the repositories moved into the `kapetacom` organisation. It is blocked on approvals while the CiteOtter owner is away.
+- **Option B (CEO request, 13 Oct 2026):** Host on a company account the team controls. Candidates are Google Cloud Run + IAP or Cloudflare Workers + Access, depending on which company account is available. Limit Google sign-in to `neuralogics.com`, use the provider's default URL without DNS, and store the CiteOtter credential as a host secret. Moving to Option A later remains possible.
+- **Either way:** Studio reaches CiteOtter over public HTTPS, has no direct database access, and keeps the CiteOtter credential as a server-held host secret. The live preview is not `chatgpt.site`, not public, and not hosted in CiteOtter's repository. Internal-model cost is already resolved. Phase 5R human engineering review is required before wider access.
+
+**Decision: unresolved.**
+
 ## Decisions needed before Phase 4
 
-Phase 3B keeps automatic decision-to-`Partial` completion deferred to Phase 4A/5; the mock parity work does not define or claim that live-engine behavior.
+Phase 3B review decisions remain Studio-side. Phase 4A defines how accepted unknowns affect the displayed outcome, while the stored engine outcome remains unchanged.
 
-- [ ] **Repository home:** move `hcirbor/importio-studio-concept` into the Import.io company GitHub organisation before live integration, or keep it in its current owner through the preview?
-- [ ] **Live preview host** that can run a Next.js server **behind an access gate** (VPN, IAP or SSO). The likely host is the same platform as CiteOtter staging, with Studio running as its own service behind staff sign-in. Not chatgpt.site, not public, not CiteOtter's repo.
-- [ ] **CiteOtter staging credential** (shared Basic auth), who issues it while the engineer is away, and where it's stored server-side.
+- [ ] **Chosen host/company account:** choose Option A or Option B above and identify the company-owned account.
+- [ ] **CiteOtter credential issuer:** name who issues the shared Basic-auth credential; store it only as a server-side host secret.
+- [ ] **Repository move/ownership:** decide whether `hcirbor/importio-studio-concept` and CiteOtter-related infrastructure repositories move into the `kapetacom` organisation, and identify their owner.
 - [x] **Amber staging cost:** Amber is an internal model; staging usage needs no sign-off.
-- [ ] **Production engine path confirmed before phases 7–10.**
-- [ ] **His manager or the CTO is told,** and a company owner is named for any CiteOtter change.
-- [ ] **Phase 5R reviewer named** (an engineer who signs off the live integration).
+- [ ] **Named company owner for any CiteOtter change:** required before any separate CiteOtter branch or PR; initial integration remains read-only.
+- [ ] **CTO or platform owner informed:** confirm the live-host and ownership plan has been communicated.
+- [ ] **Confirmed production engine path:** confirm the hosted Studio → `/api/engine/*` → public HTTPS CiteOtter route before phases 7–10.
+- [ ] **Named Phase 5R reviewer:** an engineer must sign off the live integration before wider access.
+
+Phase 5 adapter wiring carries the remaining legacy boundary work: split `mock-control-plane.ts`; remove the three `window.dispatchEvent` bridges; replace the UI-shaped `RunEvent.presentation`; and close review findings R2, R3, R9 and R13 as detailed in `studio-next/docs/engine-contract.md`.
 
 ## Rollback (non-destructive only)
 

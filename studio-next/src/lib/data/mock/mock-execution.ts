@@ -1,6 +1,6 @@
 import { uniqueDatasetIdentity } from '@/lib/dataset-slug';
 import type {
-  EnrichmentCell, ExecutionEngine, MonitorRequest, RunEvent, RunPresentation, RunWorker,
+  EnrichmentCell, StudioExecutionFacade, MonitorRequest, RunEvent, RunPresentation, RunWorker,
   StudioControlPlane, StudioSnapshot, WorkflowPlan, WorkflowRequest, WorkspaceRun,
 } from '@/lib/data/StudioDataSource';
 import { mockDomainRecord } from '@/lib/data/mock/mock-web-data';
@@ -72,7 +72,7 @@ function enrichedValue(field: string, rowIndex: number, values: Record<string, s
   return { value, verdict: 'Supported', evidence: { sourceUrl: source || `https://source-${rowIndex + 1}.example`, quote: field === 'category' ? `${subject} describes its business as ${value.toLowerCase()}.` : `${subject} lists ${value} as its main office.` } };
 }
 
-export function createMockExecution(controlPlane: StudioControlPlane, getSnapshot: () => StudioSnapshot): ExecutionEngine {
+export function createMockExecution(controlPlane: StudioControlPlane, getSnapshot: () => StudioSnapshot): StudioExecutionFacade {
   const listeners = new Map<string, Set<(event: RunEvent) => void>>();
   const presentations = new Map<string, RunPresentation>(Object.entries(seededPresentations));
   const runResults = new Map<string, ReturnType<typeof mockDomainRecord>[]>();

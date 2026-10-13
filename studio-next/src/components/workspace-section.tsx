@@ -1,10 +1,17 @@
 'use client';
 
 import { redirect } from 'next/navigation';
-import { CandidatesSection, SearchSection } from './workspace/discovery-sections';
+import { CandidatesSection } from './discovery/candidates-section';
+import { SearchSection } from './discovery/search-section';
 import { BatchesSection, SavedRunsSection } from './workspace/library-sections';
-import { DatasetsSection, MonitorsSection, PipelinesSection, RunsSection } from './workspace/operate-sections';
-import { DevelopersSection, SettingsSection, UsageSection, WebhooksSection } from './workspace/reference-sections';
+import { DatasetsSection } from './workspace/datasets-section';
+import { MonitorsSection } from './workspace/monitors-section';
+import { PipelinesSection } from './workspace/pipelines-section';
+import { RunsSection } from './workspace/runs-section';
+import { DevelopersSection } from './workspace/developers-section';
+import { SettingsSection } from './workspace/settings-section';
+import { UsageSection } from './workspace/usage-section';
+import { WebhooksSection } from './workspace/webhooks-section';
 import { SectionTabs, useSectionTab, type SectionTab } from './workspace/section-tabs';
 import { PageHead } from './workspace/shared';
 
