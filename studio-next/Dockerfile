@@ -21,7 +21,6 @@ ENV HOSTNAME=0.0.0.0
 ENV PORT=8080
 WORKDIR "/app/Import Studio/studio-next"
 COPY --from=builder --chown=node:node ["/workspace/Import Studio/studio-next/.next/standalone/", "/app/"]
-COPY --from=builder --chown=node:node ["/workspace/Import Studio/studio-next/public/", "/app/Import Studio/studio-next/public/"]
 COPY --from=builder --chown=node:node ["/workspace/Import Studio/studio-next/.next/static/", "/app/Import Studio/studio-next/.next/static/"]
 USER node
 EXPOSE 8080
