@@ -70,7 +70,6 @@ export class MockContractExecutionEngine implements ExecutionEngine {
       ...request,
       id: `plan-${this.plans.size + 1}`,
       createdAt: new Date(0).toISOString(),
-      requiresHumanInput: false,
     };
     this.plans.set(plan.id, plan);
     return { ok: true, value: plan };

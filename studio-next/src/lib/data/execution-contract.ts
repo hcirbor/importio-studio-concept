@@ -19,7 +19,6 @@ export type ExecutionRequest = {
 export type ExecutionPlan = ExecutionRequest & {
   id: string;
   createdAt: string;
-  requiresHumanInput: boolean;
 };
 
 export type ValidationIssue = {
@@ -184,14 +183,29 @@ export type SearchResult = {
   description: string;
 };
 
-export function deriveStudioOutcome(run: ExecutionRun, results: RunResults): RunOutcome {
+export type AcceptedUnknownField = {
+  recordId: string;
+  field: string;
+};
+
+export function deriveStudioOutcome(run: ExecutionRun, results: RunResults, acceptedUnknowns: readonly AcceptedUnknownField[] = []): RunOutcome {
   if (run.failure) return run.outcome;
   if (run.state !== 'completed') return null;
-  if (run.outcome === 'partial') return 'partial';
   const required = results.fields.filter((field) => field.required);
   if (!results.records.length && required.length) return 'partial';
-  const unresolved = results.records.some((record) => required.some((field) => record.fields[field.name]?.verdict !== 'supported'));
-  return unresolved ? 'partial' : 'succeeded';
+  const accepted = new Set(acceptedUnknowns.map(({ recordId, field }) => JSON.stringify([recordId, field])));
+  let resolvedByAcceptance = false;
+  const unresolved = results.records.some((record) => required.some((field) => {
+    const verdict = record.fields[field.name]?.verdict;
+    if (verdict === 'supported') return false;
+    const acceptedUnknown = (verdict === 'unknown' || verdict === 'not_stated')
+      && accepted.has(JSON.stringify([record.id, field.name]));
+    if (acceptedUnknown) resolvedByAcceptance = true;
+    return !acceptedUnknown;
+  }));
+  if (unresolved) return 'partial';
+  if (run.outcome === 'partial' && !resolvedByAcceptance) return 'partial';
+  return 'succeeded';
 }
 
 export interface ExecutionEngine {

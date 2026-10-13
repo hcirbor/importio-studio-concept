@@ -136,6 +136,37 @@ describe('production ExecutionEngine contract', () => {
     expect(deriveStudioOutcome(partialRun, { runId: partial.id, datasetId: null, fields: planned.fields, records: [{ id: 'record-1', fields: { name: { value: 'Trailhead', verdict: 'supported', evidenceIds: [] } } }] })).toBe('partial');
   });
 
+  it('resolves a field-derived partial outcome when Studio accepts that record field as unknown', async () => {
+    const engine = new MockContractExecutionEngine();
+    const planned = await plan(engine, { fields: [{ name: 'name', required: true }] });
+    const started = value(await engine.startRun(planned));
+    engine.seedRun(started.id, {
+      records: [
+        { id: 'record-1', fields: { name: { value: null, verdict: 'not_stated', evidenceIds: [] } } },
+        { id: 'record-2', fields: { name: { value: null, verdict: 'unknown', evidenceIds: [] } } },
+      ],
+    });
+    engine.completeRun(started.id, 'partial');
+    const run = value(await engine.getRun(started.id));
+    const results = value(await engine.getResults(started.id));
+
+    expect(deriveStudioOutcome(run, results, [{ recordId: 'record-1', field: 'name' }])).toBe('partial');
+    expect(deriveStudioOutcome(run, results, [
+      { recordId: 'record-1', field: 'name' },
+      { recordId: 'record-2', field: 'name' },
+    ])).toBe('succeeded');
+  });
+
+  it.each(['conflicting', 'not_run'] as const)('does not let Studio acceptance resolve %s fields', async (verdict) => {
+    const engine = new MockContractExecutionEngine();
+    const planned = await plan(engine, { fields: [{ name: 'name', required: true }] });
+    const started = value(await engine.startRun(planned));
+    engine.seedRun(started.id, { records: [{ id: 'record-1', fields: { name: { value: null, verdict, evidenceIds: [] } } }] });
+    engine.completeRun(started.id, 'partial');
+    const run = value(await engine.getRun(started.id));
+    expect(deriveStudioOutcome(run, value(await engine.getResults(started.id)), [{ recordId: 'record-1', field: 'name' }])).toBe('partial');
+  });
+
   it('keeps measured usage while costUsd is always unknown', async () => {
     const engine = new MockContractExecutionEngine();
     const started = value(await engine.startRun(await plan(engine)));

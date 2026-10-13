@@ -136,14 +136,14 @@ Recommended: **A now, B later.** The chosen option: **A, using the public reposi
 The host decision is open.
 
 - **Option A (original):** Studio runs as its own service on the Kapeta/Storm Hetzner staging Kubernetes cluster, next to CiteOtter. This needs a `kapeta-cloud-infra` PR, a private registry repository, DNS, a SealedSecret and the repositories moved into the `kapetacom` organisation. It is blocked on approvals while the CiteOtter owner is away.
-- **Option B (CEO request, 13 Oct 2026):** Host on a company account the team controls. The preferred candidate is Google Cloud Run + IAP; Cloudflare Workers + Access remains an alternative. Limit Google sign-in to `neuralogics.com`, use the provider's default URL without DNS, and store the CiteOtter credential as a host secret. Moving to Option A later remains possible.
+- **Option B (CEO request, 13 Oct 2026):** Host on a company account the team controls. Candidates are Google Cloud Run + IAP or Cloudflare Workers + Access, depending on which company account is available. Limit Google sign-in to `neuralogics.com`, use the provider's default URL without DNS, and store the CiteOtter credential as a host secret. Moving to Option A later remains possible.
 - **Either way:** Studio reaches CiteOtter over public HTTPS, has no direct database access, and keeps the CiteOtter credential as a server-held host secret. The live preview is not `chatgpt.site`, not public, and not hosted in CiteOtter's repository. Internal-model cost is already resolved. Phase 5R human engineering review is required before wider access.
 
 **Decision: unresolved.**
 
 ## Decisions needed before Phase 4
 
-Phase 3B keeps automatic decision-to-`Partial` completion deferred to Phase 4A/5; the mock parity work does not define or claim that live-engine behavior.
+Phase 3B review decisions remain Studio-side. Phase 4A defines how accepted unknowns affect the displayed outcome, while the stored engine outcome remains unchanged.
 
 - [ ] **Chosen host/company account:** choose Option A or Option B above and identify the company-owned account.
 - [ ] **CiteOtter credential issuer:** name who issues the shared Basic-auth credential; store it only as a server-side host secret.
