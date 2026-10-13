@@ -1,5 +1,9 @@
 node_modules
 .next
 out
+src/app/api/engine
+src/app/healthz
+src/app/readyz
+src/proxy.ts
 .DS_Store
 *.tsbuildinfo

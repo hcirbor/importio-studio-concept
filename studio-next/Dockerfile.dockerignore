@@ -1,0 +1,13 @@
+*
+!Import Studio/studio-next/
+!Import Studio/studio-next/**
+!Import.io design system/
+!Import.io design system/**
+Import Studio/studio-next/.next/
+Import Studio/studio-next/node_modules/
+Import Studio/studio-next/out/
+Import Studio/studio-next/playwright-report/
+Import Studio/studio-next/test-results/
+Import.io design system/.git/
+Import.io design system/node_modules/
+Import.io design system/dist/

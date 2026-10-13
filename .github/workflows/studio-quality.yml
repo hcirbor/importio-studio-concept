@@ -70,3 +70,21 @@ jobs:
           name: playwright-report
           path: Import Studio/studio-next/playwright-report
           if-no-files-found: ignore
+
+  container-build:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out Studio
+        uses: actions/checkout@v7.0.1
+        with:
+          path: Import Studio
+
+      - name: Check out Import.io design system
+        uses: actions/checkout@v7.0.1
+        with:
+          repository: ${{ vars.DESIGN_SYSTEM_REPOSITORY || 'hcirbor/importio-design-system' }}
+          ref: ac9e379164dcfdd6c6b2711c073466af756a937a
+          path: Import.io design system
+
+      - name: Build production container
+        run: docker build --progress=plain --build-arg GITHUB_SHA="$GITHUB_SHA" --file "Import Studio/studio-next/Dockerfile" .

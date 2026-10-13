@@ -3,8 +3,10 @@
   "entry": [
     "src/app/**/page.tsx",
     "src/app/layout.tsx",
+    "server-routes/app/**/route.ts",
+    "server-routes/proxy.ts",
     "playwright.config.ts",
     "tests/**/*.ts"
   ],
-  "project": ["src/**/*.{ts,tsx}", "tests/**/*.ts", "playwright.config.ts"]
+  "project": ["src/**/*.{ts,tsx}", "server-routes/**/*.ts", "tests/**/*.ts", "playwright.config.ts"]
 }

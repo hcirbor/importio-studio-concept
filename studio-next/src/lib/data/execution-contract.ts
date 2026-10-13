@@ -32,7 +32,7 @@ export type ValidationResult = {
   issues: ValidationIssue[];
 };
 
-type ExecutionFailureCode =
+export type ExecutionFailureCode =
   | 'blocked'
   | 'unavailable'
   | 'timeout'
