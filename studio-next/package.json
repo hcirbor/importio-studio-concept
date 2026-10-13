@@ -3,13 +3,16 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
-    "build": "next build --webpack",
+    "dev": "node scripts/with-server-routes.mjs dev --webpack",
+    "build": "npm run build:demo && npm run build:server && npm run test:client-secrets",
+    "build:demo": "STUDIO_BUILD_TARGET=demo next build --webpack",
+    "build:server": "CITEOTTER_BASIC_AUTH_FILE=phase4-client-secret-test node scripts/with-server-routes.mjs build --webpack",
     "start": "next start",
     "lint": "eslint .",
     "lint:quality": "node scripts/check-quality.mjs",
     "typecheck": "tsc --noEmit",
     "test:unit": "vitest run",
+    "test:client-secrets": "node scripts/check-client-secrets.mjs",
     "test:e2e": "playwright test && playwright test --config=playwright.labelled.config.ts && playwright test --config=playwright.restricted.config.ts",
     "test:e2e:update": "playwright test tests/visual.spec.ts --update-snapshots && playwright test --config=playwright.labelled.config.ts tests/labelled/visual.spec.ts --update-snapshots",
     "check": "npm run lint && npm run typecheck && npm run build"

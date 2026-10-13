@@ -6,12 +6,15 @@ function git(args: string[]) {
   return execFileSync('git', args, { cwd: path.resolve(process.cwd(), '..'), encoding: 'utf8' }).trim();
 }
 
-const commit = process.env.GITHUB_SHA ?? git(['rev-parse', 'HEAD']);
-const exactTags = process.env.STUDIO_BUILD_TAG ?? git(['tag', '--points-at', commit]).split('\n').find(Boolean);
-const dirty = git(['status', '--porcelain']).length > 0;
+const externalCommit = process.env.GITHUB_SHA;
+const commit = externalCommit ?? git(['rev-parse', 'HEAD']);
+const exactTags = process.env.STUDIO_BUILD_TAG
+  ?? (externalCommit ? undefined : git(['tag', '--points-at', commit]).split('\n').find(Boolean));
+const dirty = externalCommit ? false : git(['status', '--porcelain']).length > 0;
+const serverBuild = process.env.STUDIO_BUILD_TARGET === 'server';
 
 const nextConfig: NextConfig = {
-  output: 'export',
+  output: serverBuild ? 'standalone' : 'export',
   allowedDevOrigins: ['127.0.0.1'],
   images: { unoptimized: true },
   reactStrictMode: true,
