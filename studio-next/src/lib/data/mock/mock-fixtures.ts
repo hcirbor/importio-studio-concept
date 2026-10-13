@@ -18,9 +18,9 @@ export const mockFixtures: MockFixtures = {
   ],
   readyCandidateIds: ['northwind-trade', 'summit-supply-europe'],
   pipelines: [
-    { name: 'Competitor prices', detail: '3 sources · 5 fields', version: 'v4', lastRun: '2 min ago', schedule: 'On demand', status: 'Needs review', tone: 'warning', href: '/pipelines/competitor-prices' },
-    { name: 'Outdoor catalogue', detail: '12 categories · 8 fields', version: 'v7', lastRun: '1 hr ago', schedule: 'Daily', status: 'Healthy', tone: 'success' },
-    { name: 'Qualified suppliers', detail: 'EU region · 9 fields', version: 'v2', lastRun: 'Yesterday', schedule: 'Weekly', status: 'Healthy', tone: 'success' },
+    { id: 'competitor-prices', name: 'Competitor prices', detail: '3 sources · 5 fields', version: 'v4', lastRun: '2 min ago', schedule: 'On demand', status: 'Needs review', tone: 'warning', href: '/pipelines/competitor-prices' },
+    { id: 'outdoor-catalogue', name: 'Outdoor catalogue', detail: '12 categories · 8 fields', version: 'v7', lastRun: '1 hr ago', schedule: 'Daily', status: 'Healthy', tone: 'success' },
+    { id: 'qualified-suppliers', name: 'Qualified suppliers', detail: 'EU region · 9 fields', version: 'v2', lastRun: 'Yesterday', schedule: 'Weekly', status: 'Healthy', tone: 'success' },
   ],
   memoryRows: [
     { id: 'competitor-price-review', label: 'Competitor price review', runId: 'run_7f3a', retention: 'Saved until 5 Nov 2026', status: 'Completed · Partial', tone: 'warning', href: '/build?template=compare&input=prior' },
@@ -55,9 +55,9 @@ export const mockFixtures: MockFixtures = {
   ],
   homePipelinesByWorkspace: {
     studio: [
-      { name: 'Competitor prices', status: 'Needs review', records: '3', tone: 'warning', href: '/pipelines/competitor-prices', reviewLinked: true },
-      { name: 'Outdoor catalogue', status: 'Completed', records: '1,284', tone: 'success', href: '/pipelines' },
-      { name: 'MAP watch', status: 'Healthy', records: '9,316', tone: 'success', href: '/monitors' },
+      { id: 'competitor-prices', name: 'Competitor prices', status: 'Needs review', records: '3', tone: 'warning', href: '/pipelines/competitor-prices', reviewLinked: true },
+      { id: 'outdoor-catalogue', name: 'Outdoor catalogue', status: 'Completed', records: '1,284', tone: 'success', href: '/pipelines' },
+      { id: 'map-watch', name: 'MAP watch', status: 'Healthy', records: '9,316', tone: 'success', href: '/monitors' },
     ],
     northwind: [],
   },

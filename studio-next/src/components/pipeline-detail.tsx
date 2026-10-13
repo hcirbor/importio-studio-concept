@@ -8,7 +8,7 @@ import {
   DialogFooter,
   Eyebrow,
 } from '@/components/design-system';
-import { can, useStudio, viewerTooltip } from '@/lib/data';
+import { can, pipelineVersionForRepair, useStudio, viewerTooltip } from '@/lib/data';
 import { PipelineRepairSummary } from './pipeline-repair';
 import { ActionBar } from './action-bar';
 
@@ -22,10 +22,10 @@ const initialDestinations = [
 
 export function PipelineDetail() {
   const session = useStudio((snapshot) => snapshot.auth.session);
-  const { version, repair } = useStudio((snapshot) => ({
-    version: snapshot.humanReview.pipelineVersion,
-    repair: snapshot.pipelineRepairs.find((item) => item.pipelineId === 'competitor-prices'),
-  }));
+  const repair = useStudio((snapshot) => (
+    snapshot.pipelineRepairs.find((item) => item.pipelineId === 'competitor-prices')
+  ));
+  const version = pipelineVersionForRepair(repair, 4);
   const mayPromote = can(session, 'promote');
   const [message, setMessage] = useState('');
   const [destinations, setDestinations] = useState(initialDestinations);
@@ -121,13 +121,15 @@ export function PipelineDetail() {
             </tr>
           </thead>
           <tbody>
-            {version === 5 ? (
+            {repair?.status === 'Approved' || repair?.status === 'Rolled back' ? (
               <tr>
                 <td>v5</td>
-                <td>Promoted from the reviewed v4 definition</td>
+                <td>Repair: product cards changed</td>
                 <td>Now</td>
                 <td>
-                  <Badge tone="success">Validated</Badge>
+                  <Badge tone={repair.status === 'Rolled back' ? 'warning' : 'success'}>
+                    {repair.status === 'Rolled back' ? 'Rolled back' : 'Validated'}
+                  </Badge>
                 </td>
               </tr>
             ) : null}

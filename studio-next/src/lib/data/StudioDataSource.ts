@@ -59,6 +59,7 @@ export type WorkspaceDataset = {
   updatedAt?: number;
   unresolvedCount?: number;
   sourceWorkflow?: string;
+  pipelineId?: string;
   sourceRunId?: string;
   sourceRunHref?: string;
   records?: DatasetRecord[];
@@ -234,6 +235,7 @@ type EnrichmentRequest = { enrichmentId: string };
 
 type QualificationVerdict = 'Supported' | 'Unresolved' | 'Not supported';
 type RecentPipeline = {
+  id?: string;
   name: string;
   status: string;
   records: string;
@@ -245,7 +247,7 @@ export type MockFixtures = {
   candidates: { name: string; domain: string; detail: string }[];
   qualificationRows: { id: string; name: string; verdicts: QualificationVerdict[] }[];
   readyCandidateIds: string[];
-  pipelines: { name: string; detail: string; version: string; lastRun: string; schedule: string; status: string; tone: 'success' | 'warning'; href?: string }[];
+  pipelines: { id: string; name: string; detail: string; version: string; lastRun: string; schedule: string; status: string; tone: 'success' | 'warning'; href?: string }[];
   memoryRows: { id: string; label: string; runId: string; retention: string; status: string; tone: 'success' | 'warning'; href: string }[];
   groups: { name: string; items: string; status: string; tone: 'success' | 'warning' }[];
   usageRows: { id: string; values: string[] }[];
@@ -296,10 +298,6 @@ export interface StudioControlPlane {
   updateEnrichment(id: string, updates: Partial<WorkspaceEnrichment>): void;
   addSource(source: string): void;
   removeSource(source: string): void;
-  acceptReviewItem(): void;
-  restoreReviewItem(): void;
-  promotePipeline(): void;
-  rollbackPipeline(): void;
 }
 
 interface StudioAuth {
@@ -332,15 +330,14 @@ type StudioAuthSnapshot = {
 
 export type AuthInterface = StudioAuthSnapshot & StudioAuth & StudioControlPlane;
 type HumanReviewSnapshot = {
-  hasReviewItem: boolean;
+  items: WorkspaceDataset[];
   reviewCount: number;
-  pipelineVersion: number;
   pipelineStatus: 'Needs review' | 'Healthy';
-  acceptReviewItem(): void;
-  restoreReviewItem(): void;
-  promotePipeline(): void;
-  rollbackPipeline(): void;
 };
+
+export function pipelineVersionForRepair(repair: PipelineRepair | undefined, fallback: number) {
+  return repair?.status === 'Approved' ? repair.proposedVersion : repair?.baseVersion ?? fallback;
+}
 export type StudioSnapshot = {
   auth: AuthInterface;
   humanReview: HumanReviewSnapshot;

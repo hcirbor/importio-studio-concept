@@ -10,7 +10,6 @@ import { EvidencePanel, type EvidenceDetail } from './evidence-panel';
 import { useState } from 'react';
 import { RelativeTime } from './relative-time';
 import { sourceDomain as domainFromSource } from '@/lib/web/source-domain';
-import { ReviewDecisionControls } from './review-decision-controls';
 
 export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
   const searchParams = useSearchParams();
@@ -19,7 +18,6 @@ export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
     currentWorkspace: snapshot.auth.currentWorkspace,
   }));
   const [evidence, setEvidence] = useState<EvidenceDetail | null>(null);
-  const [enterRequest, setEnterRequest] = useState(0);
   const dataset = auth.datasets.find((item) => item.id === datasetId);
   if (!dataset) {
     return (
@@ -87,7 +85,7 @@ export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
             {dataset.version.replace('DATASET · ', 'Dataset ')} · evidence retained with every supported value.
           </p>
           {dataset.review?.status === 'Open' ? (
-            <Link href="/review">
+            <Link href={`/review?dataset=${dataset.id}`}>
               <Badge tone="warning">
                 Needs review
               </Badge>
@@ -156,20 +154,27 @@ export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
                       && (record.values[field] === null || record.values[field] === 'Unknown');
                     return (
                       <td key={field}>
-                        <button
-                          type="button"
-                          className="value-evidence-button"
-                          onClick={() => unresolved
-                            ? setEnterRequest((request) => request + 1)
-                            : showEvidence(record.id, field)}
-                        >
-                          {field === 'source' ? sourceDomain(record) : unresolved ? 'Unknown' : record.values[field] ?? '—'}
-                          {field !== 'source' && record.reviewedBy?.[field] ? (
-                            <small className="reviewed-by">
-                              Reviewed by {record.reviewedBy[field]}
-                            </small>
-                          ) : null}
-                        </button>
+                        {unresolved ? (
+                          <Link
+                            href={`/review?dataset=${dataset.id}`}
+                            className="value-evidence-button"
+                          >
+                            Unknown · Open review →
+                          </Link>
+                        ) : (
+                          <button
+                            type="button"
+                            className="value-evidence-button"
+                            onClick={() => showEvidence(record.id, field)}
+                          >
+                            {field === 'source' ? sourceDomain(record) : record.values[field] ?? '—'}
+                            {field !== 'source' && record.reviewedBy?.[field] ? (
+                              <small className="reviewed-by">
+                                Reviewed by {record.reviewedBy[field]}
+                              </small>
+                            ) : null}
+                          </button>
+                        )}
                       </td>
                     );
                   })}
@@ -189,16 +194,7 @@ export function WorkspaceDatasetDetail({ datasetId }: { datasetId: string }) {
       <EvidencePanel
         evidence={evidence}
         onClose={() => setEvidence(null)}
-        reviewDatasetId={fromReview && dataset.review?.status === 'Open' ? dataset.id : undefined}
       />
-      {dataset.review?.status === 'Open' ? (
-        <ReviewDecisionControls
-          key={enterRequest}
-          datasetId={dataset.id}
-          mode="action-bar"
-          enterRequest={enterRequest}
-        />
-      ) : null}
     </div>
   );
 }

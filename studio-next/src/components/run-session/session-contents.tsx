@@ -26,6 +26,10 @@ type SessionContentsProps = {
   expanded?: boolean;
   expandAction?: ReactNode;
   showNeedsInputNotice?: boolean;
+  review?: {
+    description: string;
+    href: string;
+  };
 };
 
 export function SessionContents({
@@ -40,6 +44,7 @@ export function SessionContents({
   expanded = false,
   expandAction,
   showNeedsInputNotice = true,
+  review,
 }: SessionContentsProps) {
   const worker = scenario.workers[workerIndex];
   const waiting = scenario.workers.filter((item) => item.state === 'Needs input');
@@ -93,7 +98,12 @@ export function SessionContents({
               {workerStatusLabel(worker)}
             </Badge>
           </div>
-          <Timeline worker={worker} step={step} onStep={setStep} />
+          <Timeline
+            worker={worker}
+            step={step}
+            onStep={setStep}
+            review={worker.availability === 'Unresolved' ? review : undefined}
+          />
           {worker.state === 'Needs input' ? (
             <div className="inline-intervention">
               <strong>Decision required</strong>

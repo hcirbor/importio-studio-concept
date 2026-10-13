@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useState } from 'react';
 import { Button } from '@/components/design-system';
-import { can, useStudio, viewerTooltip } from '@/lib/data';
+import { can, pipelineVersionForRepair, useStudio, viewerTooltip } from '@/lib/data';
 import {
   Feedback,
   PageHead,
@@ -18,33 +18,33 @@ import {
 export function PipelinesSection() {
   const session = useStudio((snapshot) => snapshot.auth.session);
   const pipelines = useStudio((snapshot) => snapshot.fixtures.pipelines);
-  const { pipelineVersion, repairs } = useStudio((snapshot) => ({
-    pipelineVersion: snapshot.humanReview.pipelineVersion,
-    repairs: snapshot.pipelineRepairs,
-  }));
+  const repairs = useStudio((snapshot) => snapshot.pipelineRepairs);
   const mayRun = can(session, 'run');
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
   const [inspected, setInspected] = useState<string>();
-  const pendingRepair = repairs.find((repair) => (
-    repair.pipelineId === 'competitor-prices' && repair.status !== 'Approved'
-  ));
-  const currentPipelines = pipelines.map((pipeline) => pipeline.name === 'Competitor prices'
-    ? {
-        ...pipeline,
-        version: `v${pipelineVersion}`,
-        status: pendingRepair ? 'Repair ready' : 'Healthy',
-        tone: pendingRepair ? 'warning' as Tone : 'success' as Tone,
-      }
-    : pipeline);
+  const currentPipelines = pipelines.map((pipeline) => {
+    const repair = repairs.find((item) => item.pipelineId === pipeline.id);
+    const fallbackVersion = Number(pipeline.version.replace(/^v/, ''));
+    return repair ? {
+      ...pipeline,
+      version: `v${pipelineVersionForRepair(repair, fallbackVersion)}`,
+      status: repair.status === 'Ready' || repair.status === 'Rolled back' ? 'Repair ready' : 'Healthy',
+      tone: repair.status === 'Ready' || repair.status === 'Rolled back' ? 'warning' as Tone : 'success' as Tone,
+    } : pipeline;
+  });
   const visiblePipelines = currentPipelines.filter((pipeline) => {
     const matchesQuery = pipeline.name.toLowerCase().includes(query.toLowerCase());
     const matchesStatus = status === 'all' || pipeline.status === status;
     return matchesQuery && matchesStatus;
   });
-  const rows: TableRow[] = visiblePipelines.map((pipeline) => ({
-    id: pipeline.name,
-    cells: [
+  const rows: TableRow[] = visiblePipelines.map((pipeline) => {
+    const pendingRepair = repairs.find((repair) => (
+      repair.pipelineId === pipeline.id && repair.status !== 'Approved'
+    ));
+    return {
+      id: pipeline.name,
+      cells: [
       <span key="pipeline">
         <strong>{pipeline.name}</strong>
         <small>{pipeline.detail}</small>
@@ -52,7 +52,7 @@ export function PipelinesSection() {
       pipeline.version,
       pipeline.lastRun,
       pipeline.schedule,
-      pipeline.name === 'Competitor prices' && pendingRepair ? (
+      pendingRepair ? (
         <Link key="status" href={`/pipelines/${pendingRepair.pipelineId}/repair`}>
           <Status tone="warning">Repair ready</Status>
         </Link>
@@ -73,8 +73,9 @@ export function PipelinesSection() {
           Open
         </Button>
       ),
-    ],
-  }));
+      ],
+    };
+  });
 
   return (
     <>

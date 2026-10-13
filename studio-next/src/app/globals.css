@@ -263,6 +263,9 @@ main { min-width: 0; padding: 38px 34px 64px; }
 .session-timeline button > span { position: relative; z-index: 2; width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: var(--io-color-raised); color: var(--io-color-subtle); }
 .session-timeline button > div { position: relative; z-index: 2; min-width: 0; }
 .session-timeline li.done button > span { background: var(--io-color-success); color: white; }
+.session-timeline li.review button { border-color: var(--io-color-warning); background: var(--io-color-warning-soft); }
+.session-timeline li.review button > span { background: var(--io-color-warning); color: var(--io-color-foreground); }
+.session-timeline li.review > .text-link { display: inline-block; margin: 0 var(--io-space-3) var(--io-space-2) 49px; }
 .session-timeline li.current button > span { background: var(--io-color-primary); color: white; }
 .session-timeline strong, .session-timeline small, .session-timeline em { display: block; }
 .session-timeline small { margin-top: 4px; color: var(--io-color-muted); line-height: 1.45; }

@@ -58,7 +58,7 @@ test('running multi-worker run exposes queue warnings, resolve action, API code,
   await page.getByRole('button', { name: 'Cancel run' }).click();
   await expect(page.getByRole('link', { name: 'Retry as new run' })).toBeVisible();
   await page.getByRole('button', { name: 'Resolve inputs (1)' }).last().click();
-  await expect(page.getByText('Ready to review')).toBeVisible();
+  await expect(page.getByText('Dataset ready')).toBeVisible();
   await page.getByRole('button', { name: 'View screenshot' }).click();
   await expect(page.getByText('Screenshot preview opened for this capture.')).toBeVisible();
 });
@@ -67,6 +67,8 @@ test('Home review journey carries evidence and decision context until resolution
   await page.goto('/');
   await waitForStudio(page);
   const attention = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Needs attention' }) });
+  await expect(attention).toContainText('3 items');
+  await expect(page.getByRole('link', { name: 'Review 1' })).toBeVisible();
   await expect(attention).toContainText('Trail Shop · Trailhead 2P availability not found');
   await attention.getByRole('link', { name: 'Review', exact: true }).click();
   await expect(page.getByText('Recommended:')).toBeVisible();
@@ -77,6 +79,44 @@ test('Home review journey carries evidence and decision context until resolution
   await page.getByRole('button', { name: 'Accept unknown' }).click();
   await expect(page.getByText('0 items need review')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Review queue clear' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Review', exact: true })).toBeVisible();
+  await page.goto('/runs/run_7f3a');
+  await waitForStudio(page);
+  await expect(page.getByRole('link', { name: 'Open dataset' })).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Needs review' })).toHaveCount(0);
+  await page.goto('/datasets/competitor-prices');
+  await waitForStudio(page);
+  await expect(page.getByText('Validated · 0 unresolved')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Open review/ })).toHaveCount(0);
+  await page.goto('/');
+  await waitForStudio(page);
+  await expect(attention).toContainText('2 items');
+  await expect(attention).not.toContainText('Trail Shop · Trailhead 2P availability not found');
+});
+
+test('review state belongs to the affected run and the decision stays in the inbox', async ({ page }) => {
+  await page.goto('/runs/run_7f3a');
+  await waitForStudio(page);
+  await expect(page.getByRole('link', { name: 'Needs review' })).toBeVisible();
+  await expect(page.getByText('Trail Shop · Trailhead 2P availability not found').last()).toBeVisible();
+  const openReview = page.getByRole('link', { name: /Open review/ });
+  await expect(openReview).toHaveAttribute('href', '/review?dataset=competitor-prices');
+  await expect(page.getByRole('link', { name: 'Review availability' })).toHaveAttribute('href', '/review?dataset=competitor-prices');
+  await expect(page.getByRole('button', { name: 'Accept unknown' })).toHaveCount(0);
+  await openReview.click();
+  await expect(page.getByText('Trail Shop · Trailhead 2P availability not found').first()).toBeVisible();
+
+  await page.goto('/runs/run_7f3a?from=review');
+  await waitForStudio(page);
+  await expect(page.getByRole('link', { name: 'Review availability' })).toHaveAttribute('href', '/review?dataset=competitor-prices');
+  await expect(page.getByRole('link', { name: 'Back to review' })).toBeVisible();
+
+  await page.goto('/runs/run_7e91');
+  await waitForStudio(page);
+  await expect(page.getByRole('link', { name: 'Needs review' })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: /Open review/ })).toHaveCount(0);
+  await expect(page.getByRole('link', { name: 'Open dataset' })).toBeVisible();
+  await expect(page.getByText('Issues').first()).toBeVisible();
 });
 
 test('re-running Research versions one dataset instead of creating a copy', async ({ page }) => {
@@ -98,6 +138,20 @@ test('re-running Research versions one dataset instead of creating a copy', asyn
   await expect(researchCards).toHaveCount(1);
   await expect(researchCards).toContainText('Dataset V2');
   await expect(page.getByText(/Pricing · CloudHarbor, Letterloop, BrightSend \(2\)/)).toHaveCount(0);
+});
+
+test('re-running Outdoor catalogue creates v8 without replacing seeded records', async ({ page }) => {
+  await page.goto('/build?template=collect');
+  await waitForStudio(page);
+  await page.getByRole('button', { name: 'Plan workflow', exact: true }).click();
+  await page.getByRole('textbox', { name: 'Workflow name' }).fill('Outdoor catalogue');
+  await page.getByRole('button', { name: 'Approve and run →' }).click();
+  await page.getByRole('button', { name: 'Review data →' }).click();
+  await page.getByRole('button', { name: 'Save dataset' }).click();
+  await page.goto('/datasets/outdoor-catalogue');
+  await expect(page.getByText('Dataset V8')).toBeVisible();
+  await expect(page.getByText(/1,?284 records/)).toBeVisible();
+  await expect(page.getByText('northwind-outdoors.example/tents/summit-solo')).toBeVisible();
 });
 
 test('enrichment retries failed rows', async ({ page }) => {

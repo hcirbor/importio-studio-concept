@@ -18,7 +18,6 @@ import {
   Eyebrow,
 } from '@/components/design-system';
 import { ActionBar } from './action-bar';
-import { ReviewDecisionControls } from './review-decision-controls';
 import { RunSession, type RunSessionHandle } from './run-session';
 import { RunDetailAction } from './run-detail-action';
 import { useStudio, type WorkspaceRun } from '@/lib/data';
@@ -66,9 +65,7 @@ export function RunDetail({ id }: { id: string }) {
   const actionHref = dataset?.href ?? (workspaceRun?.state === 'Completed' ? '/datasets' : undefined);
   const workspaceDetail: RunDetailData | null = workspaceRun ? {
     title: workspaceRun.pipeline,
-    description: dataset?.review?.status === 'Resolved'
-      ? `Completed run · ${workspaceRun.coverage} · review resolved`
-      : `${workspaceRun.state} run · ${workspaceRun.coverage} · ${workspaceRun.records} ${workspaceRun.records === '1' ? 'record' : 'records'}`,
+    description: `${workspaceRun.state} run · ${workspaceRun.coverage} · ${workspaceRun.records} ${workspaceRun.records === '1' ? 'record' : 'records'}`,
     status: detailStatus(workspaceRun.state),
     badge: `${workspaceRun.state} · ${workspaceRun.outcome}`,
     tone: workspaceRun.tone,
@@ -103,7 +100,7 @@ export function RunDetail({ id }: { id: string }) {
         </div>
         <div>
           {needsReview ? (
-            <Link href="/review">
+            <Link href={`/review?dataset=${dataset?.id}`}>
               <Badge tone="warning">Needs review</Badge>
             </Link>
           ) : (
@@ -150,7 +147,9 @@ export function RunDetail({ id }: { id: string }) {
               {displayRun.status === 'failed'
                 ? 'Blocked'
                 : displayRun.status === 'completed'
-                  ? 'Needs review'
+                  ? needsReview
+                    ? 'Needs review'
+                    : 'Issues'
                   : 'Needs input'}
             </small>
             <b>{displayRun.metrics[2]}</b>
@@ -189,52 +188,55 @@ export function RunDetail({ id }: { id: string }) {
       <RunSession
         ref={runSession}
         runId={currentId}
+        review={needsReview && dataset?.review ? {
+          description: dataset.review.itemDescription,
+          href: `/review?dataset=${dataset.id}`,
+        } : undefined}
         showNeedsInputNotice={false}
         showExpandAction={false}
       />
-      {fromReview && needsReview && dataset ? (
-        <ReviewDecisionControls
-          datasetId={dataset.id}
-          mode="action-bar"
-        />
-      ) : (
-        <ActionBar
-          status={needsInput
-            ? 'Input required'
-            : needsReview
-              ? `${dataset?.review?.field} needs review`
-              : displayRun.status === 'completed'
-                ? 'Ready to review'
-                : displayRun.badge}
-          summary={needsInput?.summary
-            ?? dataset?.review?.itemDescription
-            ?? 'Review the supported records and retained evidence.'}
-          secondary={needsInput ? (
-            <RunDetailAction
-              status={displayRun.status}
-              runId={currentId}
-            />
-          ) : undefined}
-          primary={needsInput ? (
-            <Button variant="primary" onClick={resolveInputs}>
-              Resolve inputs ({needsInput.count})
-            </Button>
-          ) : needsReview ? (
-            <Button variant="primary" asChild>
-              <Link href={displayRun.actionHref ?? '/datasets'}>
-                Open dataset
-              </Link>
-            </Button>
-          ) : (
-            <RunDetailAction
-              status={displayRun.status}
-              runId={currentId}
-              href={displayRun.actionHref}
-              label={displayRun.actionLabel}
-            />
-          )}
-        />
-      )}
+      <ActionBar
+        status={needsInput
+          ? 'Input required'
+          : needsReview
+            ? `${issueCount} ${issueCount === 1 ? 'value needs' : 'values need'} review`
+            : displayRun.status === 'completed'
+              ? 'Dataset ready'
+              : displayRun.badge}
+        summary={needsInput?.summary
+          ?? dataset?.review?.itemDescription
+          ?? 'Review the supported records and retained evidence.'}
+        secondary={fromReview ? (
+          <Button variant="secondary" asChild>
+            <Link href="/review">
+              Back to review
+            </Link>
+          </Button>
+        ) : needsInput ? (
+          <RunDetailAction
+            status={displayRun.status}
+            runId={currentId}
+          />
+        ) : undefined}
+        primary={needsInput ? (
+          <Button variant="primary" onClick={resolveInputs}>
+            Resolve inputs ({needsInput.count})
+          </Button>
+        ) : needsReview && dataset?.review ? (
+          <Button variant="primary" asChild>
+            <Link href={`/review?dataset=${dataset.id}`}>
+              Review {dataset.review.field.toLowerCase()}
+            </Link>
+          </Button>
+        ) : (
+          <RunDetailAction
+            status={displayRun.status}
+            runId={currentId}
+            href={displayRun.actionHref}
+            label={displayRun.actionLabel}
+          />
+        )}
+      />
     </div>
   );
 }

@@ -11,6 +11,10 @@ import { useRunReplay } from './run-session/use-run-replay';
 
 type RunSessionProps = {
   runId: string;
+  review?: {
+    description: string;
+    href: string;
+  };
   onResearchResolved?: () => void;
   onResearchStateChange?: (state: 'Running' | 'Complete') => void;
   showNeedsInputNotice?: boolean;
@@ -23,12 +27,14 @@ export type RunSessionHandle = {
 
 export const RunSession = forwardRef<RunSessionHandle, RunSessionProps>(function RunSession({
   runId,
+  review,
   onResearchResolved,
   onResearchStateChange,
   showNeedsInputNotice = true,
   showExpandAction = true,
 }, ref) {
   const execution = useStudio((snapshot) => snapshot.execution);
+  const hasReview = Boolean(review);
   const researchCallbacks = useRef({ onResearchResolved, onResearchStateChange });
   const [scenario, setScenario] = useState<Scenario>(pendingScenario);
   const {
@@ -55,9 +61,13 @@ export const RunSession = forwardRef<RunSessionHandle, RunSessionProps>(function
 
   useEffect(() => execution.subscribeRunEvents(runId, (event) => {
     setScenario(event.presentation);
+    if (hasReview) {
+      const reviewWorkerIndex = event.presentation.workers.findIndex((worker) => worker.availability === 'Unresolved');
+      if (reviewWorkerIndex >= 0) setWorkerIndex(reviewWorkerIndex);
+    }
     if (event.decisionState) researchCallbacks.current.onResearchStateChange?.(event.decisionState);
     if (event.decisionState === 'Complete') researchCallbacks.current.onResearchResolved?.();
-  }), [execution, runId]);
+  }), [execution, hasReview, runId, setWorkerIndex]);
 
   function recordCookieDecision() {
     setStep(2);
@@ -120,6 +130,7 @@ export const RunSession = forwardRef<RunSessionHandle, RunSessionProps>(function
               onCookieDecision={recordCookieDecision}
               expanded
               showNeedsInputNotice={false}
+              review={review}
             />
           </section>
         </div>
@@ -135,6 +146,7 @@ export const RunSession = forwardRef<RunSessionHandle, RunSessionProps>(function
         onCookieDecision={recordCookieDecision}
         expandAction={showExpandAction ? expandAction : undefined}
         showNeedsInputNotice={showNeedsInputNotice}
+        review={review}
       />
       <CaptureHistory
         scenario={scenario}

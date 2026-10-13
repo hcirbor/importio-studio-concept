@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import {
   Badge,
   Button,
@@ -15,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/design-system';
-import { useStudio } from '@/lib/data';
+import { pipelineVersionForRepair, useStudio } from '@/lib/data';
 import { ReviewDecisionControls } from './review-decision-controls';
 
 function PipelineFilter({ names }: { names: string[] }) {
@@ -35,12 +36,18 @@ function PipelineFilter({ names }: { names: string[] }) {
 }
 
 export function ReviewInbox() {
+  const searchParams = useSearchParams();
   const state = useStudio((snapshot) => ({
     datasets: snapshot.auth.datasets,
+    reviewItems: snapshot.humanReview.items,
+    reviewCount: snapshot.humanReview.reviewCount,
+    repairs: snapshot.pipelineRepairs,
     setDatasetReviewState: snapshot.controlPlane.setDatasetReviewState,
-    pipelineVersion: snapshot.humanReview.pipelineVersion,
   }));
-  const reviewDataset = state.datasets.find((dataset) => dataset.review);
+  const requestedDatasetId = searchParams.get('dataset');
+  const reviewDataset = state.reviewItems.find((dataset) => dataset.id === requestedDatasetId)
+    ?? state.reviewItems[0];
+  const restoreDataset = state.datasets.find((dataset) => dataset.review);
   const review = reviewDataset?.review;
   const reviewRecord = reviewDataset?.records?.find((record) => {
     const value = review ? record.values[review.field] : undefined;
@@ -49,33 +56,35 @@ export function ReviewInbox() {
   const sourceEvidence = review && reviewRecord ? reviewRecord.evidence[review.field] : undefined;
   const sourceDomain = sourceEvidence ? new URL(sourceEvidence.sourceUrl).hostname : 'source.example';
   const itemTitle = review?.title ?? 'Field needs review';
-  const hasReviewItem = review?.status === 'Open';
-  const reviewCount = state.datasets.reduce((count, dataset) => count + (dataset.review?.issueCount ?? 0), 0);
+  const pipelineId = reviewDataset?.pipelineId;
+  const repair = state.repairs.find((item) => item.pipelineId === pipelineId);
+  const datasetVersion = Number(reviewDataset?.version.match(/V(\d+)/i)?.[1] ?? 1);
+  const pipelineVersion = pipelineVersionForRepair(repair, datasetVersion);
   function restoreDemoReview() {
-    if (!reviewDataset) return;
-    state.setDatasetReviewState(reviewDataset.id, 1);
+    if (!restoreDataset) return;
+    state.setDatasetReviewState(restoreDataset.id, 1);
   }
 
-  if (!reviewDataset || !review || !reviewRecord) return null;
-
-  if (!hasReviewItem) {
+  if (!reviewDataset || !review || !reviewRecord) {
     return (
       <>
         <section className="panel review-toolbar">
           <label>
             PIPELINE
-            <PipelineFilter names={state.datasets.filter((dataset) => dataset.review).map((dataset) => dataset.title)} />
+            <PipelineFilter names={state.reviewItems.map((dataset) => dataset.title)} />
           </label>
-          <span>{reviewCount} items need review</span>
+          <span>0 items need review</span>
         </section>
         <div className="panel empty-page">
           <div>
             <div className="empty-check">✓</div>
             <h2>Review queue clear</h2>
             <p className="muted">The decision is complete. Restore the demo item to explore the other review actions.</p>
-            <Button variant="secondary" onClick={restoreDemoReview}>
-              Restore demo review
-            </Button>
+            {restoreDataset ? (
+              <Button variant="secondary" onClick={restoreDemoReview}>
+                Restore demo review
+              </Button>
+            ) : null}
           </div>
         </div>
       </>
@@ -87,21 +96,32 @@ export function ReviewInbox() {
       <section className="panel review-toolbar">
         <label>
           PIPELINE
-          <PipelineFilter names={state.datasets.filter((dataset) => dataset.review).map((dataset) => dataset.title)} />
+          <PipelineFilter names={state.reviewItems.map((dataset) => dataset.title)} />
         </label>
-        <span>{reviewCount} item needs review</span>
+        <span>
+          {state.reviewCount} {state.reviewCount === 1 ? 'item needs' : 'items need'} review
+        </span>
         <small className="review-shortcuts">Open the item to inspect evidence and make its decision.</small>
       </section>
       <div className="review-layout">
         <section className="panel">
-          <Button variant="ghost" className="review-item selected">
-            <span className="review-index">1</span>
-            <span>
-              <strong>{itemTitle}</strong>
-              <small className="muted">{review.itemDescription}</small>
-            </span>
-            <Badge tone="warning">Needs review</Badge>
-          </Button>
+          {state.reviewItems.map((dataset, index) => (
+            <Button
+              variant="ghost"
+              className={`review-item${dataset.id === reviewDataset.id ? ' selected' : ''}`}
+              asChild
+              key={dataset.id}
+            >
+              <Link href={`/review?dataset=${dataset.id}`}>
+                <span className="review-index">{index + 1}</span>
+                <span>
+                  <strong>{dataset.review?.title}</strong>
+                  <small className="muted">{dataset.review?.itemDescription}</small>
+                </span>
+                <Badge tone="warning">Needs review</Badge>
+              </Link>
+            </Button>
+          ))}
         </section>
         <aside className="panel">
           <div className="section-head">
@@ -139,8 +159,8 @@ export function ReviewInbox() {
               <div>
                 <dt>Pipeline</dt>
                 <dd>
-                  <Link href={`/pipelines/${reviewDataset.id}?from=review`} className="text-link">
-                    {reviewDataset.sourceWorkflow} · v{state.pipelineVersion} →
+                  <Link href={`/pipelines/${pipelineId ?? reviewDataset.id}?from=review`} className="text-link">
+                    {reviewDataset.sourceWorkflow} · v{pipelineVersion} →
                   </Link>
                 </dd>
               </div>
@@ -166,7 +186,6 @@ export function ReviewInbox() {
             </Button>
             <ReviewDecisionControls
               datasetId={reviewDataset.id}
-              mode="inbox"
               includeRetry
             />
           </div>

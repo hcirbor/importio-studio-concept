@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useState } from 'react';
 import { toast } from 'sonner';
@@ -20,19 +19,14 @@ import {
   SelectValue,
 } from '@/components/design-system';
 import { can, useStudio, viewerTooltip } from '@/lib/data';
-import { ActionBar } from './action-bar';
 
 type ReviewDecisionControlsProps = {
   datasetId: string;
-  mode: 'inbox' | 'action-bar';
-  enterRequest?: number;
   includeRetry?: boolean;
 };
 
 export function ReviewDecisionControls({
   datasetId,
-  mode,
-  enterRequest = 0,
   includeRetry = false,
 }: ReviewDecisionControlsProps) {
   const router = useRouter();
@@ -43,7 +37,7 @@ export function ReviewDecisionControls({
     updateDatasetValue: snapshot.controlPlane.updateDatasetValue,
     setDatasetReviewState: snapshot.controlPlane.setDatasetReviewState,
   }));
-  const [editing, setEditing] = useState(enterRequest > 0);
+  const [editing, setEditing] = useState(false);
   const [reviewedValue, setReviewedValue] = useState('In stock');
   const [reviewNote, setReviewNote] = useState('');
   const mayReview = can(state.session, 'review');
@@ -123,54 +117,27 @@ export function ReviewDecisionControls({
 
   return (
     <>
-      {mode === 'action-bar' ? (
-        <ActionBar
-          status="1 value needs a decision"
-          summary={review.itemDescription}
-          secondary={(
-            <>
-              <Button variant="secondary" asChild>
-                <Link href="/review">
-                  Back to review
-                </Link>
-              </Button>
-              {enterValue}
-            </>
-          )}
-          primary={(
-            <Button
-              variant="primary"
-              disabled={!mayReview}
-              title={!mayReview ? viewerTooltip : undefined}
-              onClick={acceptUnknown}
-            >
-              Accept unknown
-            </Button>
-          )}
-        />
-      ) : (
-        <div className="review-actions">
-          {enterValue}
-          {includeRetry ? (
-            <Button
-              variant="secondary"
-              disabled={!mayReview}
-              title={!mayReview ? viewerTooltip : undefined}
-              onClick={retry}
-            >
-              Retry
-            </Button>
-          ) : null}
+      <div className="review-actions">
+        {enterValue}
+        {includeRetry ? (
           <Button
-            variant="primary"
+            variant="secondary"
             disabled={!mayReview}
             title={!mayReview ? viewerTooltip : undefined}
-            onClick={acceptUnknown}
+            onClick={retry}
           >
-            Accept unknown
+            Retry
           </Button>
-        </div>
-      )}
+        ) : null}
+        <Button
+          variant="primary"
+          disabled={!mayReview}
+          title={!mayReview ? viewerTooltip : undefined}
+          onClick={acceptUnknown}
+        >
+          Accept unknown
+        </Button>
+      </div>
       <Dialog open={editing} onOpenChange={setEditing}>
         <DialogContent>
           <DialogHeader>

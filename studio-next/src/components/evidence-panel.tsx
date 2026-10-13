@@ -4,8 +4,6 @@ import { X } from 'lucide-react';
 import { useRef } from 'react';
 import { Button } from '@/components/design-system';
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet';
-import { ActionBar } from './action-bar';
-import { ReviewDecisionControls } from './review-decision-controls';
 
 export type EvidenceDetail = {
   field: string;
@@ -20,11 +18,9 @@ export type EvidenceDetail = {
 export function EvidencePanel({
   evidence,
   onClose,
-  reviewDatasetId,
 }: {
   evidence: EvidenceDetail | null;
   onClose: () => void;
-  reviewDatasetId?: string;
 }) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -98,31 +94,6 @@ export function EvidencePanel({
               </div>
             </section>
           </div>
-          {reviewDatasetId ? (
-            <ReviewDecisionControls
-              datasetId={reviewDatasetId}
-              mode="action-bar"
-            />
-          ) : (
-            <ActionBar
-              status="Evidence retained"
-              summary={`${evidence.record} · ${evidence.field}`}
-              secondary={(
-                <SheetClose asChild>
-                  <Button variant="secondary">
-                    Close
-                  </Button>
-                </SheetClose>
-              )}
-              primary={(
-                <Button variant="primary" asChild>
-                  <a href={evidence.sourceUrl} target="_blank" rel="noreferrer">
-                    Open source
-                  </a>
-                </Button>
-              )}
-            />
-          )}
         </SheetContent>
       ) : null}
     </Sheet>

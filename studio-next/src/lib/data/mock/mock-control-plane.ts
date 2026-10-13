@@ -44,9 +44,6 @@ type AuthState = {
   demoRole?: Role;
 };
 
-type WorkspaceReviewState = { hasReviewItem: boolean; pipelineVersion: number };
-type ReviewStateMap = Record<string, WorkspaceReviewState>;
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
@@ -275,6 +272,7 @@ const seededDatasets: Record<string, WorkspaceDataset[]> = {
     {
       id: 'competitor-prices', version: 'DATASET · V4', title: 'Competitor prices', detail: '3 records · 5 fields · 1 unresolved', status: 'Needs review', tone: 'warning', href: '/datasets/competitor-prices', recordCount: 3,
       fields: ['Retailer','Product','Price','Availability'], lastUpdated: '2 minutes ago', updatedAt: seededNow - 2 * 60_000, unresolvedCount: 1, sourceWorkflow: 'Competitor prices', sourceRunId: 'run_7f3a',
+      pipelineId: 'competitor-prices',
       sourceRunHref: '/runs/run_7f3a',
       review: {
         title: 'Trailhead availability is unknown',
@@ -307,6 +305,7 @@ const seededDatasets: Record<string, WorkspaceDataset[]> = {
       updatedAt: seededNow - 60 * 60_000,
       unresolvedCount: 0,
       sourceWorkflow: 'Outdoor catalogue',
+      pipelineId: 'outdoor-catalogue',
       sourceRunId: 'run_7e91',
       sourceRunHref: '/runs/run_7e91',
       review: {
@@ -561,6 +560,32 @@ function unresolvedCountFromDetail(detail: string) {
   return Number(detail.match(/(\d+)\s+unresolved/i)?.[1] ?? 0);
 }
 
+function normalizeDatasetReview(dataset: WorkspaceDataset) {
+  if (!dataset.review) return dataset;
+  const records = dataset.records;
+  const unresolvedRecords = records
+    ? records.filter((record) => {
+        const value = record.values[dataset.review?.field ?? ''];
+        return value === null || value === 'Unknown';
+      }).length
+    : dataset.unresolvedCount ?? dataset.review.issueCount;
+  const open = dataset.review.status === 'Open' && unresolvedRecords > 0;
+  const unresolvedCount = open ? unresolvedRecords : 0;
+  const baseDetail = dataset.detail.replace(/\s·\s(?:\d+\s+unresolved|fully validated)$/, '');
+  return {
+    ...dataset,
+    unresolvedCount,
+    status: open ? 'Needs review' as const : 'Validated' as const,
+    tone: open ? 'warning' as const : 'success' as const,
+    detail: `${baseDetail} · ${open ? `${unresolvedCount} unresolved` : 'fully validated'}`,
+    review: {
+      ...dataset.review,
+      status: open ? 'Open' as const : 'Resolved' as const,
+      issueCount: unresolvedCount,
+    },
+  };
+}
+
 function normalizeRuns(collections: Record<string, WorkspaceRun[]> | undefined) {
   if (!collections) return {};
   return Object.fromEntries(Object.entries(collections).map(([workspaceId, runs]) => [
@@ -599,7 +624,7 @@ function normalizeDatasets(collections: Record<string, WorkspaceDataset[]> | und
             ? 2
             : null;
       const seeded = seededDatasets[workspaceId]?.find((item) => item.id === stableId);
-      return [{
+      return [normalizeDatasetReview({
         ...seeded,
         ...dataset,
         id: stableId,
@@ -623,7 +648,7 @@ function normalizeDatasets(collections: Record<string, WorkspaceDataset[]> | und
         detail: recordCount === null
           ? dataset.detail
           : dataset.detail.replace(/^\d+ records?/, `${recordCount} ${recordCount === 1 ? 'record' : 'records'}`),
-      }];
+      })];
     });
     return [workspaceId, normalized];
   }));
@@ -631,10 +656,8 @@ function normalizeDatasets(collections: Record<string, WorkspaceDataset[]> | und
 
 const storageKey = 'importio-studio-demo-auth';
 const reviewStateKey = 'importio-studio-review-state';
-const seededReviewState: ReviewStateMap = {
-  studio: { hasReviewItem: true, pipelineVersion: 4 },
-  northwind: { hasReviewItem: false, pipelineVersion: 4 },
-};
+const storageSchemaKey = 'importio-studio-demo-schema';
+const storageSchemaVersion = 'phase-3b-review-v2';
 const initialState = (): AuthState => ({
     session: null,
     workspaces: seededWorkspaces,
@@ -676,53 +699,10 @@ function decodeAuthState(value: unknown): AuthState {
   };
 }
 
-function isWorkspaceReviewState(value: unknown): value is WorkspaceReviewState {
-  return isRecord(value) && typeof value.hasReviewItem === 'boolean' && typeof value.pipelineVersion === 'number';
-}
-
-function decodeReviewState(value: unknown): ReviewStateMap {
-  if (isWorkspaceReviewState(value)) return { ...seededReviewState, studio: value };
-  if (!isRecord(value)) return seededReviewState;
-  const result: ReviewStateMap = { ...seededReviewState };
-  for (const [workspaceId, review] of Object.entries(value)) {
-    if (isWorkspaceReviewState(review)) result[workspaceId] = review;
-  }
-  return result;
-}
-
-function reconcileStoredReviewState(state: AuthState, reviewState: ReviewStateMap): AuthState {
-  const datasetsByWorkspace = Object.fromEntries(
-    Object.entries(state.datasetsByWorkspace).map(([workspaceId, datasets]) => [
-      workspaceId,
-      datasets.map((dataset) => {
-        const seededReview = seededDatasets[workspaceId]?.find((item) => item.id === dataset.id)?.review;
-        if (!dataset.review || !seededReview?.issueCount) return dataset;
-        const open = reviewState[workspaceId]?.hasReviewItem ?? dataset.review.status === 'Open';
-        return {
-          ...dataset,
-          unresolvedCount: open ? 1 : 0,
-          status: open ? 'Needs review' as const : 'Validated' as const,
-          tone: open ? 'warning' as const : 'success' as const,
-          review: {
-            ...dataset.review,
-            status: open ? 'Open' as const : 'Resolved' as const,
-            issueCount: open ? 1 : 0,
-          },
-        };
-      }),
-    ]),
-  );
-  return {
-    ...state,
-    datasetsByWorkspace,
-  };
-}
-
 class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
   readonly source = 'mock' as const;
   readonly capabilities = mockCapabilities;
   private state = initialState();
-  private reviewState: ReviewStateMap = seededReviewState;
   private ready = false;
   private initialized = false;
   private listeners = new Set<() => void>();
@@ -742,13 +722,8 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
           this.state = decodeAuthState(JSON.parse(stored));
         } catch { window.localStorage.removeItem(storageKey); }
       }
-      const storedReview = window.localStorage.getItem(reviewStateKey);
-      if (storedReview) {
-        try {
-          this.reviewState = decodeReviewState(JSON.parse(storedReview));
-        } catch { window.localStorage.removeItem(reviewStateKey); }
-      }
-      this.state = reconcileStoredReviewState(this.state, this.reviewState);
+      window.localStorage.removeItem(reviewStateKey);
+      window.localStorage.setItem(storageSchemaKey, storageSchemaVersion);
       this.ready = true;
       this.publish();
     }, 0);
@@ -765,7 +740,7 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     this.snapshot = this.createSnapshot();
     if (this.ready && typeof window !== 'undefined') {
       window.localStorage.setItem(storageKey, JSON.stringify(this.state));
-      window.localStorage.setItem(reviewStateKey, JSON.stringify(this.reviewState));
+      window.localStorage.setItem(storageSchemaKey, storageSchemaVersion);
     }
     this.listeners.forEach((listener) => listener());
   }
@@ -784,7 +759,6 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       : null;
     const currentRole = state.session ? state.demoRole ?? state.session.role : null;
     const session = state.session && currentRole ? { ...state.session, role: currentRole } : null;
-    const currentReview = this.reviewState[session?.workspaceId ?? 'studio'] ?? { hasReviewItem: false, pipelineVersion: 4 };
     const auth: AuthInterface = {
       ready: this.ready,
       session,
@@ -807,22 +781,20 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       ...this.auth,
       ...this.controlPlane,
     };
-    const reviewCount = auth.datasets.reduce(
-      (count, dataset) => count + (dataset.review?.status === 'Open' ? dataset.review.issueCount : 0),
-      0,
-    );
+    const reviewItems = auth.datasets.filter((dataset) => (
+      dataset.review?.status === 'Open'
+      && dataset.review.issueCount > 0
+      && (dataset.unresolvedCount ?? 0) > 0
+    ));
+    const reviewCount = reviewItems.length;
     const humanReview = {
-      hasReviewItem: reviewCount > 0,
+      items: reviewItems,
       reviewCount,
-      pipelineVersion: currentReview.pipelineVersion,
       pipelineStatus: reviewCount > 0 ? 'Needs review' as const : 'Healthy' as const,
-      acceptReviewItem: this.acceptReviewItem,
-      restoreReviewItem: this.restoreReviewItem,
-      promotePipeline: this.promotePipeline,
-      rollbackPipeline: this.rollbackPipeline,
     };
+    const reviewPipelineIds = new Set(reviewItems.map((dataset) => dataset.pipelineId).filter(Boolean));
     const recentPipelines = (mockFixtures.homePipelinesByWorkspace[session?.workspaceId ?? ''] ?? []).map((pipeline) => pipeline.reviewLinked
-      ? { ...pipeline, status: reviewCount > 0 ? 'Needs review' : 'Healthy', tone: reviewCount > 0 ? 'warning' as const : 'success' as const }
+      ? { ...pipeline, status: pipeline.id && reviewPipelineIds.has(pipeline.id) ? 'Needs review' : 'Healthy', tone: pipeline.id && reviewPipelineIds.has(pipeline.id) ? 'warning' as const : 'success' as const }
       : pipeline);
     return {
       auth,
@@ -994,7 +966,26 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
 
   addRun = (run: WorkspaceRun) => this.updateWorkspaceCollection((state) => state.runsByWorkspace, (state, runsByWorkspace) => ({ ...state, runsByWorkspace }), (runs) => [run, ...runs.filter((item) => item.id !== run.id)]);
   updateRun = (id: string, updates: Partial<WorkspaceRun>) => this.updateWorkspaceCollection((state) => state.runsByWorkspace, (state, runsByWorkspace) => ({ ...state, runsByWorkspace }), (runs) => runs.map((run) => run.id === id ? { ...run, ...updates } : run));
-  addDataset = (dataset: WorkspaceDataset) => this.updateWorkspaceCollection((state) => state.datasetsByWorkspace, (state, datasetsByWorkspace) => ({ ...state, datasetsByWorkspace }), (datasets) => [dataset, ...datasets.filter((item) => item.id !== dataset.id)]);
+  addDataset = (dataset: WorkspaceDataset) => this.updateWorkspaceCollection(
+    (state) => state.datasetsByWorkspace,
+    (state, datasetsByWorkspace) => ({ ...state, datasetsByWorkspace }),
+    (datasets) => {
+      const existing = datasets.find((item) => item.id === dataset.id);
+      const incomingSampleCount = dataset.records?.length ?? 0;
+      const preserveExistingSample = Boolean(
+        existing?.records?.length
+        && existing.recordCount
+        && existing.recordCount > incomingSampleCount,
+      );
+      const nextDataset = preserveExistingSample && existing ? {
+        ...dataset,
+        recordCount: existing.recordCount,
+        fields: existing.fields,
+        records: existing.records,
+      } : dataset;
+      return [nextDataset, ...datasets.filter((item) => item.id !== dataset.id)];
+    },
+  );
   updateDatasetValue = (datasetId: string, recordId: string, field: string, value: string, reviewedBy?: string, note?: string) => this.updateWorkspaceCollection((state) => state.datasetsByWorkspace, (state, datasetsByWorkspace) => ({ ...state, datasetsByWorkspace }), (datasets) => datasets.map((dataset) => dataset.id !== datasetId ? dataset : {
     ...dataset,
     lastUpdated: 'Just now',
@@ -1016,17 +1007,6 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     }),
   }));
   setDatasetReviewState = (datasetId: string, unresolvedCount: number) => {
-    const workspaceId = this.state.session?.workspaceId ?? 'studio';
-    const anotherItemIsOpen = this.snapshot.auth.datasets.some(
-      (dataset) => dataset.id !== datasetId && dataset.review?.status === 'Open',
-    );
-    this.reviewState = {
-      ...this.reviewState,
-      [workspaceId]: {
-        ...(this.reviewState[workspaceId] ?? { hasReviewItem: false, pipelineVersion: 4 }),
-        hasReviewItem: unresolvedCount > 0 || anotherItemIsOpen,
-      },
-    };
     this.commit((current) => {
       if (!current.session) return current;
       const workspaceId = current.session.workspaceId;
@@ -1084,14 +1064,6 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
   approvePipelineRepair = (id: string) => {
     const repair = this.snapshot.pipelineRepairs.find((item) => item.id === id);
     if (!repair) return;
-    const workspaceId = this.state.session?.workspaceId ?? 'studio';
-    this.reviewState = {
-      ...this.reviewState,
-      [workspaceId]: {
-        ...(this.reviewState[workspaceId] ?? { hasReviewItem: false, pipelineVersion: repair.baseVersion }),
-        pipelineVersion: repair.proposedVersion,
-      },
-    };
     this.updateWorkspaceCollection(
       (state) => state.pipelineRepairsByWorkspace,
       (state, pipelineRepairsByWorkspace) => ({ ...state, pipelineRepairsByWorkspace }),
@@ -1103,14 +1075,6 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
   rollbackPipelineRepair = (id: string) => {
     const repair = this.snapshot.pipelineRepairs.find((item) => item.id === id);
     if (!repair) return;
-    const workspaceId = this.state.session?.workspaceId ?? 'studio';
-    this.reviewState = {
-      ...this.reviewState,
-      [workspaceId]: {
-        ...(this.reviewState[workspaceId] ?? { hasReviewItem: false, pipelineVersion: repair.baseVersion }),
-        pipelineVersion: repair.baseVersion,
-      },
-    };
     this.updateWorkspaceCollection(
       (state) => state.pipelineRepairsByWorkspace,
       (state, pipelineRepairsByWorkspace) => ({ ...state, pipelineRepairsByWorkspace }),
@@ -1153,47 +1117,6 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       : preference),
   );
 
-  private updateCurrentReview(updates: Partial<WorkspaceReviewState>) {
-    const workspaceId = this.state.session?.workspaceId ?? 'studio';
-    this.reviewState = {
-      ...this.reviewState,
-      [workspaceId]: {
-        ...(this.reviewState[workspaceId] ?? { hasReviewItem: false, pipelineVersion: 4 }),
-        ...updates,
-      },
-    };
-    this.publish();
-  }
-
-  private setReviewOpen(open: boolean) {
-    const workspaceId = this.state.session?.workspaceId ?? 'studio';
-    this.reviewState = {
-      ...this.reviewState,
-      [workspaceId]: {
-        ...(this.reviewState[workspaceId] ?? { hasReviewItem: false, pipelineVersion: 4 }),
-        hasReviewItem: open,
-      },
-    };
-    const reviewableIds = new Set(
-      (seededDatasets[workspaceId] ?? [])
-        .filter((dataset) => Boolean(dataset.review?.issueCount))
-        .map((dataset) => dataset.id),
-    );
-    const datasets = this.snapshot.auth.datasets.filter((dataset) => open
-      ? reviewableIds.has(dataset.id)
-      : dataset.review?.status === 'Open');
-    if (!datasets.length) {
-      this.publish();
-      return;
-    }
-    datasets.forEach((dataset) => this.setDatasetReviewState(dataset.id, open ? 1 : 0));
-  }
-
-  acceptReviewItem = () => this.setReviewOpen(false);
-  restoreReviewItem = () => this.setReviewOpen(true);
-  promotePipeline = () => this.updateCurrentReview({ pipelineVersion: 5 });
-  rollbackPipeline = () => this.updateCurrentReview({ pipelineVersion: 4 });
-
   readonly auth = {
     getSession: () => this.snapshot.auth.session,
     signIn: this.signIn,
@@ -1226,10 +1149,6 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     updateEnrichment: this.updateEnrichment,
     addSource: this.addSource,
     removeSource: this.removeSource,
-    acceptReviewItem: this.acceptReviewItem,
-    restoreReviewItem: this.restoreReviewItem,
-    promotePipeline: this.promotePipeline,
-    rollbackPipeline: this.rollbackPipeline,
   };
 
   readonly execution = createMockExecution(this.controlPlane, this.getSnapshot);

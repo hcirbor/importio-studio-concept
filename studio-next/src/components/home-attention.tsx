@@ -6,14 +6,13 @@ import { useStudio } from '@/lib/data';
 
 export function HomeAttention() {
   const state = useStudio((snapshot) => ({
-    datasets: snapshot.auth.datasets,
+    reviewItems: snapshot.humanReview.items,
     repairs: snapshot.pipelineRepairs,
     monitorEvents: snapshot.monitorEvents,
   }));
-  const reviewItems = state.datasets.filter((dataset) => dataset.review?.status === 'Open');
   const repairs = state.repairs.filter((repair) => repair.status !== 'Approved');
   const monitorEvents = state.monitorEvents.filter((event) => event.status === 'New');
-  const itemCount = reviewItems.length + repairs.length + monitorEvents.length;
+  const itemCount = state.reviewItems.length + repairs.length + monitorEvents.length;
 
   return (
     <article className="panel attention-panel">
@@ -24,14 +23,14 @@ export function HomeAttention() {
         </Badge>
       </div>
       <div className="panel-body">
-        {reviewItems.map((dataset) => (
+        {state.reviewItems.map((dataset) => (
           <div className="attention-item" key={`review-${dataset.id}`}>
             <span>!</span>
             <div>
               <strong>Needs review</strong>
               <small>{dataset.review?.itemDescription}</small>
             </div>
-            <Link href="/review" className="text-link">
+            <Link href={`/review?dataset=${dataset.id}`} className="text-link">
               Review
             </Link>
           </div>

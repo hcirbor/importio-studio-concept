@@ -538,6 +538,7 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   function saveDataset(records?: DatasetRecord[], savedFields?: string[]) {
     const existingDataset = auth.datasets.find((item) => item.title === effectiveWorkflowName);
     const currentVersion = Number(existingDataset?.version.match(/V(\d+)/i)?.[1] ?? 0);
+    const savedRecordCount = existingDataset?.recordCount ?? reviewedRecordCount;
     const dataset = {
       id: existingDataset?.id ?? datasetSlug(effectiveWorkflowName),
       title: effectiveWorkflowName,
@@ -545,21 +546,22 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
     };
     const needsReview = promptSpecification.domains.length === 0 && runtimeTemplate.needsReviewWithoutDomains && (!runtimeTemplate.waitsForDecisionWithoutDomains || !researchResolved);
     auth.addDataset({
+      ...(existingDataset ?? {}),
       id: dataset.id,
       version: `DATASET · V${dataset.version}`,
       title: dataset.title,
-      detail: `${reviewedRecordCount} ${reviewedRecordCount === 1 ? 'record' : 'records'} · ${fieldCount} fields${needsReview ? ' · 1 unresolved' : ' · fully validated'}`,
+      detail: `${savedRecordCount.toLocaleString('en-US')} ${savedRecordCount === 1 ? 'record' : 'records'} · ${fieldCount} fields${needsReview ? ' · 1 unresolved' : ' · fully validated'}`,
       status: needsReview ? 'Needs review' : 'Validated',
       tone: needsReview ? 'warning' : 'success',
       href: `/datasets/${dataset.id}`,
-      recordCount: reviewedRecordCount,
-      fields: savedFields ?? fieldNames,
+      recordCount: savedRecordCount,
+      fields: savedFields ?? existingDataset?.fields ?? fieldNames,
       lastUpdated: 'Just now',
       updatedAt: Date.now(),
       unresolvedCount: needsReview ? 1 : 0,
       sourceWorkflow: template.title,
       sourceRunId: runId,
-      records,
+      records: existingDataset?.records ?? records,
     });
     setSavedDatasetId(dataset.id);
     setSavedDatasetTitle(dataset.title);
