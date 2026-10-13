@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { useSyncExternalStoreWithSelector } from 'use-sync-external-store/shim/with-selector';
-import type { PermissionAction, Role, StudioDataSource, StudioSnapshot } from '@/lib/data/StudioDataSource';
+import type { CapabilityId, PermissionAction, Role, StudioDataSource, StudioSnapshot } from '@/lib/data/StudioDataSource';
 import { createMockStudioDataSource } from '@/lib/data/mock/mock-control-plane';
 
 export * from '@/lib/data/StudioDataSource';
@@ -47,6 +47,10 @@ export function useStudio<T>(selector: (snapshot: StudioSnapshot) => T): T {
     selector,
     shallowEqual,
   );
+}
+
+export function useCapability(id: CapabilityId) {
+  return useStudio((snapshot) => snapshot.capabilities[id]);
 }
 
 function shallowEqual<T>(left: T, right: T) {

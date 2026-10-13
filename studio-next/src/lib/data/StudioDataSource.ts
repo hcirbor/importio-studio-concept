@@ -90,7 +90,30 @@ export type SignInMethod =
 
 type CapabilityStatus = 'available' | 'preview' | 'coming-soon';
 type Capability = { status: CapabilityStatus; note?: string; limit?: number };
-export type CapabilityMap = Readonly<Record<string, Capability>>;
+export const CAPABILITY_IDS = [
+  'workflow-planning',
+  'run-execution',
+  'evidence',
+  'search',
+  'enrichment',
+  'monitors',
+  'workspaces',
+  'members',
+  'humanReview',
+  'datasets',
+  'pipelines',
+  'api-keys',
+  'browser-actions',
+  'take-control',
+  'input-decisions',
+  'collect-pagination',
+  'large-collect',
+  'monitor-rules',
+  'monitor-channels',
+  'cost-estimates',
+] as const;
+export type CapabilityId = (typeof CAPABILITY_IDS)[number];
+export type CapabilityMap = Readonly<Record<CapabilityId, Capability>>;
 
 export type WorkflowRequest = { prompt: string; sources: string[]; fields: string[] };
 export type WorkflowPlan = WorkflowRequest & {
