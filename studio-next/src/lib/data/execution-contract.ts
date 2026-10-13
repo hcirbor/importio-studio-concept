@@ -1,4 +1,6 @@
 type ExecutionWorkflow = 'extract' | 'research' | 'collect' | 'enrichment' | 'monitor-page' | 'monitor-topic';
+type FieldVerdict = 'supported' | 'not_stated' | 'conflicting' | 'unknown' | 'not_run';
+type ExecutionField = { name: string; required: boolean };
 
 type ExecutionLimits = {
   maxPages: number;
@@ -10,7 +12,7 @@ export type ExecutionRequest = {
   workflow: ExecutionWorkflow;
   goal: string;
   sources: string[];
-  fields: string[];
+  fields: ExecutionField[];
   limits: ExecutionLimits;
 };
 
@@ -57,7 +59,7 @@ export type OperationOptions = {
   timeoutMs?: number;
 };
 
-type RunState = 'queued' | 'running' | 'needs-input' | 'canceling' | 'completed';
+type RunState = 'queued' | 'running' | 'canceling' | 'completed';
 type RunOutcome = 'succeeded' | 'partial' | 'blocked' | 'unavailable' | 'timeout' | 'cancelled' | null;
 
 export type ExecutionUsage = {
@@ -87,9 +89,13 @@ export type RunEvent = {
   runId: string;
   sequence: number;
   occurredAt: string;
-  type: 'state' | 'progress' | 'human-input' | 'result' | 'failure';
+  type: 'state' | 'progress' | 'result' | 'failure';
   state: RunState;
   outcome: RunOutcome;
+  sourceUrl: string | null;
+  workerId: string | null;
+  captureId?: string;
+  verdict?: FieldVerdict;
   message?: string;
 };
 
@@ -100,6 +106,7 @@ export type EvidenceItem = {
   field: string;
   sourceUrl: string;
   quote: string;
+  verdict: FieldVerdict;
   retainedAt: string;
 };
 
@@ -112,31 +119,19 @@ export type CaptureArtifact = {
   retainedAt: string | null;
 };
 
-export type HumanReviewInput = {
-  id: string;
-  runId: string;
-  prompt: string;
-  choices: string[];
-  state: 'open' | 'decided';
-  decision: string | null;
-};
-
-export type HumanReviewDecision = {
-  inputId: string;
-  choice: string;
-  decidedAt: string;
-};
-
 type ExecutionRecord = {
   id: string;
-  values: Record<string, string | number | boolean | null>;
-  evidenceIds: Record<string, string[]>;
+  fields: Record<string, {
+    value: string | number | boolean | null;
+    verdict: FieldVerdict;
+    evidenceIds: string[];
+  }>;
 };
 
 export type ExecutionDataset = {
   id: string;
   runId: string;
-  fields: string[];
+  fields: ExecutionField[];
   records: ExecutionRecord[];
   createdAt: string;
 };
@@ -144,6 +139,7 @@ export type ExecutionDataset = {
 export type RunResults = {
   runId: string;
   datasetId: string | null;
+  fields: ExecutionField[];
   records: ExecutionRecord[];
 };
 
@@ -182,23 +178,41 @@ export type MonitorEvent = {
   occurredAt: string;
 };
 
+export type SearchResult = {
+  title: string;
+  url: string;
+  description: string;
+};
+
+export function deriveStudioOutcome(run: ExecutionRun, results: RunResults): RunOutcome {
+  if (run.failure) return run.outcome;
+  if (run.state !== 'completed') return null;
+  if (run.outcome === 'partial') return 'partial';
+  const required = results.fields.filter((field) => field.required);
+  if (!results.records.length && required.length) return 'partial';
+  const unresolved = results.records.some((record) => required.some((field) => record.fields[field.name]?.verdict !== 'supported'));
+  return unresolved ? 'partial' : 'succeeded';
+}
+
 export interface ExecutionEngine {
   plan(request: ExecutionRequest, options?: OperationOptions): Promise<ExecutionResult<ExecutionPlan>>;
   validate(plan: ExecutionPlan, options?: OperationOptions): Promise<ExecutionResult<ValidationResult>>;
   startRun(plan: ExecutionPlan, options?: OperationOptions): Promise<ExecutionResult<ExecutionRun>>;
   getRun(runId: string, options?: OperationOptions): Promise<ExecutionResult<ExecutionRun>>;
+  listRuns(options?: OperationOptions): Promise<ExecutionResult<ExecutionRun[]>>;
   retryRun(runId: string, options?: OperationOptions): Promise<ExecutionResult<ExecutionRun>>;
   cancelRun(runId: string, options?: OperationOptions): Promise<ExecutionResult<ExecutionRun>>;
   subscribeRunEvents(runId: string, listener: (event: RunEvent) => void): () => void;
   getEvidence(runId: string, options?: OperationOptions): Promise<ExecutionResult<EvidenceItem[]>>;
   getCaptures(runId: string, options?: OperationOptions): Promise<ExecutionResult<CaptureArtifact[]>>;
-  getHumanReviewInputs(runId: string, options?: OperationOptions): Promise<ExecutionResult<HumanReviewInput[]>>;
-  decideHumanReview(decision: HumanReviewDecision, options?: OperationOptions): Promise<ExecutionResult<HumanReviewInput>>;
   getResults(runId: string, options?: OperationOptions): Promise<ExecutionResult<RunResults>>;
   getDataset(datasetId: string, options?: OperationOptions): Promise<ExecutionResult<ExecutionDataset>>;
   getUsage(runId: string, options?: OperationOptions): Promise<ExecutionResult<ExecutionUsage>>;
+  search(query: string, options?: OperationOptions): Promise<ExecutionResult<SearchResult[]>>;
   startEnrichment(request: EnrichmentRequest, options?: OperationOptions): Promise<ExecutionResult<ExecutionRun>>;
   createMonitor(request: MonitorRequest, options?: OperationOptions): Promise<ExecutionResult<ExecutionMonitor>>;
   getMonitor(monitorId: string, options?: OperationOptions): Promise<ExecutionResult<ExecutionMonitor>>;
+  pauseMonitor(monitorId: string, options?: OperationOptions): Promise<ExecutionResult<ExecutionMonitor>>;
+  deleteMonitor(monitorId: string, options?: OperationOptions): Promise<ExecutionResult<void>>;
   listMonitorEvents(monitorId: string, options?: OperationOptions): Promise<ExecutionResult<MonitorEvent[]>>;
 }

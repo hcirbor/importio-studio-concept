@@ -11,13 +11,12 @@ import type {
   ExecutionResult,
   ExecutionRun,
   ExecutionUsage,
-  HumanReviewDecision,
-  HumanReviewInput,
   MonitorEvent,
   MonitorRequest,
   OperationOptions,
   RunEvent,
   RunResults,
+  SearchResult,
   ValidationIssue,
   ValidationResult,
 } from '@/lib/data/execution-contract';
@@ -27,7 +26,6 @@ type RunSeed = {
   records?: RunResults['records'];
   evidence?: EvidenceItem[];
   captures?: CaptureArtifact[];
-  humanInputs?: HumanReviewInput[];
   usage?: Partial<ExecutionUsage>;
 };
 
@@ -107,6 +105,12 @@ export class MockContractExecutionEngine implements ExecutionEngine {
     return run ? { ok: true, value: run } : failure('not_found', 'Run was not found.');
   }
 
+  async listRuns(options?: OperationOptions): Promise<ExecutionResult<ExecutionRun[]>> {
+    const interrupted = stopped(options);
+    if (interrupted) return interrupted;
+    return { ok: true, value: [...this.runs.values()] };
+  }
+
   async retryRun(runId: string, options?: OperationOptions): Promise<ExecutionResult<ExecutionRun>> {
     const interrupted = stopped(options);
     if (interrupted) return interrupted;
@@ -149,38 +153,18 @@ export class MockContractExecutionEngine implements ExecutionEngine {
     return this.runArtifact(runId, options, (seed) => seed.captures ?? []);
   }
 
-  async getHumanReviewInputs(runId: string, options?: OperationOptions): Promise<ExecutionResult<HumanReviewInput[]>> {
-    return this.runArtifact(runId, options, (seed) => seed.humanInputs ?? []);
-  }
-
-  async decideHumanReview(decision: HumanReviewDecision, options?: OperationOptions): Promise<ExecutionResult<HumanReviewInput>> {
-    const interrupted = stopped(options);
-    if (interrupted) return interrupted;
-    for (const [runId, seed] of this.seeds) {
-      const input = seed.humanInputs?.find((item) => item.id === decision.inputId);
-      if (!input) continue;
-      if (!input.choices.includes(decision.choice)) return failure('invalid_request', 'Decision is not one of the allowed choices.');
-      const decided = { ...input, state: 'decided' as const, decision: decision.choice };
-      seed.humanInputs = seed.humanInputs?.map((item) => item.id === input.id ? decided : item);
-      const run = this.runs.get(runId);
-      // A decision only records input. It never invents automatic Partial or completion behavior.
-      if (run) this.emit(run, 'human-input');
-      return { ok: true, value: decided };
-    }
-    return failure('not_found', 'Human-review input was not found.');
-  }
-
   async getResults(runId: string, options?: OperationOptions): Promise<ExecutionResult<RunResults>> {
     const interrupted = stopped(options);
     if (interrupted) return interrupted;
     if (!this.runs.has(runId)) return failure('not_found', 'Run was not found.');
+    const run = this.runs.get(runId);
+    const fields = this.plans.get(run?.planId ?? '')?.fields ?? [];
     const records = this.seeds.get(runId)?.records ?? [];
     const datasetId = records.length ? `dataset-${runId}` : null;
     if (datasetId && !this.datasets.has(datasetId)) {
-      const plan = this.plans.get(this.runs.get(runId)?.planId ?? '');
-      this.datasets.set(datasetId, { id: datasetId, runId, fields: plan?.fields ?? [], records, createdAt: new Date(0).toISOString() });
+      this.datasets.set(datasetId, { id: datasetId, runId, fields, records, createdAt: new Date(0).toISOString() });
     }
-    return { ok: true, value: { runId, datasetId, records } };
+    return { ok: true, value: { runId, datasetId, fields, records } };
   }
 
   async getDataset(datasetId: string, options?: OperationOptions): Promise<ExecutionResult<ExecutionDataset>> {
@@ -197,8 +181,14 @@ export class MockContractExecutionEngine implements ExecutionEngine {
     return { ok: true, value: { ...defaultUsage, ...this.seeds.get(runId)?.usage, costUsd: null } };
   }
 
+  async search(query: string, options?: OperationOptions): Promise<ExecutionResult<SearchResult[]>> {
+    const interrupted = stopped(options);
+    if (interrupted) return interrupted;
+    return { ok: true, value: query.trim() ? [{ title: 'Example result', url: 'https://result.example', description: 'Supported public result.' }] : [] };
+  }
+
   async startEnrichment(request: EnrichmentRequest, options?: OperationOptions): Promise<ExecutionResult<ExecutionRun>> {
-    const planned = await this.plan({ workflow: 'enrichment', goal: request.name, sources: request.rows.map((row) => row.values[request.sourceField]).filter(Boolean), fields: request.fields, limits: request.limits }, options);
+    const planned = await this.plan({ workflow: 'enrichment', goal: request.name, sources: request.rows.map((row) => row.values[request.sourceField]).filter(Boolean), fields: request.fields.map((name) => ({ name, required: true })), limits: request.limits }, options);
     return planned.ok ? this.startRun(planned.value, options) : planned;
   }
 
@@ -220,6 +210,24 @@ export class MockContractExecutionEngine implements ExecutionEngine {
     return monitor ? { ok: true, value: monitor } : failure('not_found', 'Monitor was not found.');
   }
 
+  async pauseMonitor(monitorId: string, options?: OperationOptions): Promise<ExecutionResult<ExecutionMonitor>> {
+    const interrupted = stopped(options);
+    if (interrupted) return interrupted;
+    const monitor = this.monitors.get(monitorId);
+    if (!monitor) return failure('not_found', 'Monitor was not found.');
+    const paused = { ...monitor, state: 'paused' as const };
+    this.monitors.set(monitorId, paused);
+    return { ok: true, value: paused };
+  }
+
+  async deleteMonitor(monitorId: string, options?: OperationOptions): Promise<ExecutionResult<void>> {
+    const interrupted = stopped(options);
+    if (interrupted) return interrupted;
+    if (!this.monitors.delete(monitorId)) return failure('not_found', 'Monitor was not found.');
+    this.monitorEvents.delete(monitorId);
+    return { ok: true, value: undefined };
+  }
+
   async listMonitorEvents(monitorId: string, options?: OperationOptions): Promise<ExecutionResult<MonitorEvent[]>> {
     const interrupted = stopped(options);
     if (interrupted) return interrupted;
@@ -233,6 +241,12 @@ export class MockContractExecutionEngine implements ExecutionEngine {
     const finished = this.finish(run, outcome);
     this.runs.set(runId, finished);
     this.emit(finished, outcome === 'succeeded' || outcome === 'partial' ? 'result' : 'failure');
+  }
+
+  recordSourceResult(runId: string, sourceUrl: string, workerId: string, verdict: NonNullable<RunEvent['verdict']>, captureId?: string) {
+    const run = this.runs.get(runId);
+    if (!run) return;
+    this.emit(run, 'result', { sourceUrl, workerId, verdict, ...(captureId ? { captureId } : {}) });
   }
 
   recordMonitorRun(monitorId: string, runId: string, change: MonitorEvent['change']) {
@@ -258,8 +272,8 @@ export class MockContractExecutionEngine implements ExecutionEngine {
     return { ...run, state: 'completed', outcome, finishedAt: new Date(1).toISOString(), failure: failed ? { code: outcome as ExecutionFailure['code'], message: `Run ended: ${outcome}.`, retryable: outcome === 'unavailable' || outcome === 'timeout' } : null };
   }
 
-  private emit(run: ExecutionRun, type: RunEvent['type']) {
-    const event: RunEvent = { id: `event-${this.sequence + 1}`, runId: run.id, sequence: this.sequence += 1, occurredAt: new Date(this.sequence).toISOString(), type, state: run.state, outcome: run.outcome };
+  private emit(run: ExecutionRun, type: RunEvent['type'], detail: Pick<RunEvent, 'sourceUrl' | 'workerId'> & Partial<Pick<RunEvent, 'captureId' | 'verdict'>> = { sourceUrl: null, workerId: null }) {
+    const event: RunEvent = { id: `event-${this.sequence + 1}`, runId: run.id, sequence: this.sequence += 1, occurredAt: new Date(this.sequence).toISOString(), type, state: run.state, outcome: run.outcome, ...detail };
     this.listeners.get(run.id)?.forEach((listener) => listener(event));
   }
 

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { ExecutionPlan, ExecutionRequest, ExecutionResult, HumanReviewInput } from '@/lib/data/execution-contract';
+import { deriveStudioOutcome, type ExecutionPlan, type ExecutionRequest, type ExecutionResult } from '@/lib/data/execution-contract';
 import { MockContractExecutionEngine } from '@/lib/data/mock/mock-contract-execution';
 
 const request: ExecutionRequest = {
   workflow: 'extract',
   goal: 'Extract supported product facts.',
   sources: ['https://shop.example/product'],
-  fields: ['name', 'price'],
+  fields: [{ name: 'name', required: true }, { name: 'price', required: true }],
   limits: { maxPages: 3, maxRecords: 10, timeoutMs: 300_000 },
 };
 
@@ -48,7 +48,7 @@ describe('production ExecutionEngine contract', () => {
     const engine = new MockContractExecutionEngine();
     const started = value(await engine.startRun(await plan(engine)));
     const events: string[] = [];
-    const unsubscribe = engine.subscribeRunEvents(started.id, (event) => events.push(`${event.sequence}:${event.type}:${event.outcome}`));
+    const unsubscribe = engine.subscribeRunEvents(started.id, (event) => events.push(`${event.sequence}:${event.type}:${event.outcome}:${event.workerId}`));
     const cancelled = value(await engine.cancelRun(started.id));
     const retried = value(await engine.retryRun(started.id));
     unsubscribe();
@@ -56,7 +56,7 @@ describe('production ExecutionEngine contract', () => {
     expect(cancelled.outcome).toBe('cancelled');
     expect(cancelled.failure).toMatchObject({ code: 'cancelled', retryable: false });
     expect(retried).toMatchObject({ attempt: 2, state: 'running', outcome: null });
-    expect(events).toEqual(['2:state:cancelled']);
+    expect(events).toEqual(['2:state:cancelled:null']);
   });
 
   it.each([
@@ -79,28 +79,61 @@ describe('production ExecutionEngine contract', () => {
     const engine = new MockContractExecutionEngine();
     const started = value(await engine.startRun(await plan(engine)));
     engine.seedRun(started.id, {
-      records: [{ id: 'record-1', values: { name: 'Trailhead', price: null }, evidenceIds: { name: ['evidence-1'], price: [] } }],
-      evidence: [{ id: 'evidence-1', runId: started.id, recordId: 'record-1', field: 'name', sourceUrl: 'https://shop.example/product', quote: 'Trailhead tent', retainedAt: new Date(0).toISOString() }],
+      records: [{ id: 'record-1', fields: { name: { value: 'Trailhead', verdict: 'supported', evidenceIds: ['evidence-1'] }, price: { value: null, verdict: 'not_stated', evidenceIds: [] } } }],
+      evidence: [{ id: 'evidence-1', runId: started.id, recordId: 'record-1', field: 'name', sourceUrl: 'https://shop.example/product', quote: 'Trailhead tent', verdict: 'supported', retainedAt: new Date(0).toISOString() }],
       captures: [{ id: 'capture-1', runId: started.id, sourceUrl: 'https://shop.example/product', kind: 'html', state: 'retained', retainedAt: new Date(0).toISOString() }],
     });
     engine.completeRun(started.id, 'partial');
 
     const results = value(await engine.getResults(started.id));
-    expect(results.records[0]?.values.price).toBeNull();
+    expect(results.records[0]?.fields.price).toEqual({ value: null, verdict: 'not_stated', evidenceIds: [] });
     expect(value(await engine.getEvidence(started.id))).toHaveLength(1);
     expect(value(await engine.getCaptures(started.id))).toHaveLength(1);
     expect(value(await engine.getDataset(results.datasetId ?? 'missing')).records).toEqual(results.records);
   });
 
-  it('records human-review decisions without changing the run outcome', async () => {
+  it('emits ordered source and worker results with verdicts', async () => {
     const engine = new MockContractExecutionEngine();
     const started = value(await engine.startRun(await plan(engine)));
-    const input: HumanReviewInput = { id: 'input-1', runId: started.id, prompt: 'Allow the cookie choice?', choices: ['allow', 'skip'], state: 'open', decision: null };
-    engine.seedRun(started.id, { humanInputs: [input] });
+    const events: Array<{ sequence: number; sourceUrl: string | null; workerId: string | null; verdict?: string }> = [];
+    const unsubscribe = engine.subscribeRunEvents(started.id, (event) => events.push(event));
+    engine.recordSourceResult(started.id, 'https://one.example', 'worker-1', 'supported', 'capture-1');
+    engine.recordSourceResult(started.id, 'https://two.example', 'worker-2', 'unknown');
+    unsubscribe();
 
-    const decided = value(await engine.decideHumanReview({ inputId: input.id, choice: 'skip', decidedAt: new Date(0).toISOString() }));
-    expect(decided).toMatchObject({ state: 'decided', decision: 'skip' });
-    expect(value(await engine.getRun(started.id))).toMatchObject({ state: 'running', outcome: null });
+    expect(events).toMatchObject([
+      { sequence: 2, sourceUrl: 'https://one.example', workerId: 'worker-1', verdict: 'supported', captureId: 'capture-1' },
+      { sequence: 3, sourceUrl: 'https://two.example', workerId: 'worker-2', verdict: 'unknown' },
+    ]);
+  });
+
+  it.each([
+    ['supported', 'succeeded'],
+    ['not_stated', 'partial'],
+    ['conflicting', 'partial'],
+    ['unknown', 'partial'],
+    ['not_run', 'partial'],
+  ] as const)('derives %s required fields as %s', async (verdict, expected) => {
+    const engine = new MockContractExecutionEngine();
+    const started = value(await engine.startRun(await plan(engine, { fields: [{ name: 'name', required: true }] })));
+    engine.seedRun(started.id, { records: [{ id: 'record-1', fields: { name: { value: verdict === 'supported' ? 'Trailhead' : null, verdict, evidenceIds: [] } } }] });
+    engine.completeRun(started.id, 'succeeded');
+    const run = value(await engine.getRun(started.id));
+    expect(deriveStudioOutcome(run, value(await engine.getResults(started.id)))).toBe(expected);
+  });
+
+  it('gives engine failures and an existing partial outcome precedence', async () => {
+    const engine = new MockContractExecutionEngine();
+    const planned = await plan(engine, { fields: [{ name: 'name', required: true }] });
+    const unavailable = value(await engine.startRun(planned));
+    engine.completeRun(unavailable.id, 'unavailable');
+    const unavailableRun = value(await engine.getRun(unavailable.id));
+    expect(deriveStudioOutcome(unavailableRun, { runId: unavailable.id, datasetId: null, fields: planned.fields, records: [] })).toBe('unavailable');
+
+    const partial = value(await engine.startRun(planned));
+    engine.completeRun(partial.id, 'partial');
+    const partialRun = value(await engine.getRun(partial.id));
+    expect(deriveStudioOutcome(partialRun, { runId: partial.id, datasetId: null, fields: planned.fields, records: [{ id: 'record-1', fields: { name: { value: 'Trailhead', verdict: 'supported', evidenceIds: [] } } }] })).toBe('partial');
   });
 
   it('keeps measured usage while costUsd is always unknown', async () => {
@@ -116,6 +149,14 @@ describe('production ExecutionEngine contract', () => {
     expect(run).toMatchObject({ state: 'running', outcome: null, attempt: 1 });
   });
 
+  it('lists runs and searches public results', async () => {
+    const engine = new MockContractExecutionEngine();
+    const started = value(await engine.startRun(await plan(engine)));
+    expect(value(await engine.listRuns()).map((run) => run.id)).toEqual([started.id]);
+    expect(value(await engine.search('example'))).toEqual([{ title: 'Example result', url: 'https://result.example', description: 'Supported public result.' }]);
+    expect(value(await engine.search(''))).toEqual([]);
+  });
+
   it('notifies on monitor changes only when on_change is configured', async () => {
     const engine = new MockContractExecutionEngine();
     const changed = value(await engine.createMonitor({ kind: 'page', goal: 'Watch price', source: 'https://shop.example/product', fields: ['price'], scheduleMinutes: 60, notify: 'on_change' }));
@@ -126,5 +167,13 @@ describe('production ExecutionEngine contract', () => {
 
     expect(value(await engine.listMonitorEvents(changed.id)).map((event) => event.notified)).toEqual([false, true]);
     expect(value(await engine.listMonitorEvents(quiet.id))[0]?.notified).toBe(false);
+  });
+
+  it('pauses and deletes monitors', async () => {
+    const engine = new MockContractExecutionEngine();
+    const monitor = value(await engine.createMonitor({ kind: 'page', goal: 'Watch price', source: 'https://shop.example/product', fields: ['price'], scheduleMinutes: 60, notify: 'on_change' }));
+    expect(value(await engine.pauseMonitor(monitor.id)).state).toBe('paused');
+    expect((await engine.deleteMonitor(monitor.id)).ok).toBe(true);
+    expect(await engine.getMonitor(monitor.id)).toMatchObject({ ok: false, error: { code: 'not_found' } });
   });
 });

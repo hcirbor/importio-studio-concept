@@ -76,8 +76,8 @@ Naming: CiteOtter's `review` is an automated evidence check. Studio's human inbo
 | 2R | **Code review + cleanup** | P3R | Written review (duplication, components over ~300 lines, `any`, dead code, per-template special cases, text-matching logic); then one cleanup with no visual changes; quality baseline reduced | Yes, demo | `cleanup-1` | Review report saved in `docs/reviews/`; baseline violations reduced; 0 visual differences |
 | 3 | Status labels | P4 | Capabilities map + StatusTag; off on demo | Yes, demo (labels off) | `status-tags` | 0 differences with labels off; labelled states tested |
 | 3B | **Feature parity with the HTML concept** | P4B | Restore features lost in the React port (see "Parity gaps"), on mock data, with status labels where the engine can't support them yet | Yes, demo | `parity-1` | Every gap is either restored or recorded as an intentional removal; journey tests added for each restored flow |
-| 4A | **Engine contract** | P4A | Define and test the production engine contract against mock implementations only | No | `engine-contract` | The contract covers phases 7–10 and the production engine path is confirmed before live feature work begins |
-| 4 | Protected live host + server | P5 | Server build; access gate; allowlisted `/api/engine/*` proxy; health and Extract smoke test | Yes, live preview | `live-gateway` | Gate blocks anonymous access; `/healthz` OK; bounded Extract smoke test passes (provider path works); no credential reaches the browser |
+| 4A | **Engine contract** | P4A | Define and test the production engine contract against mock implementations only | No | `engine-contract` | The contract covers phases 5–10 against mock implementations and is reviewed |
+| 4 | Protected live host + server | P5 | Server build; access gate; allowlisted `/api/engine/*` proxy; health and Extract smoke test | Yes, live preview | `live-gateway` | Gate blocks anonymous access; `/healthz` OK; bounded Extract smoke test passes and confirms the production engine path; no credential reaches the browser |
 | 5 | Extract, live | P6 | Live ExecutionEngine for "Extract from a page" | Live preview | `live-extract` | Supported public HTTPS pages run end to end: plan → run → evidence → dataset → export; blocked/unavailable pages show a clear state |
 | 5R | **Human engineering review** | — | An engineer reviews the CiteOtter translation, the `/api/engine/*` server, the access gate and credential handling. Findings fixed in a follow-up prompt | No | `live-extract-reviewed` | Named reviewer signs off; blocking findings fixed. No wider access to the live preview before this |
 | 6 | Compare + harden | P7 | 10-URL mock-vs-live comparison; error states; usage metrics kept, `cost_usd` unknown | Live preview | `live-extract-hardened` | Blocked, timeout and null cases handled; comparison report written |
@@ -137,7 +137,7 @@ The host decision is open.
 
 - **Option A (original):** Studio runs as its own service on the Kapeta/Storm Hetzner staging Kubernetes cluster, next to CiteOtter. This needs a `kapeta-cloud-infra` PR, a private registry repository, DNS, a SealedSecret and the repositories moved into the `kapetacom` organisation. It is blocked on approvals while the CiteOtter owner is away.
 - **Option B (CEO request, 13 Oct 2026):** Host on a company account the team controls. The preferred candidate is Google Cloud Run + IAP; Cloudflare Workers + Access remains an alternative. Limit Google sign-in to `neuralogics.com`, use the provider's default URL without DNS, and store the CiteOtter credential as a host secret. Moving to Option A later remains possible.
-- **Either way:** Studio reaches CiteOtter over public HTTPS, has no direct database access, and keeps the CiteOtter credential as a server-held host secret. Internal-model cost is already resolved. Phase 5R human engineering review is required before wider access.
+- **Either way:** Studio reaches CiteOtter over public HTTPS, has no direct database access, and keeps the CiteOtter credential as a server-held host secret. The live preview is not `chatgpt.site`, not public, and not hosted in CiteOtter's repository. Internal-model cost is already resolved. Phase 5R human engineering review is required before wider access.
 
 **Decision: unresolved.**
 
@@ -150,8 +150,11 @@ Phase 3B keeps automatic decision-to-`Partial` completion deferred to Phase 4A/5
 - [ ] **Repository move/ownership:** decide whether `hcirbor/importio-studio-concept` and CiteOtter-related infrastructure repositories move into the `kapetacom` organisation, and identify their owner.
 - [x] **Amber staging cost:** Amber is an internal model; staging usage needs no sign-off.
 - [ ] **Named company owner for any CiteOtter change:** required before any separate CiteOtter branch or PR; initial integration remains read-only.
+- [ ] **CTO or platform owner informed:** confirm the live-host and ownership plan has been communicated.
 - [ ] **Confirmed production engine path:** confirm the hosted Studio → `/api/engine/*` → public HTTPS CiteOtter route before phases 7–10.
 - [ ] **Named Phase 5R reviewer:** an engineer must sign off the live integration before wider access.
+
+Phase 5 adapter wiring carries the remaining legacy boundary work: split `mock-control-plane.ts`; remove the three `window.dispatchEvent` bridges; replace the UI-shaped `RunEvent.presentation`; and close review findings R2, R3, R9 and R13 as detailed in `studio-next/docs/engine-contract.md`.
 
 ## Rollback (non-destructive only)
 
