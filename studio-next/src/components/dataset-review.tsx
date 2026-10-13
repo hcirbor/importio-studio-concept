@@ -91,7 +91,8 @@ export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io
   }
 
   return (
-    <section className="panel dataset-review">
+    <>
+      <section className="panel dataset-review">
       <div className="review-summary">
         <span>PREVIEW COMPLETE · RUN_7F3A</span>
         <strong>{hasAvailability ? '3 retailers checked. 1 field needs review.' : '3 retailers checked. Records are ready to review.'}</strong>
@@ -197,6 +198,7 @@ export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io
         <DatasetExportMenu dataset={{ title: datasetName, records: exportRecords }} />
       </footer>
       <EvidencePanel evidence={evidence} onClose={() => setEvidence(null)} />
+      </section>
       <ActionBar
         status={savedDatasetId ? 'Dataset saved' : hasAvailability ? 'Review required' : 'Ready to save'}
         summary={hasAvailability
@@ -217,6 +219,6 @@ export function DatasetReview({ fields = [], onSaved, workspaceName = 'Import.io
           </Button>
         )}
       />
-    </section>
+    </>
   );
 }

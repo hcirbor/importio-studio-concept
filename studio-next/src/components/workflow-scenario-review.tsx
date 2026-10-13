@@ -248,7 +248,8 @@ export function WorkflowScenarioReview({
   }
 
   return (
-    <section className="panel scenario-review">
+    <>
+      <section className="panel scenario-review">
       <div className="review-summary">
         <span>PREVIEW COMPLETE</span>
         <strong>
@@ -290,6 +291,7 @@ export function WorkflowScenarioReview({
         <DatasetExportMenu dataset={{ title: datasetName, records: datasetRecords }} />
       </footer>
       <EvidencePanel evidence={evidence} onClose={() => setEvidence(null)} />
+      </section>
       <ActionBar
         status={monitorCreated
           ? 'Monitor created'
@@ -328,6 +330,6 @@ export function WorkflowScenarioReview({
           </Button>
         )}
       />
-    </section>
+    </>
   );
 }

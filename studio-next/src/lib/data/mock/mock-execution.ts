@@ -79,7 +79,35 @@ export function createMockExecution(controlPlane: StudioControlPlane, getSnapsho
   const events = new Map<string, RunEvent>();
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
   const currentRun = (runId: string) => getSnapshot().auth.runs.find((run) => run.id === runId);
-  const presentationForRun = (runId: string) => presentations.get(runId) ?? seededPresentations.run_7f3a;
+  const presentationForRun = (runId: string) => {
+    const presentation = presentations.get(runId) ?? seededPresentations.run_7f3a;
+    const run = currentRun(runId);
+    const dataset = run?.datasetId
+      ? getSnapshot().auth.datasets.find((item) => item.id === run.datasetId)
+      : undefined;
+    const review = dataset?.review;
+    if (!review || !dataset.records) return presentation;
+    const open = review.status === 'Open' && review.issueCount > 0;
+    return {
+      ...presentation,
+      workers: presentation.workers.map((worker) => {
+        const record = dataset.records?.find((item) => {
+          const sourceUrl = item.evidence[review.field]?.sourceUrl;
+          return sourceUrl ? sourceDomain(sourceUrl) === worker.domain : false;
+        });
+        const value = record?.values[review.field];
+        const unresolved = value === null || value === 'Unknown';
+        if (open && unresolved) return { ...worker, availability: 'Unresolved' };
+        if (!open && worker.availability === 'Unresolved') {
+          return {
+            ...worker,
+            availability: typeof value === 'string' ? value : undefined,
+          };
+        }
+        return worker;
+      }),
+    };
+  };
   const emit = (runId: string, decisionState?: RunEvent['decisionState']) => {
     const run = currentRun(runId);
     if (!run) return;

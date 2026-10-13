@@ -88,22 +88,24 @@ export function PipelineDetail() {
             <h2>Operate</h2>
             <Eyebrow>Last run · 2 min ago</Eyebrow>
           </div>
-          <DialogFooter>
-            <Button variant="secondary" asChild>
-              <Link href="/monitors">Configure monitor</Link>
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={!mayPromote}
-              title={!mayPromote ? viewerTooltip : undefined}
-              onClick={() => setMessage('Schedule saved: daily at 14:00 UTC.')}
-            >
-              Schedule
-            </Button>
-            <Button variant="secondary" asChild>
-              <Link href="/developers">API / MCP setup</Link>
-            </Button>
-          </DialogFooter>
+          <div className="panel-body">
+            <DialogFooter>
+              <Button variant="secondary" asChild>
+                <Link href="/monitors">Configure monitor</Link>
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={!mayPromote}
+                title={!mayPromote ? viewerTooltip : undefined}
+                onClick={() => setMessage('Schedule saved: daily at 14:00 UTC.')}
+              >
+                Schedule
+              </Button>
+              <Button variant="secondary" asChild>
+                <Link href="/developers">API / MCP setup</Link>
+              </Button>
+            </DialogFooter>
+          </div>
         </aside>
       </div>
       <section className="panel" style={{ marginTop: 18 }}>

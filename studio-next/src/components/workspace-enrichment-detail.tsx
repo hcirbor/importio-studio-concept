@@ -2,7 +2,15 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { Badge, Button, Eyebrow } from '@/components/design-system';
+import {
+  Badge,
+  Button,
+  Card,
+  CardHeader,
+  CardTitle,
+  DialogFooter,
+  Eyebrow,
+} from '@/components/design-system';
 import { useStudio, type DatasetRecord } from '@/lib/data';
 import { formatFieldLabel } from '@/lib/workflow/fields';
 import { DatasetExportMenu } from './dataset-export-menu';
@@ -82,7 +90,26 @@ export function WorkspaceEnrichmentDetail({ enrichmentId }: { enrichmentId: stri
       </section>
       {enrichment.state === 'Validated' && enrichment.outcome === 'Ready' ? <section className="panel enrichment-ready-panel"><div><Eyebrow>Validated CSV</Eyebrow><h2>Ready to enrich {enrichment.rowCount} {enrichment.rowCount === 1 ? 'row' : 'rows'}.</h2><p>The demo will visit each row’s source and retain evidence for the enriched values.</p></div><Button variant="primary" onClick={runEnrichment}>Run enrichment</Button></section> : null}
       {enrichment.state === 'Running' ? <p className="review-feedback" role="status">Running enrichment · checking sources and retaining evidence…</p> : null}
-      {enrichment.outcome === 'Partial' && !retried ? <div className="review-warning enrichment-review-warning"><span>{reviewRows.length} preview {reviewRows.length === 1 ? 'row needs' : 'rows need'} review: {reviewRows.map((row) => Object.values(row.values)[0]).join(', ')}.</span><div><Button variant="secondary" onClick={() => { setRetried(true); auth.updateEnrichment(enrichment.id, { outcome: 'Succeeded' }); }}>Retry {reviewRows.length} failed</Button> <Link className="text-link" href="/review">Open Review →</Link></div></div> : null}
+      {enrichment.outcome === 'Partial' && !retried ? (
+        <Card className="enrichment-review-warning">
+          <CardHeader>
+            <CardTitle>
+              {reviewRows.length} preview {reviewRows.length === 1 ? 'row needs' : 'rows need'} retry: {reviewRows.map((row) => Object.values(row.values)[0]).join(', ')}.
+            </CardTitle>
+            <DialogFooter>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setRetried(true);
+                  auth.updateEnrichment(enrichment.id, { outcome: 'Succeeded' });
+                }}
+              >
+                Retry {reviewRows.length} failed
+              </Button>
+            </DialogFooter>
+          </CardHeader>
+        </Card>
+      ) : null}
       {retried ? <p className="review-feedback" role="status">Retry complete · failed rows were checked again.</p> : null}
       <section className="panel dataset-detail-table">
         <div className="table-scroll">

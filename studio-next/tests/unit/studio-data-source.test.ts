@@ -220,7 +220,21 @@ describe('mock Studio data source', () => {
     const legacy = initialize();
     expect(legacy.getSnapshot().humanReview.reviewCount).toBe(0);
     expect(storage.getItem('importio-studio-review-state')).toBeNull();
-    expect(storage.getItem('importio-studio-demo-schema')).toBe('phase-3b-review-v2');
+    expect(storage.getItem('importio-studio-demo-schema')).toBe('phase-3b-review-v3');
+  });
+
+  it('resets stale demo content at a schema boundary while preserving the session', () => {
+    const first = signedInSource();
+    first.controlPlane.setDatasetReviewState('competitor-prices', 0);
+    storage.setItem('importio-studio-demo-schema', 'phase-3b-review-v2');
+
+    const restored = initialize();
+    const snapshot = restored.getSnapshot();
+
+    expect(snapshot.auth.currentUser?.name).toBe('Jordan Davis');
+    expect(snapshot.humanReview.reviewCount).toBe(1);
+    expect(snapshot.auth.datasets.find((dataset) => dataset.id === 'outdoor-catalogue')?.recordCount).toBe(1284);
+    expect(snapshot.auth.runs.find((run) => run.id === 'run_7e91')?.issueCount).toBe(0);
   });
 
   it('decodes invalid persisted values and falls back to seeded data', () => {

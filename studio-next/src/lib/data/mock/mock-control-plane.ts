@@ -657,7 +657,7 @@ function normalizeDatasets(collections: Record<string, WorkspaceDataset[]> | und
 const storageKey = 'importio-studio-demo-auth';
 const reviewStateKey = 'importio-studio-review-state';
 const storageSchemaKey = 'importio-studio-demo-schema';
-const storageSchemaVersion = 'phase-3b-review-v2';
+const storageSchemaVersion = 'phase-3b-review-v3';
 const initialState = (): AuthState => ({
     session: null,
     workspaces: seededWorkspaces,
@@ -717,9 +717,17 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     this.initialized = true;
     window.setTimeout(() => {
       const stored = window.localStorage.getItem(storageKey);
+      const storedSchema = window.localStorage.getItem(storageSchemaKey);
       if (stored) {
         try {
-          this.state = decodeAuthState(JSON.parse(stored));
+          const decoded = decodeAuthState(JSON.parse(stored));
+          this.state = storedSchema === storageSchemaVersion
+            ? decoded
+            : {
+                ...initialState(),
+                session: decoded.session,
+                demoRole: decoded.demoRole,
+              };
         } catch { window.localStorage.removeItem(storageKey); }
       }
       window.localStorage.removeItem(reviewStateKey);

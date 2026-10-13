@@ -84,6 +84,8 @@ test('Home review journey carries evidence and decision context until resolution
   await waitForStudio(page);
   await expect(page.getByRole('link', { name: 'Open dataset' })).toBeVisible();
   await expect(page.getByRole('link', { name: 'Needs review' })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Trail Shop · complete' })).toBeVisible();
+  await expect(page.getByText('1 to review', { exact: true })).toHaveCount(0);
   await page.goto('/datasets/competitor-prices');
   await waitForStudio(page);
   await expect(page.getByText('Validated · 0 unresolved')).toBeVisible();

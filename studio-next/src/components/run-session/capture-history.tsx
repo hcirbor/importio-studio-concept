@@ -97,9 +97,11 @@ export function CaptureHistory({
         </span>
       </CardFooter>
       {artefact ? (
-        <span role="status" className="muted">
-          {artefact}
-        </span>
+        <CardContent>
+          <span role="status" className="muted">
+            {artefact}
+          </span>
+        </CardContent>
       ) : null}
     </Card>
   );
