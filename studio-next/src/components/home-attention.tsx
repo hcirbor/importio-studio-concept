@@ -28,8 +28,8 @@ export function HomeAttention() {
           <div className="attention-item" key={`review-${dataset.id}`}>
             <span>!</span>
             <div>
-              <strong>{dataset.review?.field} needs review</strong>
-              <small>{dataset.title} · {dataset.review?.summary}</small>
+              <strong>Needs review</strong>
+              <small>{dataset.review?.itemDescription}</small>
             </div>
             <Link href="/review" className="text-link">
               Review

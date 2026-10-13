@@ -9,7 +9,10 @@ import { isTimestampToday, RelativeTime, useCurrentTime } from '../relative-time
 import { Feedback, PageHead, SelectField, Status, TablePanel, type TableRow } from './shared';
 
 export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
-  const runs = useStudio((snapshot) => snapshot.auth.runs);
+  const { runs, datasets } = useStudio((snapshot) => ({
+    runs: snapshot.auth.runs,
+    datasets: snapshot.auth.datasets,
+  }));
   const router = useRouter();
   const now = useCurrentTime();
   const [workflow, setWorkflow] = useState('all');
@@ -47,9 +50,15 @@ export function RunsSection({ showHeader = true }: { showHeader?: boolean }) {
       run.coverage,
       run.records,
       `$${(run.queries * 0.007).toFixed(2)}`,
-      <Status key="status" tone={run.tone}>
-        {run.state}{run.outcome !== run.state ? ` · ${run.outcome}` : ''}
-      </Status>,
+      datasets.find((dataset) => dataset.sourceRunId === run.id)?.review?.status === 'Open' ? (
+        <Link href="/review" key="status">
+          <Status tone="warning">Needs review</Status>
+        </Link>
+      ) : (
+        <Status key="status" tone={run.tone}>
+          {run.state}{run.outcome !== run.state ? ` · ${run.outcome}` : ''}
+        </Status>
+      ),
       <Button key="open" variant="ghost" size="sm" asChild>
         <Link href={run.href}>Open</Link>
       </Button>,

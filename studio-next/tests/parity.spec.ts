@@ -15,13 +15,17 @@ test('approved product identity, workspace identity, readiness, and compact them
   await expect(page.getByText('Interactive demo', { exact: false })).toHaveCount(0);
 });
 
-test('pipeline repair compares evidence, creates a version, and rolls back', async ({ page }) => {
+test('pipeline repair approval leaves the pipeline ready to run and rollback remains available', async ({ page }) => {
   await page.goto('/pipelines/competitor-prices/repair');
   await waitForStudio(page);
   await expect(page.getByRole('heading', { name: 'Product cards changed' })).toBeVisible();
   await page.getByRole('button', { name: 'Approve repair (creates v5)' }).click();
   await expect(page.getByText('Repair approved. Version 5 created and activated.')).toBeVisible();
   await page.getByRole('button', { name: 'Close toast' }).click();
+  await page.goto('/pipelines/competitor-prices');
+  await expect(page.getByText('Active · v5').first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Run now' })).toBeVisible();
+  await page.goto('/pipelines/competitor-prices/repair');
   await page.getByRole('button', { name: 'Roll back to v4' }).click();
   await expect(page.getByText('Rolled back to v4.')).toBeVisible();
   await page.reload();
@@ -59,17 +63,41 @@ test('running multi-worker run exposes queue warnings, resolve action, API code,
   await expect(page.getByText('Screenshot preview opened for this capture.')).toBeVisible();
 });
 
-test('review evidence preserves context and resolution remains synchronized', async ({ page }) => {
-  await page.goto('/review');
+test('Home review journey carries evidence and decision context until resolution', async ({ page }) => {
+  await page.goto('/');
   await waitForStudio(page);
+  const attention = page.getByRole('article').filter({ has: page.getByRole('heading', { name: 'Needs attention' }) });
+  await expect(attention).toContainText('Trail Shop · Trailhead 2P availability not found');
+  await attention.getByRole('link', { name: 'Review', exact: true }).click();
+  await expect(page.getByText('Recommended:')).toBeVisible();
+  await expect(page.getByText('No availability statement appears on the captured page.').first()).toBeVisible();
   await page.getByRole('link', { name: /Price supported/ }).click();
-  await expect(page.getByText('Availability needs review').first()).toBeVisible();
-  await expect(page.getByText('Trail Shop availability was not found.')).toBeVisible();
+  await expect(page.getByText('Trail Shop · Trailhead 2P availability not found').first()).toBeVisible();
   await page.getByRole('link', { name: 'Back to review' }).click();
   await page.getByRole('button', { name: 'Accept unknown' }).click();
-  await page.goto('/runs/run_7f3a?from=review');
-  await expect(page.getByText('Ready to review')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Open review item' })).toHaveCount(0);
+  await expect(page.getByText('0 items need review')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Review queue clear' })).toBeVisible();
+});
+
+test('re-running Research versions one dataset instead of creating a copy', async ({ page }) => {
+  async function runAndSaveResearch() {
+    await page.goto('/build?template=research');
+    await waitForStudio(page);
+    await page.getByRole('button', { name: 'Plan workflow', exact: true }).click();
+    await page.getByRole('button', { name: 'Approve and run →' }).click();
+    await page.getByRole('button', { name: 'Resolve input', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Review data →' })).toBeEnabled();
+    await page.getByRole('button', { name: 'Review data →' }).click();
+    await page.getByRole('button', { name: 'Save dataset' }).click();
+  }
+
+  await runAndSaveResearch();
+  await runAndSaveResearch();
+  await page.goto('/datasets');
+  const researchCards = page.locator('.dataset-card').filter({ hasText: 'Pricing · CloudHarbor, Letterloop, BrightSend' });
+  await expect(researchCards).toHaveCount(1);
+  await expect(researchCards).toContainText('Dataset V2');
+  await expect(page.getByText(/Pricing · CloudHarbor, Letterloop, BrightSend \(2\)/)).toHaveCount(0);
 });
 
 test('enrichment retries failed rows', async ({ page }) => {

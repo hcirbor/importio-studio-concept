@@ -5,12 +5,7 @@ import { useState } from 'react';
 import {
   Badge,
   Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
   DialogFooter,
-  DialogHeader,
-  DialogTitle,
   Eyebrow,
 } from '@/components/design-system';
 import { can, useStudio, viewerTooltip } from '@/lib/data';
@@ -27,14 +22,12 @@ const initialDestinations = [
 
 export function PipelineDetail() {
   const session = useStudio((snapshot) => snapshot.auth.session);
-  const { version, promotePipeline } = useStudio((snapshot) => ({
+  const { version, repair } = useStudio((snapshot) => ({
     version: snapshot.humanReview.pipelineVersion,
-    promotePipeline: snapshot.humanReview.promotePipeline,
+    repair: snapshot.pipelineRepairs.find((item) => item.pipelineId === 'competitor-prices'),
   }));
   const mayPromote = can(session, 'promote');
   const [message, setMessage] = useState('');
-  const [promoteOpen, setPromoteOpen] = useState(false);
-  const [hasUnreviewedRegression, setHasUnreviewedRegression] = useState(true);
   const [destinations, setDestinations] = useState(initialDestinations);
   const [aperturePublished, setAperturePublished] = useState(false);
   const toggleDestination = (name: string) => {
@@ -95,15 +88,7 @@ export function PipelineDetail() {
             <h2>Operate</h2>
             <Eyebrow>Last run · 2 min ago</Eyebrow>
           </div>
-          <div className="button-grid">
-            <Button
-              variant="secondary"
-              disabled={!mayPromote}
-              title={!mayPromote ? viewerTooltip : undefined}
-              onClick={() => setPromoteOpen(true)}
-            >
-              Promote v5
-            </Button>
+          <DialogFooter>
             <Button variant="secondary" asChild>
               <Link href="/monitors">Configure monitor</Link>
             </Button>
@@ -118,34 +103,9 @@ export function PipelineDetail() {
             <Button variant="secondary" asChild>
               <Link href="/developers">API / MCP setup</Link>
             </Button>
-          </div>
+          </DialogFooter>
         </aside>
       </div>
-    <Dialog open={promoteOpen} onOpenChange={setPromoteOpen}>
-      <DialogContent className="promote-dialog">
-        <DialogHeader>
-          <DialogTitle>Promote version 5</DialogTitle>
-          <DialogDescription>Compare v5 with the last reviewed v4 results before it becomes active.</DialogDescription>
-        </DialogHeader>
-        <div className="promotion-summary">
-          <div><span>Fields changed</span><strong>2</strong></div>
-          <div><span>Records</span><strong>+2 / −1</strong></div>
-          <div><span>Values differ</span><strong>1</strong></div>
-        </div>
-        <div className="promotion-comparison">
-          <article><div><Badge tone="info">Field</Badge><strong>currency_code added</strong><small>New required output field</small></div><Link className="text-link" href="/runs/run_7f3a?worker=northwind&step=2">Evidence →</Link></article>
-          <article><div><Badge tone="info">Field</Badge><strong>availability required → nullable</strong><small>Matches the reviewed unknown-value policy</small></div><Link className="text-link" href="/runs/run_7f3a?worker=trail-shop&step=2">Evidence →</Link></article>
-          <article><div><Badge tone="success">Records</Badge><strong>2 added · 1 removed</strong><small>Net +1 supported record against v4</small></div><Link className="text-link" href="/datasets/competitor-prices">Evidence →</Link></article>
-          <article className={hasUnreviewedRegression ? 'regression' : ''}><div><Badge tone={hasUnreviewedRegression ? 'warning' : 'success'}>{hasUnreviewedRegression ? 'Unreviewed' : 'Reviewed'}</Badge><strong>Trailhead price €249 → €259</strong><small>Value differs from the last reviewed result</small></div><Link className="text-link" href="/runs/run_7f3a?worker=trail-shop&step=2">Evidence →</Link></article>
-        </div>
-        {hasUnreviewedRegression ? <p className="promotion-warning">Promotion is blocked by 1 unreviewed regression.</p> : <p className="promotion-ready">All regressions reviewed. Version 5 is ready to promote.</p>}
-        <DialogFooter>
-          <Button variant="secondary" onClick={() => setPromoteOpen(false)}>Cancel</Button>
-          {hasUnreviewedRegression ? <Button variant="secondary" onClick={() => setHasUnreviewedRegression(false)}>Mark regression reviewed</Button> : null}
-          <Button variant="primary" disabled={hasUnreviewedRegression} onClick={() => { promotePipeline(); setMessage('Version 5 promoted and set active.'); setPromoteOpen(false); }}>Promote v5</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
       <section className="panel" style={{ marginTop: 18 }}>
         <div className="section-head">
           <h2>Recent versions</h2>
@@ -225,14 +185,22 @@ export function PipelineDetail() {
         </div>
       </section>
       <ActionBar
-        status={`Active · v${version}`}
-        summary="The saved pipeline is ready to run against its approved sources."
+        status={repair?.status === 'Ready' || repair?.status === 'Rolled back'
+          ? 'Repair ready'
+          : `Active · v${version}`}
+        summary={repair?.status === 'Ready' || repair?.status === 'Rolled back'
+          ? repair.summary
+          : 'The saved pipeline is ready to run against its approved sources.'}
         secondary={(
           <Button variant="secondary" asChild>
             <Link href="/build?template=compare">Edit pipeline</Link>
           </Button>
         )}
-        primary={(
+        primary={repair?.status === 'Ready' || repair?.status === 'Rolled back' ? (
+          <Button variant="primary" asChild>
+            <Link href="/pipelines/competitor-prices/repair">Review repair</Link>
+          </Button>
+        ) : (
           <Button
             variant="primary"
             disabled={!mayPromote}

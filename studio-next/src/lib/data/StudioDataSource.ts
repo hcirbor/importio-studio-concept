@@ -68,6 +68,9 @@ export type WorkspaceDataset = {
     issueCount: number;
     summary: string;
     description: string;
+    itemDescription: string;
+    recommendation: string;
+    captureLabel: string;
     field: string;
   };
 };

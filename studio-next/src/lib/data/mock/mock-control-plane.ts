@@ -1,4 +1,4 @@
-import { datasetDisplayName } from '@/lib/dataset-slug';
+import { datasetDisplayName, datasetSlug } from '@/lib/dataset-slug';
 import { isRole } from '@/lib/data/StudioDataSource';
 import type {
   AuthInterface,
@@ -282,6 +282,9 @@ const seededDatasets: Record<string, WorkspaceDataset[]> = {
         issueCount: 1,
         summary: 'Trail Shop availability was not found.',
         description: 'The product page exposes a price but no supported availability statement. Keep the field unknown or enter a reviewed value.',
+        itemDescription: 'Trail Shop · Trailhead 2P availability not found',
+        recommendation: 'Accept unknown — the page states price but not availability.',
+        captureLabel: 'Trail Shop · Trailhead 2P capture',
         field: 'Availability',
       },
       records: [
@@ -290,7 +293,61 @@ const seededDatasets: Record<string, WorkspaceDataset[]> = {
         { id: 'trail-shop', values: { Retailer:'Trail Shop',Product:'Trailhead 2 Person',Price:'€259.00',Availability:'Unknown' }, evidence: { Retailer:{sourceUrl:'https://trail-shop.example/search?q=trailhead',quote:'Trail Shop — Trailhead 2 Person.'}, Product:{sourceUrl:'https://trail-shop.example/search?q=trailhead',quote:'Trailhead 2 Person — €259.00.'}, Price:{sourceUrl:'https://trail-shop.example/search?q=trailhead',quote:'Trailhead 2 Person — €259.00.'}, Availability:{sourceUrl:'https://trail-shop.example/search?q=trailhead',quote:'No availability statement appears on the captured page.'} } },
       ],
     },
-    { id: 'outdoor-catalogue', version: 'DATASET · V7', title: 'Outdoor catalogue', detail: '1,284 records · 8 fields · fully validated', status: 'Validated', tone: 'success', href: '/datasets/outdoor-catalogue', recordCount: 1284, fields: ['Product','Price','Availability','URL'], lastUpdated:'1 hour ago', updatedAt: seededNow - 60 * 60_000, unresolvedCount: 0, sourceWorkflow:'Outdoor catalogue', sourceRunId:'run_7e91', sourceRunHref: '/runs/run_7e91', review: { title: 'Outdoor catalogue review resolved', status: 'Resolved', issueCount: 0, summary: 'All required fields are supported.', description: 'All required fields are supported.', field: 'Availability' }, records: [{ id:'summit-solo', values:{Product:'Summit Solo Tent',Price:'€179',Availability:'In stock',URL:'northwind-outdoors.example/tents/summit-solo'}, evidence:{Product:{sourceUrl:'https://northwind-outdoors.example/tents/summit-solo',quote:'Summit Solo Tent — €179 · In stock.'},Price:{sourceUrl:'https://northwind-outdoors.example/tents/summit-solo',quote:'Summit Solo Tent — €179 · In stock.'},Availability:{sourceUrl:'https://northwind-outdoors.example/tents/summit-solo',quote:'Summit Solo Tent — €179 · In stock.'},URL:{sourceUrl:'https://northwind-outdoors.example/tents/summit-solo',quote:'Summit Solo Tent product page.'}}}] },
+    {
+      id: 'outdoor-catalogue',
+      version: 'DATASET · V7',
+      title: 'Outdoor catalogue',
+      detail: '1,284 records · 8 fields · fully validated',
+      status: 'Validated',
+      tone: 'success',
+      href: '/datasets/outdoor-catalogue',
+      recordCount: 1284,
+      fields: ['Product', 'Price', 'Availability', 'URL'],
+      lastUpdated: '1 hour ago',
+      updatedAt: seededNow - 60 * 60_000,
+      unresolvedCount: 0,
+      sourceWorkflow: 'Outdoor catalogue',
+      sourceRunId: 'run_7e91',
+      sourceRunHref: '/runs/run_7e91',
+      review: {
+        title: 'Outdoor catalogue review resolved',
+        status: 'Resolved',
+        issueCount: 0,
+        summary: 'All required fields are supported.',
+        description: 'All required fields are supported.',
+        itemDescription: 'Northwind catalogue · all required fields supported',
+        recommendation: 'No decision required.',
+        captureLabel: 'Northwind catalogue capture',
+        field: 'Availability',
+      },
+      records: [{
+        id: 'summit-solo',
+        values: {
+          Product: 'Summit Solo Tent',
+          Price: '€179',
+          Availability: 'In stock',
+          URL: 'northwind-outdoors.example/tents/summit-solo',
+        },
+        evidence: {
+          Product: {
+            sourceUrl: 'https://northwind-outdoors.example/tents/summit-solo',
+            quote: 'Summit Solo Tent — €179 · In stock.',
+          },
+          Price: {
+            sourceUrl: 'https://northwind-outdoors.example/tents/summit-solo',
+            quote: 'Summit Solo Tent — €179 · In stock.',
+          },
+          Availability: {
+            sourceUrl: 'https://northwind-outdoors.example/tents/summit-solo',
+            quote: 'Summit Solo Tent — €179 · In stock.',
+          },
+          URL: {
+            sourceUrl: 'https://northwind-outdoors.example/tents/summit-solo',
+            quote: 'Summit Solo Tent product page.',
+          },
+        },
+      }],
+    },
     { id: 'qualified-suppliers', version: 'DATASET · V2', title: 'Qualified suppliers', detail: '74 records · 9 fields · 6 unresolved', status: 'Partial', tone: 'warning', href: '/datasets/qualified-suppliers', recordCount:74, fields:['Company','Location','Categories','Minimum order'], lastUpdated:'Yesterday', updatedAt: seededNow - 24 * 60 * 60_000, unresolvedCount: 6, sourceWorkflow:'Qualified supplier discovery', sourceRunId:'run_supplier_2b81', sourceRunHref: '/runs/run_7f3a?run=run_supplier_2b81', records:[{id:'northwind-trade',values:{Company:'Northwind Trade',Location:'Rotterdam',Categories:'Tents, packs','Minimum order':'€500'},evidence:{Company:{sourceUrl:'https://worthington-directory.example/northwind-trade',quote:'Northwind Trade — wholesale outdoor equipment.'},Location:{sourceUrl:'https://worthington-directory.example/northwind-trade',quote:'Based in Rotterdam, Netherlands.'},Categories:{sourceUrl:'https://worthington-directory.example/northwind-trade',quote:'Categories: tents and packs.'},'Minimum order':{sourceUrl:'https://worthington-directory.example/northwind-trade',quote:'Minimum order €500.'}}}] },
   ],
   northwind: [],
@@ -520,6 +577,8 @@ function normalizeDatasets(collections: Record<string, WorkspaceDataset[]> | und
   return Object.fromEntries(Object.entries(collections).map(([workspaceId, datasets]) => {
     const seen = new Set<string>();
     const normalized = datasets.flatMap((dataset) => {
+      if (dataset.id === 'trailhead-quick-try' || dataset.title === 'Trailhead quick try') return [];
+      const baseTitle = dataset.title.replace(/\s+\(\d+\)$/, '');
       const stableIds: Record<string,string> = {
         'SaaS pricing research': 'saas-pricing-research',
         'Extract': 'extract',
@@ -528,7 +587,8 @@ function normalizeDatasets(collections: Record<string, WorkspaceDataset[]> | und
         'Trailhead baseline': 'trailhead-baseline',
         'Competitor prices': 'competitor-prices',
       };
-      const stableId = stableIds[dataset.title] ?? dataset.id;
+      const stableId = stableIds[baseTitle]
+        ?? (baseTitle !== dataset.title ? datasetSlug(baseTitle) : dataset.id);
       if (seen.has(stableId)) return [];
       seen.add(stableId);
       const recordCount = dataset.title === 'Build a dataset' || dataset.title === 'SaaS pricing research'
@@ -543,10 +603,23 @@ function normalizeDatasets(collections: Record<string, WorkspaceDataset[]> | und
         ...seeded,
         ...dataset,
         id: stableId,
-        title: datasetDisplayName(dataset.title.replace(/\s+\(\d+\)$/, ''), stableId),
+        title: datasetDisplayName(baseTitle, stableId),
         href: `/datasets/${stableId}`,
         updatedAt: dataset.updatedAt ?? seeded?.updatedAt ?? timestampFromRelativeLabel(dataset.lastUpdated),
         unresolvedCount: dataset.unresolvedCount ?? seeded?.unresolvedCount ?? unresolvedCountFromDetail(dataset.detail),
+        review: dataset.review ? {
+          ...seeded?.review,
+          ...dataset.review,
+          itemDescription: dataset.review.itemDescription
+            ?? seeded?.review?.itemDescription
+            ?? dataset.review.summary,
+          recommendation: dataset.review.recommendation
+            ?? seeded?.review?.recommendation
+            ?? 'Review the retained evidence before deciding.',
+          captureLabel: dataset.review.captureLabel
+            ?? seeded?.review?.captureLabel
+            ?? `${baseTitle} capture`,
+        } : seeded?.review,
         detail: recordCount === null
           ? dataset.detail
           : dataset.detail.replace(/^\d+ records?/, `${recordCount} ${recordCount === 1 ? 'record' : 'records'}`),
@@ -617,6 +690,34 @@ function decodeReviewState(value: unknown): ReviewStateMap {
   return result;
 }
 
+function reconcileStoredReviewState(state: AuthState, reviewState: ReviewStateMap): AuthState {
+  const datasetsByWorkspace = Object.fromEntries(
+    Object.entries(state.datasetsByWorkspace).map(([workspaceId, datasets]) => [
+      workspaceId,
+      datasets.map((dataset) => {
+        const seededReview = seededDatasets[workspaceId]?.find((item) => item.id === dataset.id)?.review;
+        if (!dataset.review || !seededReview?.issueCount) return dataset;
+        const open = reviewState[workspaceId]?.hasReviewItem ?? dataset.review.status === 'Open';
+        return {
+          ...dataset,
+          unresolvedCount: open ? 1 : 0,
+          status: open ? 'Needs review' as const : 'Validated' as const,
+          tone: open ? 'warning' as const : 'success' as const,
+          review: {
+            ...dataset.review,
+            status: open ? 'Open' as const : 'Resolved' as const,
+            issueCount: open ? 1 : 0,
+          },
+        };
+      }),
+    ]),
+  );
+  return {
+    ...state,
+    datasetsByWorkspace,
+  };
+}
+
 class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
   readonly source = 'mock' as const;
   readonly capabilities = mockCapabilities;
@@ -647,6 +748,7 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
           this.reviewState = decodeReviewState(JSON.parse(storedReview));
         } catch { window.localStorage.removeItem(reviewStateKey); }
       }
+      this.state = reconcileStoredReviewState(this.state, this.reviewState);
       this.ready = true;
       this.publish();
     }, 0);
@@ -705,18 +807,22 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
       ...this.auth,
       ...this.controlPlane,
     };
+    const reviewCount = auth.datasets.reduce(
+      (count, dataset) => count + (dataset.review?.status === 'Open' ? dataset.review.issueCount : 0),
+      0,
+    );
     const humanReview = {
-      hasReviewItem: currentReview.hasReviewItem,
-      reviewCount: currentReview.hasReviewItem ? 1 : 0,
+      hasReviewItem: reviewCount > 0,
+      reviewCount,
       pipelineVersion: currentReview.pipelineVersion,
-      pipelineStatus: currentReview.hasReviewItem ? 'Needs review' as const : 'Healthy' as const,
+      pipelineStatus: reviewCount > 0 ? 'Needs review' as const : 'Healthy' as const,
       acceptReviewItem: this.acceptReviewItem,
       restoreReviewItem: this.restoreReviewItem,
       promotePipeline: this.promotePipeline,
       rollbackPipeline: this.rollbackPipeline,
     };
     const recentPipelines = (mockFixtures.homePipelinesByWorkspace[session?.workspaceId ?? ''] ?? []).map((pipeline) => pipeline.reviewLinked
-      ? { ...pipeline, status: currentReview.hasReviewItem ? 'Needs review' : 'Healthy', tone: currentReview.hasReviewItem ? 'warning' as const : 'success' as const }
+      ? { ...pipeline, status: reviewCount > 0 ? 'Needs review' : 'Healthy', tone: reviewCount > 0 ? 'warning' as const : 'success' as const }
       : pipeline);
     return {
       auth,
@@ -849,7 +955,10 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     const target = members.find((member) => member.id === id);
     const owners = members.filter((member) => member.role === 'Owner' && member.status !== 'Invited');
     if (target?.role === 'Owner' && role !== 'Owner' && owners.length === 1) return { ok: false, message: 'At least one Owner must remain.' };
-    this.updateMembers((current) => current.map((member) => member.id === id ? { ...member, role } : member));
+    this.updateMembers(
+      (current) => current.map((member) => member.id === id ? { ...member, role } : member),
+      `changed ${target?.name ?? id} to ${role}`,
+    );
     return { ok: true };
   };
 
@@ -907,6 +1016,17 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     }),
   }));
   setDatasetReviewState = (datasetId: string, unresolvedCount: number) => {
+    const workspaceId = this.state.session?.workspaceId ?? 'studio';
+    const anotherItemIsOpen = this.snapshot.auth.datasets.some(
+      (dataset) => dataset.id !== datasetId && dataset.review?.status === 'Open',
+    );
+    this.reviewState = {
+      ...this.reviewState,
+      [workspaceId]: {
+        ...(this.reviewState[workspaceId] ?? { hasReviewItem: false, pipelineVersion: 4 }),
+        hasReviewItem: unresolvedCount > 0 || anotherItemIsOpen,
+      },
+    };
     this.commit((current) => {
       if (!current.session) return current;
       const workspaceId = current.session.workspaceId;
@@ -1045,8 +1165,32 @@ class MockStudioDataSource implements StudioDataSource, StudioControlPlane {
     this.publish();
   }
 
-  acceptReviewItem = () => this.updateCurrentReview({ hasReviewItem: false });
-  restoreReviewItem = () => this.updateCurrentReview({ hasReviewItem: true });
+  private setReviewOpen(open: boolean) {
+    const workspaceId = this.state.session?.workspaceId ?? 'studio';
+    this.reviewState = {
+      ...this.reviewState,
+      [workspaceId]: {
+        ...(this.reviewState[workspaceId] ?? { hasReviewItem: false, pipelineVersion: 4 }),
+        hasReviewItem: open,
+      },
+    };
+    const reviewableIds = new Set(
+      (seededDatasets[workspaceId] ?? [])
+        .filter((dataset) => Boolean(dataset.review?.issueCount))
+        .map((dataset) => dataset.id),
+    );
+    const datasets = this.snapshot.auth.datasets.filter((dataset) => open
+      ? reviewableIds.has(dataset.id)
+      : dataset.review?.status === 'Open');
+    if (!datasets.length) {
+      this.publish();
+      return;
+    }
+    datasets.forEach((dataset) => this.setDatasetReviewState(dataset.id, open ? 1 : 0));
+  }
+
+  acceptReviewItem = () => this.setReviewOpen(false);
+  restoreReviewItem = () => this.setReviewOpen(true);
   promotePipeline = () => this.updateCurrentReview({ pipelineVersion: 5 });
   rollbackPipeline = () => this.updateCurrentReview({ pipelineVersion: 4 });
 

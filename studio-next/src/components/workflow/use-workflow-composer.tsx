@@ -9,7 +9,7 @@ import {
 } from '@/components/design-system';
 import { resolveWorkflowTemplate, visibleStarterKeys, workflowRuntimeTemplates, workflowTemplates, type WorkflowTemplateKey } from '@/lib/workflow/templates';
 import { can, useCapability, useStudio, type DatasetRecord } from '@/lib/data';
-import { uniqueDatasetIdentity } from '@/lib/dataset-slug';
+import { datasetSlug } from '@/lib/dataset-slug';
 import { fieldTypeRecord, inferFieldType, inferFieldTypes, normalizeFieldName, type FieldType } from '@/lib/workflow/fields';
 import { inferWorkflowTemplate, parsePromptSpecification } from '@/lib/workflow/prompt-parser';
 import { sourceDisplayLabel, sourceDomain } from '@/lib/web/source-domain';
@@ -536,11 +536,17 @@ function WorkflowComposerContent({ initialTemplate, initialInput, initialPrompt 
   }
 
   function saveDataset(records?: DatasetRecord[], savedFields?: string[]) {
-    const dataset = uniqueDatasetIdentity(effectiveWorkflowName, auth.datasets.map((item) => item.id));
+    const existingDataset = auth.datasets.find((item) => item.title === effectiveWorkflowName);
+    const currentVersion = Number(existingDataset?.version.match(/V(\d+)/i)?.[1] ?? 0);
+    const dataset = {
+      id: existingDataset?.id ?? datasetSlug(effectiveWorkflowName),
+      title: effectiveWorkflowName,
+      version: currentVersion + 1,
+    };
     const needsReview = promptSpecification.domains.length === 0 && runtimeTemplate.needsReviewWithoutDomains && (!runtimeTemplate.waitsForDecisionWithoutDomains || !researchResolved);
     auth.addDataset({
       id: dataset.id,
-      version: 'DATASET · V1',
+      version: `DATASET · V${dataset.version}`,
       title: dataset.title,
       detail: `${reviewedRecordCount} ${reviewedRecordCount === 1 ? 'record' : 'records'} · ${fieldCount} fields${needsReview ? ' · 1 unresolved' : ' · fully validated'}`,
       status: needsReview ? 'Needs review' : 'Validated',

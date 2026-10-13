@@ -5,6 +5,7 @@ import { useRef } from 'react';
 import { Button } from '@/components/design-system';
 import { Sheet, SheetClose, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { ActionBar } from './action-bar';
+import { ReviewDecisionControls } from './review-decision-controls';
 
 export type EvidenceDetail = {
   field: string;
@@ -16,71 +17,114 @@ export type EvidenceDetail = {
   kind?: 'pricing' | 'product';
 };
 
-export function EvidencePanel({ evidence, onClose }: { evidence: EvidenceDetail | null; onClose: () => void }) {
+export function EvidencePanel({
+  evidence,
+  onClose,
+  reviewDatasetId,
+}: {
+  evidence: EvidenceDetail | null;
+  onClose: () => void;
+  reviewDatasetId?: string;
+}) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
 
   return (
     <Sheet open={Boolean(evidence)} onOpenChange={(open) => { if (!open) onClose(); }}>
-      {evidence ? <SheetContent
-        side="right"
-        className="evidence-side-panel"
-        onOpenAutoFocus={(event) => {
-          event.preventDefault();
-          openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-          titleRef.current?.focus();
-        }}
-        onCloseAutoFocus={(event) => {
-          event.preventDefault();
-          openerRef.current?.focus();
-        }}
-      >
-        <header>
-          <div>
-            <span className="mono-label">Field evidence</span>
-            <SheetTitle asChild>
-              <h2 ref={titleRef} tabIndex={-1}>{evidence.record} · {evidence.field}</h2>
-            </SheetTitle>
-          </div>
-          <SheetClose asChild>
-            <Button variant="ghost" size="icon" aria-label="Close evidence"><X size={18} /></Button>
-          </SheetClose>
-        </header>
-        <div className="evidence-panel-body">
-          <section>
-            <span className="mono-label">Supporting quote</span>
-            <blockquote>“{evidence.quote}”</blockquote>
-          </section>
-          <section>
-            <span className="mono-label">Source URL</span>
-            <a className="text-link" href={evidence.sourceUrl} target="_blank" rel="noreferrer">{evidence.sourceUrl} ↗</a>
-          </section>
-          <section>
-            <span className="mono-label">Capture thumbnail</span>
-            <div className={`evidence-capture-thumbnail ${evidence.kind === 'product' ? 'product' : 'pricing'}`}>
-              <div><i /><i /><i /></div>
-              <strong>{evidence.captureLabel}</strong>
-              <small>{evidence.quote}</small>
+      {evidence ? (
+        <SheetContent
+          side="right"
+          className="evidence-side-panel"
+          onOpenAutoFocus={(event) => {
+            event.preventDefault();
+            openerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+            titleRef.current?.focus();
+          }}
+          onCloseAutoFocus={(event) => {
+            event.preventDefault();
+            openerRef.current?.focus();
+          }}
+        >
+          <header>
+            <div>
+              <span className="mono-label">
+                Field evidence
+              </span>
+              <SheetTitle asChild>
+                <h2 ref={titleRef} tabIndex={-1}>
+                  {evidence.record} · {evidence.field}
+                </h2>
+              </SheetTitle>
             </div>
-          </section>
-        </div>
-        <ActionBar
-          status="Evidence retained"
-          summary={`${evidence.record} · ${evidence.field}`}
-          secondary={(
             <SheetClose asChild>
-              <Button variant="secondary">Close</Button>
+              <Button variant="ghost" size="icon" aria-label="Close evidence">
+                <X size={18} />
+              </Button>
             </SheetClose>
-          )}
-          primary={(
-            <Button variant="primary" asChild>
-              <a href={evidence.sourceUrl} target="_blank" rel="noreferrer">
-                Open source
+          </header>
+          <div className="evidence-panel-body">
+            <section>
+              <span className="mono-label">
+                Supporting quote
+              </span>
+              <blockquote>
+                “{evidence.quote}”
+              </blockquote>
+            </section>
+            <section>
+              <span className="mono-label">
+                Source URL
+              </span>
+              <a className="text-link" href={evidence.sourceUrl} target="_blank" rel="noreferrer">
+                {evidence.sourceUrl} ↗
               </a>
-            </Button>
+            </section>
+            <section>
+              <span className="mono-label">
+                Capture thumbnail
+              </span>
+              <div className={`evidence-capture-thumbnail ${evidence.kind === 'product' ? 'product' : 'pricing'}`}>
+                <div>
+                  <i />
+                  <i />
+                  <i />
+                </div>
+                <strong>
+                  {evidence.captureLabel}
+                </strong>
+                <small>
+                  {evidence.quote}
+                </small>
+              </div>
+            </section>
+          </div>
+          {reviewDatasetId ? (
+            <ReviewDecisionControls
+              datasetId={reviewDatasetId}
+              mode="action-bar"
+            />
+          ) : (
+            <ActionBar
+              status="Evidence retained"
+              summary={`${evidence.record} · ${evidence.field}`}
+              secondary={(
+                <SheetClose asChild>
+                  <Button variant="secondary">
+                    Close
+                  </Button>
+                </SheetClose>
+              )}
+              primary={(
+                <Button variant="primary" asChild>
+                  <a href={evidence.sourceUrl} target="_blank" rel="noreferrer">
+                    Open source
+                  </a>
+                </Button>
+              )}
+            />
           )}
-        />
-      </SheetContent> : null}
+        </SheetContent>
+      ) : null}
     </Sheet>
   );
 }

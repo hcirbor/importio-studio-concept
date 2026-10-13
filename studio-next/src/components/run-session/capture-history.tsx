@@ -3,7 +3,11 @@
 import { useState } from 'react';
 import {
   Button,
-  DialogFooter,
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  CardTitle,
 } from '@/components/design-system';
 import { StatusTag } from '@/components/status-tag';
 import { useCapability, type RunPresentation as Scenario } from '@/lib/data';
@@ -25,30 +29,38 @@ export function CaptureHistory({
   const recording = useCapability('capture-recording');
 
   return (
-    <section className="panel capture-history">
-      <div className="section-head compact-section-head">
-        <h2>Capture history</h2>
-        <span className="mono-label">{stepDefinitions.length} retained captures</span>
-      </div>
-      <div className="capture-strip" role="region" aria-label="Capture history" tabIndex={0}>
-        {workerSteps(scenario.workers[workerIndex]).map((capture, index) => (
-          <div
-            inert
-            aria-hidden="true"
-            className={index === step ? 'active' : ''}
-            key={capture.title}
-          >
-            <ProductFrame
-              worker={scenario.workers[workerIndex]}
-              step={index}
-              scenario={scenario}
-              onCookieDecision={onCookieDecision}
-            />
-            <span>{capture.duration} · {capture.title}</span>
-          </div>
-        ))}
-      </div>
-      <DialogFooter role="group" aria-label="Capture actions">
+    <Card className="capture-history">
+      <CardHeader>
+        <CardTitle>
+          Capture history
+        </CardTitle>
+        <span className="mono-label">
+          {stepDefinitions.length} retained captures
+        </span>
+      </CardHeader>
+      <CardContent>
+        <div className="capture-strip" role="region" aria-label="Capture history" tabIndex={0}>
+          {workerSteps(scenario.workers[workerIndex]).map((capture, index) => (
+            <div
+              inert
+              aria-hidden="true"
+              className={index === step ? 'active' : ''}
+              key={capture.title}
+            >
+              <ProductFrame
+                worker={scenario.workers[workerIndex]}
+                step={index}
+                scenario={scenario}
+                onCookieDecision={onCookieDecision}
+              />
+              <span>
+                {capture.duration} · {capture.title}
+              </span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+      <CardFooter role="group" aria-label="Capture actions">
         <span className="capability-control">
           <Button
             variant="secondary"
@@ -83,10 +95,12 @@ export function CaptureHistory({
           </Button>
           <StatusTag capabilityId="capture-recording" />
         </span>
-      </DialogFooter>
+      </CardFooter>
       {artefact ? (
-        <span role="status" className="muted">{artefact}</span>
+        <span role="status" className="muted">
+          {artefact}
+        </span>
       ) : null}
-    </section>
+    </Card>
   );
 }

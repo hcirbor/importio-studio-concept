@@ -18,6 +18,7 @@ import {
   Eyebrow,
 } from '@/components/design-system';
 import { ActionBar } from './action-bar';
+import { ReviewDecisionControls } from './review-decision-controls';
 import { RunSession, type RunSessionHandle } from './run-session';
 import { RunDetailAction } from './run-detail-action';
 import { useStudio, type WorkspaceRun } from '@/lib/data';
@@ -78,7 +79,7 @@ export function RunDetail({ id }: { id: string }) {
       workspaceRun.records,
     ],
     actionHref,
-    actionLabel: workspaceRun.state === 'Completed' ? 'Review data' : undefined,
+    actionLabel: workspaceRun.state === 'Completed' ? 'Open dataset' : undefined,
   } : null;
   const displayRun = workspaceDetail ?? unavailableRun;
   const fromReview = searchParams.get('from') === 'review';
@@ -91,8 +92,8 @@ export function RunDetail({ id }: { id: string }) {
 
   return (
     <div className="page">
-      <Link href="/runs" className="back-link">
-        ← Runs
+      <Link href={fromReview ? '/review' : '/runs'} className="back-link">
+        {fromReview ? '← Review' : '← Runs'}
       </Link>
       <header className="page-head run-detail-heading">
         <div>
@@ -101,7 +102,13 @@ export function RunDetail({ id }: { id: string }) {
           <p>{displayRun.description}</p>
         </div>
         <div>
-          <Badge tone={displayRun.tone}>{displayRun.badge}</Badge>
+          {needsReview ? (
+            <Link href="/review">
+              <Badge tone="warning">Needs review</Badge>
+            </Link>
+          ) : (
+            <Badge tone={displayRun.tone}>{displayRun.badge}</Badge>
+          )}
           <DialogFooter>
             <Button variant="secondary" size="sm" onClick={() => setApiOpen(true)}>
               Get API code
@@ -185,44 +192,49 @@ export function RunDetail({ id }: { id: string }) {
         showNeedsInputNotice={false}
         showExpandAction={false}
       />
-      <ActionBar
-        status={needsInput
-          ? 'Input required'
-          : needsReview
-            ? `${dataset?.review?.field} needs review`
-            : displayRun.status === 'completed'
-              ? 'Ready to review'
-              : displayRun.badge}
-        summary={needsInput?.summary
-          ?? dataset?.review?.summary
-          ?? 'Review the supported records and retained evidence.'}
-        secondary={fromReview ? (
-          <Button variant="secondary" asChild>
-            <Link href="/review">Back to review</Link>
-          </Button>
-        ) : needsInput ? (
-          <RunDetailAction
-            status={displayRun.status}
-            runId={currentId}
-          />
-        ) : undefined}
-        primary={needsInput ? (
-          <Button variant="primary" onClick={resolveInputs}>
-            Resolve inputs ({needsInput.count})
-          </Button>
-        ) : needsReview ? (
-          <Button variant="primary" asChild>
-            <Link href={displayRun.actionHref ?? '/datasets'}>Review data</Link>
-          </Button>
-        ) : (
-          <RunDetailAction
-            status={displayRun.status}
-            runId={currentId}
-            href={displayRun.actionHref}
-            label={displayRun.actionLabel}
-          />
-        )}
-      />
+      {fromReview && needsReview && dataset ? (
+        <ReviewDecisionControls
+          datasetId={dataset.id}
+          mode="action-bar"
+        />
+      ) : (
+        <ActionBar
+          status={needsInput
+            ? 'Input required'
+            : needsReview
+              ? `${dataset?.review?.field} needs review`
+              : displayRun.status === 'completed'
+                ? 'Ready to review'
+                : displayRun.badge}
+          summary={needsInput?.summary
+            ?? dataset?.review?.itemDescription
+            ?? 'Review the supported records and retained evidence.'}
+          secondary={needsInput ? (
+            <RunDetailAction
+              status={displayRun.status}
+              runId={currentId}
+            />
+          ) : undefined}
+          primary={needsInput ? (
+            <Button variant="primary" onClick={resolveInputs}>
+              Resolve inputs ({needsInput.count})
+            </Button>
+          ) : needsReview ? (
+            <Button variant="primary" asChild>
+              <Link href={displayRun.actionHref ?? '/datasets'}>
+                Open dataset
+              </Link>
+            </Button>
+          ) : (
+            <RunDetailAction
+              status={displayRun.status}
+              runId={currentId}
+              href={displayRun.actionHref}
+              label={displayRun.actionLabel}
+            />
+          )}
+        />
+      )}
     </div>
   );
 }

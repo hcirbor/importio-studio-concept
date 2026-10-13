@@ -199,10 +199,10 @@ main { min-width: 0; padding: 38px 34px 64px; }
 .run-filters { display: grid; grid-template-columns: repeat(3, minmax(130px, 1fr)) minmax(190px, 1.2fr) auto; gap: 10px; align-items: end; padding: 14px; }
 .run-filters label select, .run-filters label input { display: block; width: 100%; margin-top: 6px; }
 .dataset-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
-.dataset-card { padding: 20px; }
+.dataset-card { min-height: 210px; display: flex; flex-direction: column; padding: var(--io-space-5); }
 .dataset-card h2 { margin: 12px 0 8px; font-size: 19px; font-weight: 600; letter-spacing: -.015em; }
 .dataset-card p { color: var(--io-color-muted); font-size: 13px; font-weight: 500; line-height: 1.55; }
-.dataset-card footer { display: flex; align-items: center; justify-content: space-between; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--io-color-border); }
+.dataset-card footer { display: flex; align-items: center; justify-content: space-between; margin-top: auto; padding-top: var(--io-space-4); border-top: 1px solid var(--io-color-border); }
 .dataset-card footer a, .dataset-card footer button { font-weight: 600; }
 .monitor-note { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: 18px; }
 .monitor-note p { margin: 5px 0 0; color: var(--io-color-muted); }
@@ -289,7 +289,7 @@ main { min-width: 0; padding: 38px 34px 64px; }
 .replay-controls input { width: 100%; accent-color: var(--io-color-primary); }
 .icon-play { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--io-color-border); border-radius: 50%; background: var(--io-color-surface); }
 .capture-history { margin-top: 12px; }
-.capture-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, .33fr); gap: 10px; overflow-x: auto; padding: 14px; }
+.capture-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(220px, .33fr); gap: var(--io-space-3); overflow-x: auto; }
 .capture-strip > [role='button'] { overflow: hidden; padding: 0; border: 1px solid var(--io-color-border); border-radius: 8px; background: var(--io-color-surface); text-align: left; cursor: pointer; }
 .capture-strip > [role='button'].active { border-color: var(--io-color-primary); box-shadow: 0 0 0 2px var(--io-color-selected); }
 .capture-strip .browser-frame { min-height: 130px; padding: 8px; pointer-events: none; }
