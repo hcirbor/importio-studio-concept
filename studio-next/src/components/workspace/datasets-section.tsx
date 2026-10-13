@@ -3,7 +3,14 @@
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import { useState } from 'react';
-import { Button, Eyebrow } from '@/components/design-system';
+import {
+  Button,
+  Card,
+  CardContent,
+  CardFooter,
+  CardHeader,
+  Eyebrow,
+} from '@/components/design-system';
 import { useStudio } from '@/lib/data';
 import { DatasetExportMenu } from '../dataset-export-menu';
 import { EnrichmentsSection } from './library-sections';
@@ -85,11 +92,17 @@ export function DatasetsSection() {
           </Toolbar>
           <section className="dataset-cards">
             {visibleDatasets.map((dataset) => (
-              <article className="panel dataset-card" key={dataset.id}>
-                <Eyebrow>{dataset.version.replace('DATASET · ', 'Dataset ')}</Eyebrow>
-                <h2>{dataset.title}</h2>
-                <p>{dataset.detail}</p>
-                <footer>
+              <Card className="dataset-card" role="article" key={dataset.id}>
+                <CardHeader>
+                  <div>
+                    <Eyebrow>{dataset.version.replace('DATASET · ', 'Dataset ')}</Eyebrow>
+                    <h2>{dataset.title}</h2>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <p>{dataset.detail}</p>
+                </CardContent>
+                <CardFooter>
                   {dataset.review?.status === 'Open' ? (
                     <Link href="/review">
                       <Status tone="warning">Needs review</Status>
@@ -100,8 +113,8 @@ export function DatasetsSection() {
                   <Button variant="secondary" size="sm" asChild>
                     <Link href={`/datasets/${dataset.id}`}>Open</Link>
                   </Button>
-                </footer>
-              </article>
+                </CardFooter>
+              </Card>
             ))}
           </section>
         </>

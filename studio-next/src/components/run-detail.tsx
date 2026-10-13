@@ -9,6 +9,7 @@ import {
   Button,
   Card,
   CardContent,
+  CardHeader,
   Dialog,
   DialogContent,
   DialogDescription,
@@ -163,8 +164,8 @@ export function RunDetail({ id }: { id: string }) {
         </Card>
       </section>
       {workspaceRun?.domainQueue?.length ? (
-        <section className="panel domain-queue">
-          <div className="section-head">
+        <Card className="domain-queue">
+          <CardHeader>
             <div>
               <h2>Domain queue</h2>
               <p>Large runs stay bounded per domain.</p>
@@ -172,18 +173,20 @@ export function RunDetail({ id }: { id: string }) {
             <Badge tone={workspaceRun.domainQueue.every((item) => item.status === 'Complete') ? 'success' : 'info'}>
               {workspaceRun.domainQueue.length} {workspaceRun.domainQueue.length === 1 ? 'domain' : 'domains'}
             </Badge>
-          </div>
-          {workspaceRun.domainQueue.map((item) => (
-            <div className="domain-queue-row" key={item.domain}>
-              <span>
-                <strong>{item.domain}</strong>
-                <small>{item.scope}</small>
-              </span>
-              <span>{item.progress}</span>
-              <Badge tone={item.status === 'Complete' ? 'success' : 'info'}>{item.status}</Badge>
-            </div>
-          ))}
-        </section>
+          </CardHeader>
+          <CardContent>
+            {workspaceRun.domainQueue.map((item) => (
+              <div className="domain-queue-row" key={item.domain}>
+                <span>
+                  <strong>{item.domain}</strong>
+                  <small>{item.scope}</small>
+                </span>
+                <span>{item.progress}</span>
+                <Badge tone={item.status === 'Complete' ? 'success' : 'info'}>{item.status}</Badge>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
       ) : null}
       <RunSession
         ref={runSession}

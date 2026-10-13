@@ -151,9 +151,6 @@ export function PipelineRepairSummary({ pipelineId }: { pipelineId: string }) {
           <CardTitle>{repair.title}</CardTitle>
           <CardDescription>{repair.summary}</CardDescription>
         </div>
-        <Button variant="secondary" asChild>
-          <Link href={`/pipelines/${pipelineId}/repair`}>Review repair</Link>
-        </Button>
       </CardHeader>
     </Card>
   );

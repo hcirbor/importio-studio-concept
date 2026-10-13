@@ -35,7 +35,7 @@ export function PipelineDetail() {
     setMessage(`${name} ${name === 'Webhook' ? 'configuration opened' : 'connected for this demo session'}.`);
   };
   return (
-    <div className="page">
+    <div className="page pipeline-detail-page">
       <header className="page-head">
         <Link href="/pipelines" className="text-link">
           ← Pipelines

@@ -121,6 +121,46 @@ test('review state belongs to the affected run and the decision stays in the inb
   await expect(page.getByText('Issues').first()).toBeVisible();
 });
 
+for (const viewport of [
+  { name: 'desktop', width: 1440, height: 900 },
+  { name: 'mobile', width: 375, height: 812 },
+] as const) {
+  test(`review and pipeline actions remain inside their layouts at ${viewport.name}`, async ({ page }) => {
+    await page.setViewportSize({ width: viewport.width, height: viewport.height });
+    await page.goto('/runs/run_7f3a?worker=trail-shop&step=2&from=review');
+    await waitForStudio(page);
+
+    const reviewItem = page.locator('.session-timeline li.review');
+    const openReview = reviewItem.getByRole('link', { name: /Open review/ });
+    await expect(openReview).toHaveAttribute('href', '/review?dataset=competitor-prices');
+    const [itemBox, linkBox] = await Promise.all([reviewItem.boundingBox(), openReview.boundingBox()]);
+    expect(itemBox).not.toBeNull();
+    expect(linkBox).not.toBeNull();
+    expect(linkBox!.x).toBeGreaterThanOrEqual(itemBox!.x);
+    expect(linkBox!.y).toBeGreaterThanOrEqual(itemBox!.y);
+    expect(linkBox!.x + linkBox!.width).toBeLessThanOrEqual(itemBox!.x + itemBox!.width);
+    expect(linkBox!.y + linkBox!.height).toBeLessThanOrEqual(itemBox!.y + itemBox!.height);
+
+    const timeline = page.locator('.timeline-panel');
+    const reviewBadge = timeline.getByText('1 to review', { exact: true });
+    await expect(reviewBadge).toBeVisible();
+    await expect(reviewBadge).toHaveCSS('white-space', 'nowrap');
+
+    await page.goto('/pipelines/competitor-prices');
+    await waitForStudio(page);
+    await expect(page.getByRole('link', { name: 'Review repair' })).toHaveCount(1);
+    await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
+
+    const recentVersions = page.getByRole('heading', { name: 'Recent versions' }).locator('..').locator('..');
+    const lastVersionRow = recentVersions.locator('tbody tr').last();
+    const actionBar = page.getByRole('region', { name: 'Page actions' });
+    const [rowBox, actionBox] = await Promise.all([lastVersionRow.boundingBox(), actionBar.boundingBox()]);
+    expect(rowBox).not.toBeNull();
+    expect(actionBox).not.toBeNull();
+    expect(rowBox!.y + rowBox!.height).toBeLessThanOrEqual(actionBox!.y);
+  });
+}
+
 test('re-running Research versions one dataset instead of creating a copy', async ({ page }) => {
   async function runAndSaveResearch() {
     await page.goto('/build?template=research');
