@@ -1,6 +1,6 @@
 # Studio × CiteOtter — Build plan
 
-Owner: Rob Richardson · Started: 12 Oct 2026 · Revision 4 · Status: Phase 1 complete
+Owner: Rob Richardson · Started: 12 Oct 2026 · Revision 4 · Status: Phase 3B complete
 
 Repository root: `Import Studio/` · Application root: `studio-next/` (run all npm commands there)
 
@@ -116,6 +116,7 @@ Already carried over under new names: Memories → Runs › Saved · Groups → 
 - **Review reports** are saved in `studio-next/docs/reviews/YYYY-MM-DD-phase-N.md`.
 - **Reviewer for 5R:** ______ (the engineer when back, otherwise whoever covers for him)
 - **Carried forward:** `use-workflow-composer.tsx` (600 lines) and re-export shims → Phase 4A; NavTabs design-system component → Phase 3B.
+- **3B polish for a later pass:** 375px top-bar breadcrumb crowding (app shell); run-detail header badge and buttons wrap at 375px; Domain queue card title styling; version labels use lowercase v (`Dataset · v4`); fictional `.example` source/evidence links should open retained internal evidence instead of navigating to an unreachable external domain.
 
 ## Design-system dependency (decide before Phase 1)
 
@@ -169,3 +170,4 @@ Rows are added by receipt commits after each phase.
 | 2026-10-12 | Phase 2R — Code review + cleanup, part B1 | `cleanup-1` | `6a7e100` | Yes — demo | Live `/build-info.json`: commit `6a7e1000d681c47cc4f7792d2dd00953a308f9e7`; tag `cleanup-1`; source `mock`; no `dirty` field | Sites version 37. PR [#4](https://github.com/hcirbor/importio-studio-concept/pull/4); CI [38288270768](https://github.com/hcirbor/importio-studio-concept/actions/runs/38288270768) passed. Quality and axe baselines reduced to 0; 48 unit and 66 Playwright tests passed with 0 visual differences. |
 | 2026-10-12 | Phase 2R — Code review + cleanup, part B2 | `cleanup-2` | `6f827d4` | Yes — demo | Live `/build-info.json`: commit `6f827d40b6a0aa7b0c1ec372768014c56247e511`; tag `cleanup-2`; source `mock`; no `dirty` field | Sites version 38. PR [#5](https://github.com/hcirbor/importio-studio-concept/pull/5); CI [38293455862](https://github.com/hcirbor/importio-studio-concept/actions/runs/38293455862) passed. Component splits and extended axe coverage landed with 0 visual differences. |
 | 2026-10-13 | Phase 3 — Status labels | `status-tags` | `8beea7f` | Yes — demo | Live `/build-info.json`: commit `8beea7f67b59f06679fed1ba41fd029c0078185d`; tag `status-tags`; source `mock`; no `dirty` field | Sites version 39. PR [#6](https://github.com/hcirbor/importio-studio-concept/pull/6); CI [38361899124](https://github.com/hcirbor/importio-studio-concept/actions/runs/38361899124) passed. Labels remain off on the demo with the `demo` capability profile; 50 unit, 74 default Playwright, 8 labelled, and 1 restricted-profile tests passed. Existing labels-off baselines were unchanged. |
+| 2026-10-13 | Phase 3B — Feature parity with the HTML concept | `parity-1` | `54b0b91` | Yes — demo | Live `/build-info.json`: commit `54b0b910e86da20e9105a150bbc1ecad155e9da7`; tag `parity-1`; source `mock`; no `dirty` field | Sites version 40. PR [#7](https://github.com/hcirbor/importio-studio-concept/pull/7); CI [38436302920](https://github.com/hcirbor/importio-studio-concept/actions/runs/38436302920) passed. 58 unit, 110 default Playwright, 10 labelled, and 1 restricted-profile tests passed. Final correction changed only the dataset desktop/mobile baselines on Darwin and Linux. |
