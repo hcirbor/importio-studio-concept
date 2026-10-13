@@ -17,16 +17,23 @@ async function openCollectLimits(page: Page) {
 test('coming-soon controls expose their note to pointer and keyboard', async ({ page }) => {
   await page.goto('/build?template=collect');
   const browserActions = page.getByRole('button', { name: 'Browser actions' });
-  const tag = page.getByRole('button', { name: 'Coming soon' }).first();
+  await expect(page.getByRole('button', { name: 'Coming soon' })).toHaveCount(0);
+  await browserActions.click();
+  const panel = page.locator('#workflow-tool-panel');
+  await expect(panel.getByRole('heading', { name: 'Browser actions' })).toBeVisible();
+  const tag = panel.getByRole('button', { name: 'Coming soon' });
   await expect(tag).toBeVisible();
-  await tag.focus();
   const note = page.getByRole('tooltip').filter({ hasText: "Clicks, forms and logins aren't available yet." });
   await expect(note).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(note).toBeHidden();
   await expect(tag).toBeFocused();
-  await browserActions.click();
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
   await expect(note).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(note).toBeHidden();
+  await expect(tag).toBeFocused();
   await expectAccessible(page, 'labelled builder');
 });
 

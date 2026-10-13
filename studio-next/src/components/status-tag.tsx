@@ -19,8 +19,8 @@ export function StatusTag({ capabilityId, open, onOpenChange }: { capabilityId: 
     const closeOnEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       event.preventDefault();
-      setOpen(false);
       triggerRef.current?.focus();
+      setOpen(false);
     };
     document.addEventListener('keydown', closeOnEscape);
     return () => document.removeEventListener('keydown', closeOnEscape);

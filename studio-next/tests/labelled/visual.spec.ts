@@ -9,7 +9,8 @@ async function ready(page: Page, path: string) {
 
 test('labelled builder', async ({ page }) => {
   await ready(page, '/build?template=collect');
-  await page.getByRole('button', { name: 'Limits' }).click();
+  await page.getByRole('button', { name: 'Browser actions' }).click();
+  await page.keyboard.press('Escape');
   await expect(page).toHaveScreenshot('labelled-builder.png');
 });
 
