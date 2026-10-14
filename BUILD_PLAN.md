@@ -116,6 +116,7 @@ Already carried over under new names: Memories → Runs › Saved · Groups → 
 - **Review reports** are saved in `studio-next/docs/reviews/YYYY-MM-DD-phase-N.md`.
 - **Reviewer for 5R:** ______ (the engineer when back, otherwise whoever covers for him)
 - **Carried forward:** `use-workflow-composer.tsx` (600 lines) and re-export shims → Phase 4A; NavTabs design-system component → Phase 3B.
+- **Carried forward → Phase 5:** Task validator: restrict `allowed_actions` to read-only actions and require `allowed_origins` to be public HTTPS.
 - **3B polish for a later pass:** 375px top-bar breadcrumb crowding (app shell); run-detail header badge and buttons wrap at 375px; Domain queue card title styling; version labels use lowercase v (`Dataset · v4`); fictional `.example` source/evidence links should open retained internal evidence instead of navigating to an unreachable external domain.
 
 ## Design-system dependency (decide before Phase 1)
