@@ -3,7 +3,15 @@ import 'server-only';
 import { readFile } from 'node:fs/promises';
 import type { ExecutionFailure, ExecutionFailureCode } from '@/lib/data/execution-contract';
 import { readGatewayConfig, type GatewayConfig } from '@/lib/server/gateway-config';
-import { validateGatewayLimits, type JsonObject } from '@/lib/server/request-limits';
+import {
+  validateEnrichmentRequest,
+  validateMonitorRequest,
+  validateMonitorStateRequest,
+  validateSearchRequest,
+  validateTaskRequest,
+  type JsonObject,
+  type RequestValidator,
+} from '@/lib/server/request-limits';
 
 const MAX_REQUEST_BYTES = 1_000_000;
 const MAX_RESPONSE_BYTES = 5_000_000;
@@ -11,31 +19,39 @@ const MAX_RESPONSE_BYTES = 5_000_000;
 type RouteRule = {
   method: string;
   pattern: RegExp;
-  upstreamPath: (match: RegExpMatchArray) => string;
+  upstreamPath: (match: RegExpMatchArray, body?: JsonObject) => string;
   idGroups?: readonly number[];
   query?: readonly ('limit' | 'cursor')[];
   responseKind?: 'json' | 'export';
-  validatesLimits?: boolean;
+  validator?: RequestValidator;
+  forwardsBody?: boolean;
 };
 
 const ROUTES: readonly RouteRule[] = [
   { method: 'GET', pattern: /^tasks$/, upstreamPath: () => '/v1/tasks', query: ['limit', 'cursor'] },
-  { method: 'POST', pattern: /^tasks$/, upstreamPath: () => '/v1/tasks', validatesLimits: true },
-  { method: 'POST', pattern: /^tasks\/validate$/, upstreamPath: () => '/v1/tasks/validate', validatesLimits: true },
+  { method: 'POST', pattern: /^tasks$/, upstreamPath: () => '/v1/tasks', validator: validateTaskRequest },
+  { method: 'POST', pattern: /^tasks\/validate$/, upstreamPath: () => '/v1/tasks/validate', validator: validateTaskRequest },
   { method: 'GET', pattern: /^tasks\/([^/]+)$/, upstreamPath: (match) => `/v1/tasks/${match[1] ?? ''}`, idGroups: [1] },
   { method: 'GET', pattern: /^tasks\/([^/]+)\/events$/, upstreamPath: (match) => `/v1/tasks/${match[1] ?? ''}/events`, idGroups: [1], query: ['limit', 'cursor'] },
   { method: 'POST', pattern: /^tasks\/([^/]+)\/cancel$/, upstreamPath: (match) => `/v1/tasks/${match[1] ?? ''}/cancel`, idGroups: [1] },
-  { method: 'POST', pattern: /^search$/, upstreamPath: () => '/v1/search', validatesLimits: true },
+  { method: 'POST', pattern: /^search$/, upstreamPath: () => '/v1/search', validator: validateSearchRequest },
   { method: 'GET', pattern: /^enrichments$/, upstreamPath: () => '/v1/enrichments', query: ['limit', 'cursor'] },
-  { method: 'POST', pattern: /^enrichments$/, upstreamPath: () => '/v1/enrichments', validatesLimits: true },
+  { method: 'POST', pattern: /^enrichments$/, upstreamPath: () => '/v1/enrichments', validator: validateEnrichmentRequest },
   { method: 'GET', pattern: /^enrichments\/([^/]+)$/, upstreamPath: (match) => `/v1/enrichments/${match[1] ?? ''}`, idGroups: [1] },
   { method: 'GET', pattern: /^enrichments\/([^/]+)\/export$/, upstreamPath: (match) => `/v1/enrichments/${match[1] ?? ''}/export`, idGroups: [1], responseKind: 'export' },
   { method: 'GET', pattern: /^monitors$/, upstreamPath: () => '/v1/monitors', query: ['limit', 'cursor'] },
-  { method: 'POST', pattern: /^monitors$/, upstreamPath: () => '/v1/monitors', validatesLimits: true },
-  { method: 'POST', pattern: /^monitors\/validate$/, upstreamPath: () => '/v1/monitors/validate', validatesLimits: true },
+  { method: 'POST', pattern: /^monitors$/, upstreamPath: () => '/v1/monitors', validator: validateMonitorRequest },
+  { method: 'POST', pattern: /^monitors\/validate$/, upstreamPath: () => '/v1/monitors/validate', validator: validateMonitorRequest },
   { method: 'GET', pattern: /^monitors\/([^/]+)$/, upstreamPath: (match) => `/v1/monitors/${match[1] ?? ''}`, idGroups: [1] },
   { method: 'DELETE', pattern: /^monitors\/([^/]+)$/, upstreamPath: (match) => `/v1/monitors/${match[1] ?? ''}`, idGroups: [1] },
-  { method: 'POST', pattern: /^monitors\/([^/]+)\/state$/, upstreamPath: (match) => `/v1/monitors/${match[1] ?? ''}/state`, idGroups: [1], validatesLimits: true },
+  {
+    method: 'POST',
+    pattern: /^monitors\/([^/]+)\/state$/,
+    upstreamPath: (match, body) => `/v1/monitors/${match[1] ?? ''}/${String(body?.state ?? '')}`,
+    idGroups: [1],
+    validator: validateMonitorStateRequest,
+    forwardsBody: false,
+  },
   { method: 'GET', pattern: /^monitors\/([^/]+)\/events$/, upstreamPath: (match) => `/v1/monitors/${match[1] ?? ''}/events`, idGroups: [1], query: ['limit', 'cursor'] },
   { method: 'GET', pattern: /^usage$/, upstreamPath: () => '/v1/usage' },
 ];
@@ -287,17 +303,19 @@ export async function handleGatewayRequest(request: Request, segments: readonly 
   if (query instanceof Response) return query;
 
   let bytes: Uint8Array | undefined;
+  let body: JsonObject | undefined;
   if (!['GET', 'HEAD'].includes(request.method)) {
     const parsed = await readJsonBody(request);
     if (parsed instanceof Response) return parsed;
-    bytes = parsed.bytes;
-    if (route.rule.validatesLimits) {
-      const failures = validateGatewayLimits(parsed.body);
+    body = parsed.body;
+    bytes = route.rule.forwardsBody === false ? undefined : parsed.bytes;
+    if (route.rule.validator) {
+      const failures = route.rule.validator(parsed.body);
       const first = failures[0];
       if (first) return jsonFailure(400, failure('invalid_request', first.message, false, first.path));
     }
   }
-  const upstreamPath = route.rule.upstreamPath(route.match);
+  const upstreamPath = route.rule.upstreamPath(route.match, body);
   return proxyAllowedRequest(request, upstreamPath, bytes, dependencies, route.rule.responseKind, query);
 }
 
@@ -308,14 +326,23 @@ export async function handleSmokeRequest(request: Request, dependencies: Gateway
   if (parsed instanceof Response) return parsed;
   const source = parsed.body.source;
   const fields = Array.isArray(parsed.body.fields) ? parsed.body.fields : [];
+  const fieldNames = fields.filter((field): field is string => typeof field === 'string' && field.length > 0);
+  const schemaFields = fieldNames.length ? fieldNames : ['title'];
   const task: JsonObject = {
+    schema_version: '1',
     workflow: 'extract',
     goal: typeof parsed.body.goal === 'string' ? parsed.body.goal : 'Verify the bounded production extraction path.',
     sources: typeof source === 'string' ? [source] : [],
-    fields,
+    allowed_actions: ['read_page'],
+    output_schema: {
+      type: 'object',
+      properties: Object.fromEntries(schemaFields.map((field) => [field, { type: 'string' }])),
+      required: schemaFields,
+      additionalProperties: false,
+    },
     limits: { max_pages: 1, max_records: 10 },
   };
-  const failures = typeof source === 'string' ? validateGatewayLimits(task) : [{ path: 'source', message: 'One public HTTPS source is required.' }];
+  const failures = typeof source === 'string' ? validateTaskRequest(task) : [{ path: 'source', message: 'One public HTTPS source is required.' }];
   const requestedLimits = typeof parsed.body.limits === 'object' && parsed.body.limits !== null ? parsed.body.limits as JsonObject : {};
   if ((typeof requestedLimits.maxPages === 'number' && requestedLimits.maxPages > 1)
     || (typeof requestedLimits.maxRecords === 'number' && requestedLimits.maxRecords > 10)) {

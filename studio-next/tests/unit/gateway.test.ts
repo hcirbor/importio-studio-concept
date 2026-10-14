@@ -20,6 +20,44 @@ async function errorCode(response: Response): Promise<string> {
   return body.error.code;
 }
 
+const outputSchema = {
+  type: 'object',
+  properties: { title: { type: 'string' } },
+  required: ['title'],
+  additionalProperties: false,
+};
+
+const taskBody = {
+  schema_version: '1', workflow: 'extract', goal: 'Extract the title.',
+  sources: ['https://example.com/page'], allowed_actions: ['read_page'], output_schema: outputSchema,
+  limits: { max_pages: 1, max_steps: 8, max_records: 10, timeout_seconds: 120 },
+};
+const pageMonitorBody = {
+  kind: 'page', goal: 'Watch the title.', source: 'https://example.com/page',
+  output_schema: outputSchema, schedule_minutes: 60, notify: 'on_change',
+};
+const enrichmentBody = {
+  label: 'Company titles', goal: 'Extract the company title.',
+  csv: 'id,url\n1,https://example.com/one\n2,https://example.org/two\n',
+  source_column: 'url', id_column: 'id', output_schema: outputSchema,
+};
+const searchBody = { query: 'company research', seeds: ['https://example.com/start'], max_results: 10, language: 'en' };
+
+function validPostBody(segments: readonly string[]): unknown {
+  if (segments[0] === 'tasks' && segments.length <= 2) return taskBody;
+  if (segments[0] === 'search') return searchBody;
+  if (segments[0] === 'enrichments') return enrichmentBody;
+  if (segments[0] === 'monitors' && segments.at(-1) === 'state') return { state: 'pause' };
+  if (segments[0] === 'monitors' && segments.length <= 2) return pageMonitorBody;
+  return undefined;
+}
+
+async function expectRejected(path: string, segments: readonly string[], body: unknown): Promise<void> {
+  const response = await handleGatewayRequest(request(path, 'POST', body), segments, dependencies);
+  expect(response.status).toBe(400);
+  expect(fake.calls).toHaveLength(0);
+}
+
 beforeEach(async () => {
   fake = await startFakeCiteOtter();
   dependencies = {
@@ -51,9 +89,15 @@ describe('CiteOtter gateway allowlist and credential handling', () => {
     ['POST', ['monitors', 'monitor-1', 'state']], ['GET', ['monitors', 'monitor-1', 'events']],
     ['GET', ['usage']],
   ] as const)('proxies allowlisted %s /%s', async (method, segments) => {
-    const body = method === 'POST' ? { workflow: 'extract', sources: ['https://example.com/page'], limits: { max_pages: 1, max_records: 1 } } : undefined;
+    const body = method === 'POST' ? validPostBody(segments) : undefined;
     const response = await handleGatewayRequest(request(segments.join('/'), method, body), segments, dependencies);
     expect(response.ok).toBe(true);
+  });
+
+  it('translates the monitor state wrapper to CiteOtter pause with no upstream body', async () => {
+    const response = await handleGatewayRequest(request('monitors/monitor-1/state', 'POST', { state: 'pause' }), ['monitors', 'monitor-1', 'state'], dependencies);
+    expect(response.ok).toBe(true);
+    expect(fake.calls[0]).toMatchObject({ path: '/v1/monitors/monitor-1/pause', body: '' });
   });
 
   it('never returns or logs the credential or an upstream error detail', async () => {
@@ -109,19 +153,90 @@ describe('CiteOtter gateway allowlist and credential handling', () => {
 
 describe('gateway validation and failures', () => {
   it.each([
-    [{ workflow: 'extract', sources: ['http://public.example'], limits: { max_pages: 1, max_records: 1 } }, 'source'],
-    [{ workflow: 'extract', sources: ['https://127.0.0.1/page'], limits: { max_pages: 1, max_records: 1 } }, 'source'],
-    [{ workflow: 'extract', sources: ['https://100.64.0.1/page'], limits: { max_pages: 1, max_records: 1 } }, 'source'],
-    [{ workflow: 'collect', sources: ['https://example.com/one', 'https://example.com/two', 'https://example.com/three', 'https://example.com/four'], limits: { max_pages: 3, max_records: 1 } }, 'source'],
-    [{ workflow: 'collect', sources: ['https://example.com/one'], limits: { max_pages: 1, max_records: 11 } }, 'limit'],
-    [{ workflow: 'extract', sources: ['https://example.com'], limits: { maxPages: 1 } }, 'recognised'],
-    [{ workflow: 'extract', sources: ['https://example.com'], max_pages: 1 }, 'recognised'],
-    [{ source: 'https://example.com', notify: 'on_change' }, 'contract field'],
-  ])('rejects unsupported limits', async (body, expectedMessage) => {
-    const response = await handleGatewayRequest(request('tasks', 'POST', body), ['tasks'], dependencies);
-    expect(response.status).toBe(400);
-    expect((await response.text()).toLowerCase()).toContain(expectedMessage);
-    expect(fake.calls).toHaveLength(0);
+    ['tasks', ['tasks'], taskBody],
+    ['monitors', ['monitors'], pageMonitorBody],
+    ['enrichments', ['enrichments'], enrichmentBody],
+    ['search', ['search'], searchBody],
+  ] as const)('accepts a valid %s request and calls upstream once', async (path, segments, body) => {
+    const response = await handleGatewayRequest(request(path, 'POST', body), segments, dependencies);
+    expect(response.ok).toBe(true);
+    expect(fake.calls).toHaveLength(1);
+  });
+
+  it('accepts a topic monitor and notify on_change', async () => {
+    const body = { kind: 'topic', query: 'product launches', schedule_minutes: 10_080, notify: 'on_change' };
+    const response = await handleGatewayRequest(request('monitors', 'POST', body), ['monitors'], dependencies);
+    expect(response.ok).toBe(true);
+    expect(fake.calls).toHaveLength(1);
+  });
+
+  it.each([
+    [{ ...taskBody, limits: { ...taskBody.limits, maxPages: 1 } }],
+    [{ ...taskBody, limits: { ...taskBody.limits, max_pages: 4 } }],
+    [{ ...taskBody, limits: { ...taskBody.limits, max_steps: 31 } }],
+    [{ ...taskBody, limits: { ...taskBody.limits, max_records: 11 } }],
+    [{ ...taskBody, limits: { ...taskBody.limits, timeout_seconds: 301 } }],
+    [{ ...taskBody, max_pages: 1 }],
+  ])('rejects task aliases, unknown fields and bounds without calling upstream', async (body) => {
+    await expectRejected('tasks', ['tasks'], body);
+  });
+
+  it.each([
+    [{ ...pageMonitorBody, scheduleMinutes: 60 }],
+    [{ ...pageMonitorBody, schedule_minutes: 59 }],
+    [{ ...pageMonitorBody, schedule_minutes: 10_081 }],
+    [{ ...pageMonitorBody, notify: 'email' }],
+    [{ ...pageMonitorBody, notify: 'slack' }],
+    [{ ...pageMonitorBody, threshold: 10 }],
+    [{ ...pageMonitorBody, goal: 'x'.repeat(8_001) }],
+    [{ kind: 'topic', query: 'x'.repeat(401), schedule_minutes: 60, notify: 'none' }],
+  ])('rejects unsupported monitor fields, bounds and channels without calling upstream', async (body) => {
+    await expectRejected('monitors', ['monitors'], body);
+  });
+
+  it.each([
+    [{ state: 'active' }],
+    [{ state: 'paused' }],
+    [{ action: 'pause' }],
+  ])('rejects undocumented monitor state requests without calling upstream', async (body) => {
+    await expectRejected('monitors/monitor-1/state', ['monitors', 'monitor-1', 'state'], body);
+  });
+
+  it.each([
+    ['http://example.com/one'],
+    ['https://127.0.0.1/one'],
+    ['https://localhost/one'],
+    ['https://source.example/one'],
+  ])('rejects enrichment source %s without calling upstream', async (source) => {
+    const body = { ...enrichmentBody, csv: `id,url\n1,${source}\n2,https://example.org/two\n` };
+    await expectRejected('enrichments', ['enrichments'], body);
+  });
+
+  it.each([
+    [{ ...enrichmentBody, source_field: 'url' }],
+    [{ ...enrichmentBody, rows: [] }],
+    [{ ...enrichmentBody, limits: { max_pages: 1 } }],
+    [{ ...enrichmentBody, label: 'x'.repeat(201) }],
+    [{ ...enrichmentBody, goal: '' }],
+    [{ ...enrichmentBody, csv: 'id,url\n1,https://example.com/one\n' }],
+    [{ ...enrichmentBody, csv: `id,url\n${Array.from({ length: 11 }, (_, index) => `${index + 1},https://example.com/${index + 1}`).join('\n')}\n` }],
+    [{ ...enrichmentBody, csv: `${Array.from({ length: 21 }, (_, index) => `column_${index}`).join(',')}\n${Array.from({ length: 21 }, (_, index) => index === 1 ? 'https://example.com/one' : 'a').join(',')}\n${Array.from({ length: 21 }, (_, index) => index === 1 ? 'https://example.org/two' : 'b').join(',')}\n`, source_column: 'column_1' }],
+    [{ ...enrichmentBody, csv: `id,url,notes\n1,https://example.com/one,${'x'.repeat(256 * 1024)}\n2,https://example.org/two,ok\n` }],
+  ])('rejects enrichment aliases, unknown fields and row bounds without calling upstream', async (body) => {
+    await expectRejected('enrichments', ['enrichments'], body);
+  });
+
+  it.each([
+    [{ ...searchBody, limit: 5 }],
+    [{ ...searchBody, maxResults: 5 }],
+    [{ ...searchBody, max_results: 21 }],
+    [{ ...searchBody, seeds: ['https://localhost/start'] }],
+    [{ ...searchBody, seeds: ['https://example.com/1', 'https://example.com/2', 'https://example.com/3', 'https://example.com/4'] }],
+    [{ ...searchBody, query: '' }],
+    [{ ...searchBody, query: 'x'.repeat(401) }],
+    [{ ...searchBody, language: 'english' }],
+  ])('rejects search aliases, unknown fields and bounds without calling upstream', async (body) => {
+    await expectRejected('search', ['search'], body);
   });
 
   it.each([
